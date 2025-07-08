@@ -65,6 +65,81 @@ def discover_folders():
             "error": str(e)
         }), 500
 
+@app.route('/api/browse-folders', methods=['POST'])
+def browse_folders():
+    """Browse file system folders"""
+    try:
+        data = request.get_json()
+        path = data.get('path', os.path.expanduser('~'))  # Default to home directory
+        
+        if not os.path.exists(path):
+            return jsonify({
+                "success": False,
+                "error": f"Path does not exist: {path}"
+            }), 400
+        
+        if not os.path.isdir(path):
+            return jsonify({
+                "success": False,
+                "error": f"Path is not a directory: {path}"
+            }), 400
+        
+        try:
+            # Get directory contents
+            items = []
+            
+            # Add parent directory option (except for root)
+            if path != '/':
+                parent_path = os.path.dirname(path)
+                items.append({
+                    'name': '..',
+                    'path': parent_path,
+                    'type': 'parent',
+                    'is_directory': True
+                })
+            
+            # Get all items in directory
+            for item_name in sorted(os.listdir(path)):
+                item_path = os.path.join(path, item_name)
+                
+                # Skip hidden files/folders (starting with .)
+                if item_name.startswith('.'):
+                    continue
+                
+                try:
+                    is_dir = os.path.isdir(item_path)
+                    # Only include directories for folder browsing
+                    if is_dir:
+                        items.append({
+                            'name': item_name,
+                            'path': item_path,
+                            'type': 'directory',
+                            'is_directory': True
+                        })
+                except PermissionError:
+                    # Skip items we can't access
+                    continue
+            
+            return jsonify({
+                "success": True,
+                "data": {
+                    "current_path": path,
+                    "items": items
+                }
+            })
+            
+        except PermissionError:
+            return jsonify({
+                "success": False,
+                "error": f"Permission denied accessing: {path}"
+            }), 403
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/api/organize', methods=['POST'])
 def ai_organize():
     """AI-powered organization endpoint"""

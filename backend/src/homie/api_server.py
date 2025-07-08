@@ -25,8 +25,7 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'message': 'Homie backend is running',
-        'timestamp': datetime.now().isoformat()
+        'message': 'Homie API is running!'
     })
 
 @app.route('/api/discover', methods=['POST'])
@@ -145,10 +144,68 @@ def smart_organize():
         print(f"   Downloads: {downloads_path}")
         print(f"   Sorted: {sorted_path}")
         
-        organizer = SmartOrganizer(api_key)
+        # Reuse existing organizer if same API key, otherwise create new one
+        if (not hasattr(app, 'organizer_instance') or 
+            app.organizer_instance is None or 
+            getattr(app, 'organizer_api_key', None) != api_key):
+            organizer = SmartOrganizer(api_key)
+            app.organizer_instance = organizer
+            app.organizer_api_key = api_key
+        else:
+            organizer = app.organizer_instance
+        
         analysis = organizer.analyze_downloads_folder(downloads_path, sorted_path)
         
-        print(f"✅ AI analysis completed: {analysis['total_files_to_organize']} files analyzed")
+        # Check if the analysis contains quota or other API errors
+        if 'error_type' in analysis:
+            error_type = analysis['error_type']
+            
+            if error_type == 'quota_exceeded':
+                print(f"⚠️  Quota exceeded during AI analysis")
+                return jsonify({
+                    'success': False,
+                    'error_type': 'quota_exceeded',
+                    'error': analysis['error'],
+                    'error_details': analysis['error_details'],
+                    'suggestions': analysis['suggestions'],
+                    'quota_info': analysis.get('quota_info', {}),
+                    'fallback_available': analysis.get('fallback_available', False)
+                }), 429  # 429 Too Many Requests
+                
+            elif error_type == 'auth_error':
+                print(f"🔑 Authentication error during AI analysis")
+                return jsonify({
+                    'success': False,
+                    'error_type': 'auth_error',
+                    'error': analysis['error'],
+                    'error_details': analysis['error_details'],
+                    'suggestions': analysis['suggestions']
+                }), 401  # 401 Unauthorized
+                
+            elif error_type == 'api_error':
+                print(f"🔧 API error during AI analysis")
+                return jsonify({
+                    'success': False,
+                    'error_type': 'api_error',
+                    'error': analysis['error'],
+                    'error_details': analysis['error_details'],
+                    'suggestions': analysis['suggestions'],
+                    'fallback_available': analysis.get('fallback_available', False)
+                }), 502  # 502 Bad Gateway (upstream API error)
+                
+            else:  # generic_error
+                print(f"❌ Generic error during AI analysis")
+                return jsonify({
+                    'success': False,
+                    'error_type': 'generic_error',
+                    'error': analysis['error'],
+                    'error_details': analysis['error_details'],
+                    'suggestions': analysis['suggestions'],
+                    'fallback_available': analysis.get('fallback_available', False)
+                }), 500
+        
+        # Success case
+        print(f"✅ AI analysis completed: {analysis['total_files']} files analyzed")
         
         return jsonify({
             'success': True,
@@ -159,16 +216,31 @@ def smart_organize():
         print(f"❌ Error during AI organization: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error_type': 'server_error',
+            'error': 'Server Error',
+            'error_details': f'An unexpected server error occurred: {str(e)}',
+            'suggestions': [
+                'Try again in a few moments',
+                'Check that all required parameters are provided',
+                'Contact support if the problem persists'
+            ]
         }), 500
 
+
+
 @app.route('/api/status', methods=['GET'])
-def status():
-    """Get current system status"""
+def get_status():
+    """Get system status"""
     return jsonify({
-        'backend_running': True,
-        'version': '0.1.0',
-        'phase': 'Phase 1 - File Discovery'
+        'status': 'running',
+        'version': '1.0.0',
+        'endpoints': [
+            '/api/health',
+            '/api/discover', 
+            '/api/organize',
+            '/api/browse-folders',
+            '/api/status'
+        ]
     })
 
 if __name__ == '__main__':
@@ -176,10 +248,11 @@ if __name__ == '__main__':
     print("=" * 50)
     print("Frontend should connect to: http://localhost:8000")
     print("API endpoints available:")
-    print("  GET  /api/health   - Health check")
-    print("  POST /api/discover - Folder discovery")
-    print("  POST /api/organize - AI-powered organization analysis")
-    print("  GET  /api/status   - System status")
+    print("  GET  /api/health        - Health check")
+    print("  POST /api/discover      - Folder discovery")
+    print("  POST /api/organize      - AI-powered organization analysis")
+    print("  POST /api/browse-folders - File system folder browsing")
+    print("  GET  /api/status        - System status")
     print("-" * 50)
     
     app.run(host='0.0.0.0', port=8000, debug=True)

@@ -1,27 +1,91 @@
 # AI Agent Context - Homie
 
 ## Project Purpose
-Homie is your intelligent home file companion that evolves from a smart file organizer into a complete home media server. It intelligently organizes files, detects duplicates, and ultimately becomes a personal Netflix-like interface for your home server/NAS setup.
+Homie is your comprehensive intelligent home management ecosystem that evolves from a smart file organizer into a complete personal management suite. It includes multiple integrated modules:
+
+### 🗂️ **File Organizer** (Phase 1 - Current)
+- Intelligently organizes files using AI
+- Detects duplicates and suggests optimal folder structures
+- Safe preview mode with rollback capabilities
+
+### 🏠 **Home Server/NAS** (Phase 2)
+- OneDrive-like personal cloud storage replacement
+- File synchronization across devices
+- Remote access and sharing capabilities
+- Multi-device support (Windows, Linux, iOS, Android)
+
+### 🎬 **Media Manager** (Phase 3)
+- Netflix-like interface for personal movie/TV show collection
+- Watch history tracking and recommendations
+- "What to watch next" suggestions
+- IMDB integration for ratings and metadata
+- Progress tracking for series and movies
+
+### 📄 **Document Management** (Phase 4)
+- Organized storage for personal documents
+- Categories: Zeiterfassung (time tracking), Lohnzettel (pay slips), Rechnungen (invoices)
+- Invoice management for dual employment (employee + self-employed in Austria)
+- Document OCR and automatic categorization
+
+### 💰 **Financial Management** (Phase 5)
+- Invoice tracking for Austrian tax requirements (incoming/outgoing)
+- House construction cost tracking and budgeting
+- Credit/loan management and payment predictions
+- Future financial planning and affordability analysis
+- Cash flow predictions for house construction expenses
+
+### 📱 **Mobile-First Design**
+- Primary target: Smartphone application
+- Responsive web interface that works perfectly on mobile
+- Touch-optimized navigation and interactions
+- Dashboard with mini-views of all sections
 
 ## Current Status
-- **Phase**: Phase 1 implementation complete - Web interface working and tested ✅
-- **Priority**: Modernize UI design and integrate AI organization features
+- **Phase**: Phase 1 File Organizer - Web interface working and tested ✅
+- **Priority**: Create main dashboard and mobile-optimized navigation
 - **Location**: `/home/mikele/Projects/Homie`
+- **Target Platform**: Mobile-first responsive web app
 - **Recent Progress**: 
   - ✅ AI-powered file organization with Google Gemini integration
   - ✅ Complete backend system with smart file analysis
   - ✅ Environment configuration with .env setup
   - ✅ Flask API server connecting frontend ↔ backend
-  - ✅ Integrated system architecture (not separate AI service)
+  - ✅ Modern dark theme glassmorphism UI [[memory:2570958]]
   - ✅ Web interface with folder selection and quick paths working
   - ✅ Fixed frontend crashes and connection issues
-  - 🚧 Next: Modernize UI design, integrate AI organization endpoint
+  - ✅ Smart duplicate/redundant archive detection and suggestions
+  - ✅ Document content analysis (OCR, PDF text extraction, Word docs)
+  - ✅ Smart document categorization based on content analysis
+  - ✅ Quota error handling for Gemini API with user-friendly messages
+  - ✅ Enhanced error handling across frontend and backend
+  - 🚧 Next: Create main dashboard with module navigation
 
 ## Key Architecture Principles
 1. **Non-destructive by default** - Always suggest moves, never delete without explicit permission
 2. **User control** - Users can configure automation level and override any decision
 3. **Performance-first** - Designed to handle large file sets efficiently
 4. **Extensible** - Modular design for easy feature additions
+
+## Recent Technical Achievements
+
+### Smart AI Analysis System ✅
+- **Document Processing**: OCR support for scanned PDFs, text extraction from Word docs
+- **Content-Based Categorization**: AI analyzes document content to suggest proper organization
+- **Archive Intelligence**: Detects redundant archives when extracted content already exists
+- **Archive Extraction Suggestions**: Identifies archives that should be extracted for better organization
+
+### Robust Error Handling ✅
+- **Quota Management**: Comprehensive 429 error handling for Gemini API limits
+- **User-Friendly Messaging**: Clear explanations of quota limits and actionable suggestions
+- **API Error Types**: Distinguishes between quota, authentication, API, and generic errors
+- **Frontend Error Display**: Rich error messages with suggestions and quota information
+
+### Backend API Excellence ✅
+- **Folder Discovery**: `/api/discover` - Recursive directory scanning with performance metrics
+- **AI Organization**: `/api/organize` - Smart file organization with confidence scores
+- **Folder Browsing**: `/api/browse-folders` - File system navigation for path selection
+- **Health Monitoring**: `/api/health` - System status and endpoint availability
+- **Error Standards**: Consistent HTTP status codes and structured error responses
 
 ## Architecture Highlights
 
@@ -41,65 +105,30 @@ Homie is your intelligent home file companion that evolves from a smart file org
 - Minimal cloud data sharing
 - User consent for all integrations
 
-## Project Evolution (4 Phases)
-
-### Phase 1: Intelligent File Organization
-- Analyze unsorted folders and discover sorted folder structures
-- Create persistent folder maps to avoid re-scanning
-- Intelligently move files from unsorted to appropriate sorted locations
-- Implement undo/rollback functionality for safety
-
-### Phase 2: Duplicate Detection & Management
-- Scan for duplicate files across all directories (content-based hashing)
-- Detect files with different names but identical content (books, etc.)
-- Provide user interface for duplicate management (delete/keep/rename/move)
-
-### Phase 3: Remote Access
-- REST API development
-- Web interface for configuration
-- Cloud service integrations
-- Mobile companion app
-
-### Phase 4: Advanced Features
-- Plugin system architecture
-- Multi-user support
-- Enterprise features (LDAP, SSO)
-- Advanced media server capabilities
-- Netflix-like interface for movies, books, assets
-- Media metadata integration (IMDB ratings, descriptions, thumbnails)
-
 ## Current Priorities
-1. **Set up project structure**: Create backend and frontend directories
-2. **Python Backend Setup**: Initialize virtual environment, dependencies, project structure
-3. **Svelte Frontend Setup**: SvelteKit project with prettier, eslint, vitest
-4. **Phase 1 Implementation**: Core foundation development
-   - Basic file scanning and metadata extraction
-   - Simple rule-based organization
-   - CLI interface for manual operations
-   - Local configuration management
+1. **📱 Main Dashboard Creation**: Mobile-first layout with module cards and navigation
+2. **🔧 Complete File Organizer Safety**: Preview mode, confirmation, rollback system
+3. **📦 Archive Operations**: Automatic extraction with password support
+4. **🏗️ API Mobile Optimization**: Design endpoints for future mobile app compatibility
+5. **🔄 File Operations**: Implement actual move operations with safety checks
 
 ## Technology Stack (FINALIZED)
 
 ### Backend: Python 3.8+
+- **Framework**: Flask with CORS support
+- **AI Integration**: Google Gemini 1.5 Flash for file organization
+- **Document Processing**: PyPDF2, python-docx, pytesseract, pillow
 - **Testing**: pytest
 - **Code Quality**: black, flake8
 - **Database**: SQLite
-- **Config**: YAML/TOML
+- **Config**: .env files, JSON configuration
 
 ### Frontend: Svelte/SvelteKit
 - **Package Manager**: npm
-- **Styling**: Svelte scoped CSS (no Tailwind)
+- **Styling**: Svelte scoped CSS with glassmorphism design
 - **Testing**: vitest
 - **Code Quality**: prettier, eslint
-- **Selected Tools**: prettier, eslint, vitest (NO tailwindcss)
-
-## Documentation Structure
-- `docs/README.md` - Project overview and quick start
-- `docs/ARCHITECTURE.md` - Technical architecture and design decisions
-- `docs/DEVELOPMENT.md` - Development setup and guidelines
-- `docs/HISTORY.md` - Project timeline and major changes
-- `docs/TODO.md` - Current tasks and future plans
-- `.warp/context.md` - This file (AI agent context)
+- **API Communication**: Fetch API with comprehensive error handling
 
 ## Development Guidelines
 - **IMPORTANT: Work in small, incremental steps** - Always explain what you're doing and wait for user confirmation before proceeding to the next step
@@ -115,7 +144,7 @@ Homie is your intelligent home file companion that evolves from a smart file org
 - **Data Flow**: Scanner → Metadata → Rules Engine → Action Executor
 - **Storage Strategy**: Local-first with optional cloud integration
 - **Security Model**: Privacy by design, local processing
-- **Error Handling**: Operation rollback, partial failure recovery
+- **Error Handling**: Operation rollback, partial failure recovery, quota management
 - **Performance**: Multi-threaded, incremental scanning, resource management
 - **Communication**: REST API between Python and Svelte, WebSocket for real-time updates
 

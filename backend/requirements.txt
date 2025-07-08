@@ -10,10 +10,15 @@ pytest-cov>=4.0.0
 black>=22.0.0
 flake8>=5.0.0
 
+# Document processing dependencies
+PyPDF2>=3.0.0       # PDF text extraction
+python-docx>=0.8.11 # Word document processing
+pytesseract>=0.3.10 # OCR for scanned documents
+pillow>=9.0.0       # Image processing for OCR
+
 # Future dependencies for Phase 2 and 3
 # requests>=2.28.0  # For future API integrations
 flask>=2.2.0        # For web interface
 flask-cors>=4.0.0   # For CORS support
 google-generativeai>=0.3.0  # For AI-powered file analysis
-# pillow>=9.0.0     # For image handling
 # ffmpeg-python>=0.2.0  # For video/audio processing

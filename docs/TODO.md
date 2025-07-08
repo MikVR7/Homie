@@ -1,6 +1,25 @@
-# TODO & Future Plans - Homie
+# TODO & Future Plans - Homie Ecosystem
 
-### Completed ✅
+## 🎯 **Current Priority: Mobile Dashboard (Phase 1.5)**
+
+### High Priority (Next Steps) 🚧
+- [ ] **Main Dashboard Creation**: Design and implement mobile-first dashboard layout with module cards
+- [ ] **Module Navigation**: Create navigation system between different modules  
+- [ ] **Mobile Optimization**: Ensure perfect smartphone touch compatibility
+- [ ] **Dashboard Widgets**: Mini-views showing key info from each module
+- [ ] **Touch Interactions**: Optimize for mobile touch gestures
+
+## 📱 **Phase 1: File Organizer** ✅ MOSTLY COMPLETE
+
+### Recently Completed ✅
+- [x] **Smart Archive Detection**: Enhanced AI to detect and suggest deletion of redundant archive files when extracted content exists
+- [x] **Document Content Analysis**: Implemented OCR and document content analysis for PDFs, DOCs, and scanned files to determine proper categorization
+- [x] **Quota Error Handling**: Comprehensive 429 error handling with user-friendly messages and actionable suggestions
+- [x] **Enhanced Error Management**: Rich error types (quota, auth, API, generic) with detailed frontend display
+- [x] **Archive Analysis Extension**: Extended redundant archive detection to books, documents, software and all content types
+- [x] **AI Integration**: Connected AI organize endpoint to frontend interface with confidence scoring
+
+### Previously Completed ✅
 - [x] **Technology Stack Decision**: Python 3.8+ backend + Svelte frontend
 - [x] **Project Structure**: Basic backend structure with src/, config/, tests/
 - [x] **AI-Powered Organization**: Google Gemini integration for smart file categorization
@@ -11,88 +30,114 @@
 - [x] **Web UI Development**: Frontend interface for folder selection and organization preview
 - [x] **API Integration**: Connect frontend to Python backend via REST API
 - [x] **Folder Selection**: Browse button and quick access paths for common directories
+- [x] **Modern Dark Theme**: Glassmorphism design with mobile-optimized styling
+- [x] **Folder Browser API**: Created backend API endpoint for browsing file system folders
 
-### High Priority (In Progress) 🚧
-- [ ] **Modern UI Design**: Dark theme and modern styling for better user experience
-- [ ] **AI Organization Integration**: Connect AI organize endpoint to frontend interface
-- [ ] **File Operation Safety**: Implement preview-only mode with user confirmation
-- [ ] **Undo/Rollback System**: Safe file operations with rollback capability
+### Next Enhancements for File Organizer
+- [ ] **Preview Mode**: Complete preview-only mode with user confirmation for file operations
+- [ ] **File Operations**: Implement actual file move operations with safety checks
+- [ ] **Rollback System**: Implement file operation rollback and undo functionality
+- [ ] **Auto-Archive Extraction**: Implement automatic archive extraction with password support when no content exists
+- [ ] **Folder Cleanup**: Delete empty folders after successful extraction and organization
+- [ ] **Extraction API**: Create backend API endpoints for archive extraction with password handling
+- [ ] **Document Categorization**: Create smart document categories (contracts, receipts, personal docs, etc.) based on content analysis
+- [ ] **OCR Integration**: Add OCR support for scanned PDFs and image files to extract text content
 
-### Medium Priority
-- [ ] **Batch Processing**: Handle large file sets efficiently
-- [ ] **Progress Reporting**: Real-time feedback during operations
-- [ ] **User Preferences**: Customizable organization rules and automation levels
-- [ ] **Logging & Tracking**: Comprehensive logging of all file operations
+## 🏠 **Phase 2: Home Server/NAS** (Future)
 
-### Low Priority
-- [ ] **CLI Interface Enhancement**: More advanced command-line features
-- [ ] **Configuration UI**: Web-based configuration management
-- [ ] **Performance Optimization**: Multi-threading and caching
-
-## Phase 2: Duplicate Detection & Management (Future)
-
-### Core Features
-- [ ] **Content-Based Hashing**: Implement file hashing for duplicate detection
-- [ ] **Cross-Directory Scanning**: Scan entire folder structure for duplicates
-- [ ] **Smart Duplicate Recognition**: Detect same content with different filenames
-- [ ] **User Decision Interface**: Present duplicates with management options
-- [ ] **Duplicate Actions**: Delete, keep, rename, or move duplicate files
-
-## Phase 3: Home Media Server (Far Future)
-
-### NAS Functionality
+### Core NAS Features
 - [ ] **Multi-Device Access**: Support Windows, Linux, iOS, Android connections
-- [ ] **File Sync**: Upload, download, sync capabilities across devices
+- [ ] **File Sync Engine**: Upload, download, sync capabilities across devices
 - [ ] **User Management**: Multi-user access and permissions
 - [ ] **Remote Access**: Secure remote connection to home server
+- [ ] **Storage Management**: Disk usage monitoring and optimization
+- [ ] **Backup Systems**: Automated backup and versioning
 
-### Media Interface
-- [ ] **Netflix-like UI**: Web interface for media browsing
-- [ ] **Metadata Integration**: IMDB ratings, descriptions, thumbnails
-- [ ] **Media Categories**: Movies, Books, Assets, Pictures, Learning Videos
-- [ ] **Latest Uploads**: Track and display recently added content
-- [ ] **Recommendations**: Suggest content based on usage patterns
-- [ ] **Media Streaming**: Direct streaming of video/audio content
+## 🎬 **Phase 3: Media Manager** (Future)
 
-## Backlog
+### Netflix-Style Interface
+- [ ] **Media Library Scanning**: Automatic movie/TV show detection
+- [ ] **IMDB Integration**: Fetch ratings, descriptions, posters, cast information
+- [ ] **Watch History Tracking**: Record viewing progress and completion
+- [ ] **Recommendation Engine**: "What to watch next" based on viewing patterns
+- [ ] **Progress Tracking**: Resume watching, series episode management
+- [ ] **Family Profiles**: Multiple user profiles with separate watch histories
+- [ ] **Search and Filter**: Advanced filtering by genre, rating, year, etc.
 
-### Core Features
-- [ ] Rule-based organization engine
-- [ ] Duplicate file detection and handling
-- [ ] Undo/rollback functionality
-- [ ] Batch processing capabilities
-- [ ] Progress reporting and status updates
+## 📄 **Phase 4: Document Management** (Future)
 
-### Advanced Features
-- [ ] Machine learning for intelligent organization
-- [ ] Plugin system for custom organizers
-- [ ] Web-based interface
-- [ ] Cloud storage integration
-- [ ] Real-time file watching and organization
+### Austrian Business Focus
+- [ ] **Document Categories Setup**:
+  - [ ] Zeiterfassung (time tracking) management
+  - [ ] Lohnzettel (pay slips) organization
+  - [ ] Rechnungen (invoices) incoming/outgoing tracking
+  - [ ] Verträge (contracts) storage and reminders
+  - [ ] Behörden (government) document management
+- [ ] **Smart Categorization**: AI-powered document classification (building on current content analysis)
+- [ ] **Search Functionality**: Full-text search across all documents
+- [ ] **Tax Preparation**: Austrian tax reporting automation
+- [ ] **Document Workflows**: Approval processes and notifications
 
-### Quality & Performance
-- [ ] Performance benchmarking suite
-- [ ] Memory usage optimization
-- [ ] Large dataset handling
-- [ ] Error recovery mechanisms
-- [ ] Comprehensive test coverage
+## 💰 **Phase 5: Financial Management** (Future)
 
-## Ideas for Future
+### Austrian Tax Compliance
+- [ ] **Dual Employment Tracking**: Employee + Self-employed income management
+- [ ] **Invoice Management**:
+  - [ ] Incoming invoice tracking for business expenses
+  - [ ] Outgoing invoice management for self-employment income
+  - [ ] VAT/USt calculation and tracking
+  - [ ] Tax reporting automation
+- [ ] **House Construction Financial Tracking**:
+  - [ ] Real-time cost tracking against budget
+  - [ ] Supplier invoice management and payment scheduling
+  - [ ] Cost category analysis (materials, labor, permits)
+  - [ ] Budget variance reporting
+- [ ] **Credit/Loan Management**:
+  - [ ] Monthly payment tracking and reminders
+  - [ ] Interest calculation and projections
+  - [ ] Early payment scenario planning
+- [ ] **Financial Forecasting**:
+  - [ ] Cash flow predictions based on income/expenses
+  - [ ] House construction affordability timeline
+  - [ ] Major purchase planning and savings goals
+  - [ ] Emergency fund tracking and recommendations
 
-### User Experience
-- [ ] GUI application
-- [ ] Mobile companion app
-- [ ] Browser extension for download organization
-- [ ] Integration with popular file managers
+## 🔧 **Technical Infrastructure** (Ongoing)
 
-### Enterprise Features
-- [ ] Multi-user support
-- [ ] Policy-based organization
-- [ ] Audit trails and compliance
-- [ ] Network storage support
+### Core System Improvements
+- [ ] **Database Architecture**: Design unified schema for all modules
+- [ ] **API Framework**: RESTful API design for all module interactions (building on current Flask API)
+- [ ] **Authentication System**: User management and security
+- [ ] **Mobile App Development**: Consider native app vs PWA
+- [ ] **Offline Capabilities**: Core functions working without internet
+- [ ] **Data Backup**: Comprehensive backup and restore system
+- [ ] **Performance Optimization**: Handle large datasets efficiently
 
-## Completed
+### Security & Privacy
+- [ ] **Data Encryption**: Encrypt sensitive financial and personal data
+- [ ] **Access Control**: Role-based permissions for family members
+- [ ] **Audit Logging**: Track all financial and document changes
+- [ ] **GDPR Compliance**: European privacy regulation compliance
 
-- [x] Initial project documentation structure
-- [x] Basic folder organization
-- [x] Development workflow planning
+## 📱 **Mobile-First Design Principles**
+
+### Design Guidelines
+- **Touch-First**: All interactions optimized for touchscreen
+- **Thumb-Friendly**: Important actions within thumb reach
+- **Gesture Support**: Swipe, pinch, and touch gestures
+- **Responsive Layout**: Perfect on all screen sizes
+- **Fast Loading**: Optimized for mobile network speeds
+- **Offline Support**: Critical functions work without internet
+
+## 🎯 **Success Metrics**
+
+### User Experience Goals
+- **One-Touch Access**: Most common tasks achievable in 1-2 taps
+- **Mobile Performance**: < 3 second load times on mobile
+- **Adoption Rate**: Daily usage of at least 3 modules
+- **Error Reduction**: 90% reduction in financial/document errors
+- **Time Savings**: 50% reduction in administrative task time
+
+## 🚫 **Removed/Cancelled Items**
+- ~~API Usage Monitoring~~ - Google's Gemini API provides no real quota checking functionality
+- ~~Usage Display Frontend~~ - Not feasible without real quota data from Google

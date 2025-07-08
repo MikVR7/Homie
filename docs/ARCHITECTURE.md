@@ -2,7 +2,70 @@
 
 ## System Overview
 
-Homie is designed to intelligently organize files based on content, metadata, and user preferences, eventually growing into a comprehensive home media server with an intuitive interface for your media needs.
+Homie is a comprehensive intelligent home management ecosystem designed as a mobile-first application suite. It provides integrated modules for complete personal and household management, evolving from a file organizer into a full-featured home automation and management platform.
+
+## Core Modules
+
+### 🗂️ Module 1: File Organizer (Current - Phase 1)
+- **AI-Powered Organization**: Uses Google Gemini for intelligent file categorization
+- **Smart Folder Detection**: Analyzes existing folder structures and suggests improvements
+- **Duplicate Management**: Content-based duplicate detection and resolution
+- **Safe Operations**: Preview mode with rollback capabilities
+
+### 🏠 Module 2: Home Server/NAS (Phase 2)
+- **Personal Cloud Storage**: OneDrive replacement for home use
+- **Cross-Device Sync**: Seamless file synchronization across all devices
+- **Remote Access**: Secure external connectivity via WebRTC/P2P or AWS proxy
+- **Multi-Platform Support**: Windows, Linux, iOS, Android compatibility
+
+### 🎬 Module 3: Media Manager (Phase 3)
+- **Netflix-Style Interface**: Beautiful media browsing and discovery
+- **Watch History**: Track viewing progress and completion status
+- **Smart Recommendations**: "What to watch next" based on viewing patterns
+- **Metadata Integration**: IMDB ratings, descriptions, posters, and cast info
+- **Progress Tracking**: Resume watching, series episode tracking
+- **Family Profiles**: Multiple user viewing histories
+
+### 📄 Module 4: Document Management (Phase 4)
+- **Austrian Business Focus**: Tailored for Austrian employment/self-employment
+- **Document Categories**:
+  - **Zeiterfassung**: Time tracking records and timesheets
+  - **Lohnzettel**: Pay slips and salary documentation
+  - **Rechnungen**: Invoice management (incoming/outgoing)
+  - **Verträge**: Contracts and agreements
+  - **Behörden**: Government and official documents
+- **OCR Integration**: Automatic text extraction and categorization
+- **Search and Filter**: Quick document retrieval by date, type, amount
+- **Tax Preparation**: Automated reporting for Austrian tax requirements
+
+### 💰 Module 5: Financial Management (Phase 5)
+- **Dual Employment Tracking**: Employee + Self-employed income management
+- **Austrian Tax Compliance**: 
+  - Incoming invoice tracking for business expenses
+  - Outgoing invoice management for self-employment
+  - VAT/USt calculation and tracking
+  - Annual tax preparation assistance
+- **House Construction Management**:
+  - Real-time cost tracking against budget
+  - Supplier invoice management
+  - Payment scheduling and reminders
+  - Cost category analysis (materials, labor, permits, etc.)
+- **Credit/Loan Management**:
+  - Monthly payment tracking
+  - Interest calculation and projections
+  - Early payment scenario planning
+- **Financial Forecasting**:
+  - Cash flow predictions based on income/expenses
+  - House construction affordability timeline
+  - Major purchase planning
+  - Emergency fund tracking
+
+### 📱 Mobile-First Dashboard
+- **Unified Home Screen**: Overview widgets from all active modules
+- **Touch-Optimized Navigation**: Smartphone-native interaction patterns
+- **Quick Actions**: Most common tasks accessible with one tap
+- **Responsive Design**: Seamless experience from phone to tablet to desktop
+- **Offline Capabilities**: Core functions work without internet connection
 
 ## Core Components
 
