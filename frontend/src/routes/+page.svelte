@@ -1,68 +1,115 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Dashboard from '$lib/components/Dashboard.svelte';
-	import AIOrganizer from '$lib/components/AIOrganizer.svelte';
-	import DiscoveryControls from '$lib/components/DiscoveryControls.svelte';
-	import ResultsDisplay from '$lib/components/ResultsDisplay.svelte';
-	import ActivityLog from '$lib/components/ActivityLog.svelte';
 	import { homieStore } from '$lib/stores/homieStore';
+	import ActivityLog from '$lib/components/ActivityLog.svelte';
 
-	let currentView = 'dashboard'; // 'dashboard' or 'file-organizer'
+	interface ModuleCard {
+		id: string;
+		title: string;
+		icon: string;
+		status: 'active' | 'development' | 'planned';
+		route: string;
+	}
 
-	onMount(() => {
-		console.log('🏠 Homie Frontend initialized');
-		homieStore.addLogEntry('Frontend initialized - Ready to interact with Homie backend');
-
-		// Simple hash-based routing
-		const hash = window.location.hash.substring(1);
-		if (hash === 'file-organizer') {
-			currentView = 'file-organizer';
+	const modules: ModuleCard[] = [
+		{
+			id: 'file-organizer',
+			title: 'File Organizer',
+			icon: '📂',
+			status: 'active',
+			route: '/file-organizer'
+		},
+		{
+			id: 'media-manager',
+			title: 'Media Manager',
+			icon: '🎬',
+			status: 'planned',
+			route: '/media'
+		},
+		{
+			id: 'document-manager',
+			title: 'Document Manager',
+			icon: '📄',
+			status: 'planned',
+			route: '/documents'
+		},
+		{
+			id: 'financial-manager',
+			title: 'Financial Manager',
+			icon: '💰',
+			status: 'active',
+			route: '/financial'
 		}
+	];
 
-		// Listen for hash changes
-		window.addEventListener('hashchange', () => {
-			const newHash = window.location.hash.substring(1);
-			if (newHash === 'file-organizer') {
-				currentView = 'file-organizer';
-			} else {
-				currentView = 'dashboard';
-			}
-		});
+	onMount(async () => {
+		console.log('🏠 Homie Dashboard initialized');
+		homieStore.updateStatus('🏠 Homie Dashboard Ready', 'success');
+		homieStore.addLogEntry('🚀 Homie ecosystem dashboard loaded', 'success');
 	});
 
-	function goToDashboard() {
-		currentView = 'dashboard';
-		window.location.hash = '';
+	function navigateToModule(module: ModuleCard) {
+		if (module.status === 'active') {
+			window.location.href = module.route;
+		} else {
+			homieStore.updateStatus(`${module.icon} ${module.title} - Coming Soon!`, 'warning');
+			homieStore.addLogEntry(`📅 ${module.title} is planned for future development`, 'info');
+		}
+	}
+
+	function getStatusColor(status: string): string {
+		switch (status) {
+			case 'active': return '#22c55e';
+			case 'development': return '#f59e0b';
+			case 'planned': return '#6b7280';
+			default: return '#6b7280';
+		}
+	}
+
+	function getStatusText(status: string): string {
+		switch (status) {
+			case 'active': return 'Available';
+			case 'development': return 'In Development';
+			case 'planned': return 'Planned';
+			default: return 'Unknown';
+		}
 	}
 </script>
 
 <svelte:head>
-	<title>🏠 Homie - Intelligent Home Management</title>
+	<title>🏠 Homie - Smart Home Management</title>
+	<meta name="description" content="AI-powered home management ecosystem with file organization, media management, and financial tracking" />
 </svelte:head>
 
-<div class="container">
-	{#if currentView === 'dashboard'}
-		<Dashboard />
-	{:else if currentView === 'file-organizer'}
-		<div class="file-organizer">
-			<div class="breadcrumb">
-				<button class="back-btn" on:click={goToDashboard}>
-					← Back to Dashboard
-				</button>
-			</div>
-			
-			<header>
-				<h1>🗂️ File Organizer</h1>
-				<p>AI-powered intelligent file organization</p>
-			</header>
+<main class="dashboard">
+	<div class="dashboard-header">
+		<h1>🏠 Homie Dashboard</h1>
+	</div>
 
-			<main>
-				<AIOrganizer />
-				<ActivityLog />
-			</main>
-		</div>
-	{/if}
-</div>
+	<div class="modules-grid">
+		{#each modules as module}
+			<div 
+				class="module-card" 
+				class:active={module.status === 'active'}
+				class:planned={module.status === 'planned'}
+				on:click={() => navigateToModule(module)}
+				role="button"
+				tabindex="0"
+				on:keydown={(e) => e.key === 'Enter' && navigateToModule(module)}
+			>
+				<span class="module-icon">{module.icon}</span>
+				<h3>{module.title}</h3>
+				{#if module.status === 'active'}
+					<span class="status-badge active">Available</span>
+				{:else}
+					<span class="status-badge planned">Coming Soon</span>
+				{/if}
+			</div>
+		{/each}
+	</div>
+	
+	<ActivityLog />
+</main>
 
 <style>
 	:global(body) {
@@ -74,92 +121,121 @@
 		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
-	.container {
-		min-height: 100vh;
-	}
-
-	.file-organizer {
+	.dashboard {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 1rem;
+		padding: 2rem;
 		min-height: 100vh;
 	}
 
-	.breadcrumb {
-		margin-bottom: 2rem;
-	}
-
-	.back-btn {
-		background: rgba(255, 255, 255, 0.1);
-		color: #e2e8f0;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		padding: 0.75rem 1.5rem;
-		border-radius: 10px;
-		font-size: 0.875rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		backdrop-filter: blur(10px);
-	}
-
-	.back-btn:hover {
-		background: rgba(255, 255, 255, 0.15);
-		transform: translateY(-1px);
-	}
-
-	header {
+	.dashboard-header {
 		text-align: center;
-		margin-bottom: 3rem;
-		padding-bottom: 2rem;
-		border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-		background: rgba(255, 255, 255, 0.02);
-		border-radius: 16px;
-		padding: 2rem;
-		backdrop-filter: blur(10px);
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+		margin-bottom: 2rem;
+		padding: 1rem;
 	}
 
-	header h1 {
-		color: #ffffff;
-		margin: 0 0 0.5rem 0;
+	.dashboard-header h1 {
 		font-size: 2.5rem;
-		font-weight: 700;
+		margin: 0;
 		background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
 		background-clip: text;
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
-		text-shadow: 0 0 30px rgba(96, 165, 250, 0.3);
+		font-weight: 700;
 	}
 
-	header p {
-		color: #94a3b8;
-		margin: 0;
-		font-size: 1.1rem;
-		font-weight: 400;
-		opacity: 0.8;
+	.modules-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		gap: 1.5rem;
+		margin-bottom: 2rem;
 	}
 
-	main {
-		display: flex;
-		flex-direction: column;
-		gap: 2rem;
+	.module-card {
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 12px;
+		padding: 1.5rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		text-align: center;
+	}
+
+	.module-card:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+		border-color: rgba(255, 255, 255, 0.2);
+	}
+
+	.module-card.active {
+		border-color: rgba(34, 197, 94, 0.5);
+	}
+
+	.module-card.planned {
+		opacity: 0.6;
+	}
+
+	.module-icon {
+		font-size: 3rem;
+		display: block;
+		margin-bottom: 1rem;
+	}
+
+	.module-card h3 {
+		margin: 0 0 1rem 0;
+		font-size: 1.3rem;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.status-badge {
+		display: inline-block;
+		padding: 0.4rem 1rem;
+		border-radius: 20px;
+		font-size: 0.8rem;
+		font-weight: 500;
+	}
+
+	.status-badge.active {
+		background: #22c55e;
+		color: white;
+	}
+
+	.status-badge.planned {
+		background: #6b7280;
+		color: white;
 	}
 
 	@media (max-width: 768px) {
-		.file-organizer {
+		.dashboard {
 			padding: 1rem;
 		}
 
-		header {
-			margin-bottom: 2rem;
+		.dashboard-header h1 {
+			font-size: 2.5rem;
+		}
+
+		.dashboard-subtitle {
+			font-size: 1rem;
+		}
+
+		.modules-grid {
+			grid-template-columns: 1fr;
+			gap: 1.5rem;
+		}
+
+		.module-card {
 			padding: 1.5rem;
 		}
 
-		header h1 {
-			font-size: 2rem;
+		.module-header {
+			flex-direction: column;
+			text-align: center;
+			gap: 0.5rem;
 		}
 
-		header p {
-			font-size: 1rem;
+		.module-icon {
+			font-size: 2rem;
 		}
 	}
 </style>

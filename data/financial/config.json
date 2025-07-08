@@ -1,0 +1,52 @@
+{
+  "currency": "EUR",
+  "tax_year": 2025,
+  "austrian_tax_rates": {
+    "income_tax_brackets": [
+      {
+        "min": 0,
+        "max": 11000,
+        "rate": 0.0
+      },
+      {
+        "min": 11000,
+        "max": 18000,
+        "rate": 0.2
+      },
+      {
+        "min": 18000,
+        "max": 31000,
+        "rate": 0.32
+      },
+      {
+        "min": 31000,
+        "max": 60000,
+        "rate": 0.42
+      },
+      {
+        "min": 60000,
+        "max": 90000,
+        "rate": 0.48
+      },
+      {
+        "min": 90000,
+        "max": 1000000,
+        "rate": 0.5
+      },
+      {
+        "min": 1000000,
+        "max": Infinity,
+        "rate": 0.55
+      }
+    ],
+    "social_security_rate": 0.1812,
+    "social_security_max": 5550,
+    "self_employment_tax_rate": 0.2739
+  },
+  "construction_loan": {
+    "total_amount": 0,
+    "interest_rate": 0.0,
+    "loan_term_years": 0,
+    "start_date": null
+  }
+}
