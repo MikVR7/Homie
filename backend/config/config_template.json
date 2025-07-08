@@ -1,0 +1,30 @@
+{
+    "version": "0.1.0",
+    "settings": {
+        "auto_organize": false,
+        "create_backups": true,
+        "log_level": "INFO",
+        "max_file_size_mb": 1000,
+        "excluded_extensions": [".tmp", ".log", ".cache"],
+        "excluded_directories": ["node_modules", ".git", "__pycache__"]
+    },
+    "paths": {
+        "unsorted_folder": "",
+        "sorted_base_folder": "",
+        "backup_folder": "",
+        "log_folder": "logs/"
+    },
+    "organization_rules": {
+        "by_extension": {
+            "images": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"],
+            "videos": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm"],
+            "documents": [".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt"],
+            "archives": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2"],
+            "audio": [".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma"]
+        },
+        "by_size": {
+            "small_files_mb": 10,
+            "large_files_mb": 100
+        }
+    }
+}

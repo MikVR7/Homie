@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏠 Homie - File Organizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏠 Homie - Intelligent Home File Organizer</h1>
+            <p>Easy interface to interact with your file organization backend</p>
+        </header>
+
+        <main>
+            <section class="controls">
+                <h2>📁 Discovery Controls</h2>
+                <div class="control-group">
+                    <label for="scan-path">Scan Path:</label>
+                    <input type="text" id="scan-path" placeholder="/path/to/scan" value="">
+                    <button id="discover-btn" onclick="runDiscovery()">🔍 Discover Folders</button>
+                </div>
+                <div class="status" id="status">Ready to scan...</div>
+            </section>
+
+            <section class="results">
+                <h2>📊 Discovery Results</h2>
+                <div class="results-summary" id="results-summary">
+                    No scan results yet. Click "Discover Folders" to start.
+                </div>
+                
+                <div class="folder-tree" id="folder-tree">
+                    <!-- Results will be populated here -->
+                </div>
+            </section>
+
+            <section class="logs">
+                <h2>📝 Activity Log</h2>
+                <div class="log-container" id="log-container">
+                    <div class="log-entry">Frontend initialized - Ready to interact with Homie backend</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
