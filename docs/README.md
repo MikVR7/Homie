@@ -1,14 +1,16 @@
 # Project Overview
 
-Welcome to the Homie project! Homie is your intelligent home file organizer, evolving into a complete OneDrive-like home server. This document provides a quick overview to get you started.
+Welcome to the Homie project! Homie is your intelligent home management ecosystem, designed as a mobile-first application suite that evolves from a smart file organizer into a complete personal management platform.
 
 ## Infrastructure Overview
 
-Homie is designed to run as a self-hosted OneDrive-like server at your home, providing:
-- Personal cloud storage with web interface
+Homie is designed to run as a self-hosted home server with a cross-platform mobile frontend, providing:
+- Personal cloud storage with mobile and web interface
 - File synchronization across devices
 - Media streaming capabilities
 - Remote access and sharing
+- Financial management with Austrian tax compliance
+- Document organization and management
 
 ### AWS Integration
 
@@ -23,7 +25,7 @@ While Homie runs primarily on your home server, AWS services may be utilized for
 
 ## ✨ AI-Powered File Organization
 
-Homie now features intelligent file organization powered by Google Gemini AI! 
+Homie features intelligent file organization powered by Google Gemini AI! 
 
 ### What Makes It Smart?
 - **Content-aware analysis**: Understands file content, not just extensions
@@ -40,13 +42,63 @@ Homie now features intelligent file organization powered by Google Gemini AI!
 ⚠️ **Preview Only**: Never moves files without explicit user confirmation
 🔒 **Privacy Focused**: Only sends metadata to AI, never actual file content
 
+## 📱 Mobile-First Design
+
+Homie is built as a **Flutter cross-platform application** that works seamlessly on:
+- **Android** smartphones and tablets
+- **iOS** devices (iPhone and iPad)
+- **Web browsers** (desktop and mobile)
+- **Desktop** applications (Windows, macOS, Linux)
+
+### Current Modules
+- **📁 File Organizer**: AI-powered file organization with confidence scoring
+- **💰 Financial Manager**: Austrian tax-compliant financial tracking
+- **🏠 Media Manager**: Coming soon - Netflix-style media library
+- **📄 Document Manager**: Coming soon - Austrian business document management
+
 ## Quick Start
 
+### 🚀 Easy Startup (Recommended)
+
+**Start Everything:**
+```bash
+./start_homie.sh
+```
+This starts both backend and frontend services automatically!
+
+**Individual Services:**
+```bash
+# Backend only
+./start_backend.sh
+
+# Frontend only  
+./start_frontend.sh
+```
+
+### Manual Startup Commands
+
+**Backend (Python API):**
+```bash
+cd backend && source venv/bin/activate && python api_server.py
+```
+
+**Frontend (Flutter App):**
+```bash
+cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 3000
+```
+
+### Access Points
+- **🌐 Flutter Web App**: http://localhost:3000
+- **🔗 Backend API**: http://localhost:8000
+- **📱 Mobile**: Run `flutter run` for device deployment
+
 ### For Developers
+
+#### Backend Setup
 1. Clone the repository
 2. Follow setup instructions in DEVELOPMENT.md
 3. Get your Google Gemini API key from https://makersuite.google.com/app/apikey
-4. Test the AI organization system:
+4. Set up the backend:
    ```bash
    cd backend
    python setup_env.py
@@ -54,8 +106,18 @@ Homie now features intelligent file organization powered by Google Gemini AI!
    python test_smart_organizer.py
    ```
 
+#### Flutter Frontend Setup
+1. Install Flutter SDK (https://flutter.dev/docs/get-started/install)
+2. Set up the mobile app:
+   ```bash
+   cd mobile_app
+   flutter pub get
+   flutter run
+   ```
+
 ### For Users
-- Web interface coming soon! The backend AI system is ready.
-- Currently available as a test script for preview
+- **📱 Mobile App**: Run the Flutter app on your device
+- **🌐 Web Interface**: Access via web browser when backend is running
+- **🖥️ Desktop App**: Use the Flutter desktop build
 
 For more detailed information, check the other documentation files.

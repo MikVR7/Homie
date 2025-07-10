@@ -80,7 +80,7 @@ Homie is a comprehensive intelligent home management ecosystem designed as a mob
 - Handles duplicate detection and resolution
 
 ### User Interface
-- Command-line interface for automation
+- Flutter cross-platform application
 - Configuration management
 - Progress reporting and logging
 
@@ -88,24 +88,28 @@ Homie is a comprehensive intelligent home management ecosystem designed as a mob
 
 ### Backend (Core Logic)
 - **Language**: Python 3.8+
+- **Framework**: Flask with CORS support
+- **AI Integration**: Google Gemini 1.5 Flash for file organization
 - **Database**: SQLite for metadata and organization history
-- **Configuration**: YAML/TOML files in `~/.config/homie/`
+- **Configuration**: JSON files in `backend/config/`
 - **Testing**: pytest with comprehensive file operation tests
 - **Code Quality**: black (formatting), flake8 (linting)
 
-### Frontend (Web Interface)
-- **Framework**: Svelte/SvelteKit for the web UI
-- **Package Manager**: npm
-- **Styling**: Svelte scoped CSS with CSS custom properties
-- **Testing**: vitest for component and integration tests
-- **Code Quality**: prettier (formatting), eslint (linting)
-- **Build System**: Vite (integrated with SvelteKit)
+### Frontend (Mobile/Web/Desktop)
+- **Framework**: Flutter (Dart) for cross-platform development
+- **Platforms**: Android, iOS, Web, Windows, macOS, Linux
+- **State Management**: Provider pattern for reactive state updates
+- **Navigation**: Go Router for declarative routing
+- **HTTP Client**: Built-in Dart HTTP client for API communication
+- **UI Framework**: Material Design 3 with custom dark theme
+- **Testing**: Flutter test framework for widget and integration tests
+- **Code Quality**: Dart analyzer with strict linting rules
 
 ### Architecture Pattern
 - **Backend**: Modular Python services with clear separation of concerns
-- **Frontend**: Component-based Svelte architecture
-- **Communication**: REST API between Python backend and Svelte frontend
-- **Data Flow**: Event-driven with WebSocket for real-time updates
+- **Frontend**: Flutter widget-based architecture with Provider state management
+- **Communication**: REST API between Python backend and Flutter frontend
+- **Data Flow**: Provider pattern with reactive state updates
 
 ## Design Decisions
 
@@ -114,6 +118,8 @@ Homie is a comprehensive intelligent home management ecosystem designed as a mob
 2. User control over automation level
 3. Extensible rule system
 4. Performance-first for large file sets
+5. Mobile-first responsive design
+6. Cross-platform compatibility
 
 ## Cloud Service Integration
 

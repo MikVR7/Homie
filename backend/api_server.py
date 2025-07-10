@@ -176,7 +176,7 @@ def file_organizer_organize():
                 'success': False,
                 'error': f'Downloads path does not exist: {downloads_path}'
             }), 400
-            
+        
         if not os.path.exists(sorted_path):
             return jsonify({
                 'success': False,
