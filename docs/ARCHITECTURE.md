@@ -242,42 +242,80 @@ While Homie operates as a self-hosted home server, AWS services may enhance func
 **Backend Architecture:**
 ```
 backend/
-├── src/homie/
-│   ├── smart_organizer.py     # 🤖 Google Gemini AI integration
-│   ├── api_server.py          # Original backend API  
-│   ├── discover.py            # Folder discovery system
-│   └── main.py               # Core backend logic
-├── api_server.py             # 🌐 Flask REST API server
-├── test_smart_organizer.py   # 🧪 AI system testing
-├── .env                      # 🔑 Environment configuration
-└── venv/                     # Python virtual environment
+├── services/
+│   ├── file_organizer/
+│   │   ├── smart_organizer.py     # 🤖 Google Gemini AI integration
+│   │   ├── discover.py            # Folder discovery system
+│   │   └── __init__.py
+│   ├── financial_manager/         # 💰 Financial management module
+│   └── shared/                    # Shared utilities
+├── api_server.py                  # 🌐 Flask REST API server
+├── test_smart_organizer.py        # 🧪 AI system testing
+├── .env                          # 🔑 Environment configuration
+└── venv/                         # Python virtual environment
 ```
 
-**Frontend Integration:**
-- Svelte/SvelteKit web interface
-- REST API communication with backend
-- Real-time file organization preview
-- Folder selection and path management
+**Frontend Architecture:**
+```
+mobile_app/
+├── lib/
+│   ├── main.dart                 # Flutter app entry point
+│   ├── theme/                    # Material 3 dark theme
+│   ├── providers/                # State management
+│   ├── services/                 # API communication
+│   ├── models/                   # Data models
+│   ├── screens/                  # UI screens
+│   └── widgets/                  # Reusable components
+├── android/                      # Android-specific code
+├── ios/                         # iOS-specific code
+├── web/                         # Web-specific code
+└── linux/                       # Linux desktop code
+```
+
+**Cross-Platform Flutter Integration:**
+- Material 3 dark theme with professional design
+- Cross-platform support (Android, iOS, Web, Desktop)
+- Provider pattern for reactive state management
+- Real-time file organization with user control
+- Native folder picker integration
 
 **AI Integration Features:**
 - **Smart Analysis**: Content-aware file categorization using Google Gemini
 - **Context Awareness**: Understands existing folder structure
-- **Metadata Extraction**: File type, size, content hints
-- **Safe Preview**: Shows suggestions without moving files
-- **Fallback Logic**: Rule-based organization if AI fails
+- **Project Detection**: Recognizes .git folders and treats projects as single units
+- **Content Reading**: Analyzes PDF, DOC, and TXT file content
+- **User Control**: Accept, Specify, or Delete actions for each file
+- **AI Re-analysis**: Re-analyzes files with user input for custom specifications
+- **Memory System**: Comprehensive logging of all operations
 - **Privacy Focus**: Only metadata sent to AI, never file content
 
 **API Endpoints:**
 - `GET /api/health` - System health check
-- `POST /api/discover` - Basic folder discovery (legacy)
-- `POST /api/organize` - AI-powered organization analysis
+- `POST /api/file-organizer/organize` - AI-powered organization analysis
+- `POST /api/file-organizer/execute-action` - Execute file operations (move, delete)
+- `POST /api/file-organizer/re-analyze` - Re-analyze files with user input
+- `POST /api/file-organizer/discover` - Discover files and folders
+- `POST /api/file-organizer/browse-folders` - Browse file system
+
+**Memory/Logging System:**
+- **Memory Files**: `.homie_memory.json` created in both source and destination folders
+- **Operation Tracking**: All file operations logged with timestamps
+- **User Actions**: Tracks user decisions and custom specifications
+- **Analytics Ready**: Data structure supports future usage pattern analysis
 
 ## Implementation Phases
 
 ### Phase 1: Core Foundation ✅ COMPLETE
 - [x] Basic file scanning and metadata extraction
-- [x] AI-powered intelligent organization
-- [x] Web interface for user operations  
+- [x] AI-powered intelligent organization with Google Gemini
+- [x] Flutter cross-platform mobile app
+- [x] Real file operations (move, delete) with user confirmation
+- [x] Project detection with .git folder recognition
+- [x] PDF/DOC/TXT content reading for better categorization
+- [x] User control system with Accept/Specify/Delete actions
+- [x] Completed actions tracking with timestamps
+- [x] Memory/log system (.homie_memory.json) in both folders
+- [x] AI re-analysis with user input integration
 - [x] Environment configuration management
 - [x] REST API for frontend integration
 

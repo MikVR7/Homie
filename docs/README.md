@@ -39,7 +39,13 @@ Homie features intelligent file organization powered by Google Gemini AI!
 📊 **Smart Metadata**: Extracts file size, type, and content hints
 🎯 **Context Aware**: Understands your existing folder structure
 💡 **New Folder Suggestions**: Proposes logical new categories
-⚠️ **Preview Only**: Never moves files without explicit user confirmation
+📁 **Project Detection**: Recognizes .git folders and treats projects as single units
+📄 **Content Reading**: Analyzes PDF, DOC, and TXT file content for better categorization
+✅ **Real Operations**: Actually moves and deletes files with user confirmation
+🎛️ **User Control**: Accept, Specify custom path, or Delete for each file
+📝 **Memory System**: Logs all operations to .homie_memory.json files
+⏰ **Action Tracking**: Completed actions section with timestamps and status
+🔄 **AI Re-analysis**: Re-analyzes files when user provides custom specifications
 🔒 **Privacy Focused**: Only sends metadata to AI, never actual file content
 
 ## 📱 Mobile-First Design
@@ -51,7 +57,7 @@ Homie is built as a **Flutter cross-platform application** that works seamlessly
 - **Desktop** applications (Windows, macOS, Linux)
 
 ### Current Modules
-- **📁 File Organizer**: AI-powered file organization with confidence scoring
+- **📁 File Organizer**: AI-powered file organization with real operations and memory tracking
 - **💰 Financial Manager**: Austrian tax-compliant financial tracking
 - **🏠 Media Manager**: Coming soon - Netflix-style media library
 - **📄 Document Manager**: Coming soon - Austrian business document management

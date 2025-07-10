@@ -55,6 +55,18 @@ dependencies:
   
   # JSON handling
   json_annotation: ^4.9.0
+  
+  # Speed dial FAB
+  flutter_speed_dial: ^7.0.0
+  
+  # URL launcher for bank authentication
+  url_launcher: ^6.2.5
+  
+  # Internationalization and date formatting
+  intl: ^0.19.0
+  
+  # UUID generation
+  uuid: ^4.2.1
 
 dev_dependencies:
   flutter_test:

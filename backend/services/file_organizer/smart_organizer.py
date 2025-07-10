@@ -7,8 +7,10 @@ Uses Google Gemini to intelligently categorize and suggest file placements
 import os
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+from datetime import datetime, timedelta
 import google.generativeai as genai
 from dotenv import load_dotenv
 import time
@@ -93,14 +95,480 @@ class SmartOrganizer:
     def _get_file_inventory(self, folder_path: str) -> List[Dict]:
         """Get detailed inventory of files in downloads folder"""
         files = []
+        project_folders = set()
         
         for root, dirs, filenames in os.walk(folder_path):
+            # Check if this is a project folder (contains .git)
+            if '.git' in dirs:
+                project_folders.add(root)
+                # Add the entire project as one unit
+                project_info = self._analyze_project_folder(root)
+                files.append(project_info)
+                # Skip walking into this directory further
+                dirs.clear()
+                continue
+            
+            # Check if we're inside a known project folder
+            is_inside_project = any(root.startswith(proj_path) for proj_path in project_folders)
+            if is_inside_project:
+                continue
+                
             for filename in filenames:
                 file_path = os.path.join(root, filename)
                 file_info = self._analyze_file(file_path)
                 files.append(file_info)
                 
         return files
+    
+    def _analyze_project_folder(self, project_path: str) -> Dict:
+        """Analyze a project folder as a single unit"""
+        project_name = os.path.basename(project_path)
+        
+        # Calculate total size
+        total_size = 0
+        file_count = 0
+        for root, dirs, files in os.walk(project_path):
+            for file in files:
+                try:
+                    file_path = os.path.join(root, file)
+                    total_size += os.path.getsize(file_path)
+                    file_count += 1
+                except (OSError, IOError):
+                    continue
+        
+        # Detect project type
+        project_type = self._detect_project_type(project_path)
+        
+        return {
+            'name': project_name,
+            'path': project_path,
+            'type_category': 'project',
+            'project_type': project_type,
+            'size_mb': round(total_size / (1024*1024), 2),
+            'size_bytes': total_size,
+            'file_count': file_count,
+            'is_project': True,
+            'size_category': self._categorize_size(total_size),
+            'base_name_no_ext': project_name.lower()
+        }
+    
+    def _detect_project_type(self, project_path: str) -> str:
+        """Detect the type of project based on files present"""
+        files_in_root = []
+        try:
+            files_in_root = os.listdir(project_path)
+        except (OSError, IOError):
+            return 'unknown'
+        
+        files_lower = [f.lower() for f in files_in_root]
+        
+        # Web development
+        if any(f in files_lower for f in ['package.json', 'index.html', 'webpack.config.js', 'vite.config.js']):
+            return 'web_development'
+        
+        # Python project
+        if any(f in files_lower for f in ['requirements.txt', 'setup.py', 'pyproject.toml', 'pipfile']):
+            return 'python_project'
+        
+        # Node.js project
+        if 'package.json' in files_lower:
+            return 'nodejs_project'
+        
+        # Java project
+        if any(f in files_lower for f in ['pom.xml', 'build.gradle', 'gradle.properties']):
+            return 'java_project'
+        
+        # C/C++ project
+        if any(f in files_lower for f in ['makefile', 'cmake.txt', 'configure.ac']):
+            return 'cpp_project'
+        
+        # Flutter/Dart project
+        if 'pubspec.yaml' in files_lower:
+            return 'flutter_project'
+        
+        # Documentation/Website
+        if any(f in files_lower for f in ['readme.md', 'index.md', '_config.yml']):
+            return 'documentation'
+        
+        return 'software_project'
+    
+    def execute_file_action(self, action: str, file_path: str, destination_path: str = None, 
+                           source_folder: str = None, destination_folder: str = None) -> Dict:
+        """Execute a file action (move, delete, etc.) and log to memory file"""
+        try:
+            full_file_path = file_path if os.path.isabs(file_path) else os.path.join(source_folder, file_path)
+            
+            if not os.path.exists(full_file_path):
+                raise FileNotFoundError(f"File not found: {full_file_path}")
+            
+            result = {
+                'action': action,
+                'file': file_path,
+                'timestamp': datetime.now().isoformat(),
+                'success': False
+            }
+            
+            if action == 'delete':
+                os.remove(full_file_path)
+                result['success'] = True
+                result['message'] = f"File deleted: {file_path}"
+                
+            elif action == 'move':
+                if not destination_path:
+                    raise ValueError("destination_path is required for move action")
+                
+                # Construct full destination path
+                full_dest_path = os.path.join(destination_folder, destination_path)
+                
+                # Create destination directory if it doesn't exist
+                os.makedirs(os.path.dirname(full_dest_path), exist_ok=True)
+                
+                # Move the file
+                shutil.move(full_file_path, full_dest_path)
+                result['success'] = True
+                result['message'] = f"File moved from {file_path} to {destination_path}"
+                result['destination'] = destination_path
+                
+            else:
+                raise ValueError(f"Unknown action: {action}")
+            
+            # Log to memory file
+            self._log_to_memory_file(result, source_folder, destination_folder)
+            
+            return result
+            
+        except Exception as e:
+            result = {
+                'action': action,
+                'file': file_path,
+                'timestamp': datetime.now().isoformat(),
+                'success': False,
+                'error': str(e)
+            }
+            self._log_to_memory_file(result, source_folder, destination_folder)
+            raise
+    
+    def re_analyze_file(self, file_path: str, user_input: str, source_folder: str, 
+                       destination_folder: str) -> Dict:
+        """Re-analyze a file with user input"""
+        try:
+            full_file_path = file_path if os.path.isabs(file_path) else os.path.join(source_folder, file_path)
+            
+            if not os.path.exists(full_file_path):
+                raise FileNotFoundError(f"File not found: {full_file_path}")
+            
+            # Analyze the file
+            file_info = self._analyze_file(full_file_path)
+            
+            # Create enhanced prompt with user input
+            enhanced_prompt = f"""
+You are re-analyzing a file based on user input. The user has provided specific guidance about this file.
+
+FILE: {file_info['name']}
+USER INPUT: {user_input}
+
+File Details:
+- Size: {file_info['size_mb']} MB
+- Type: {file_info['type_category']}
+- Extension: {file_info['extension']}
+
+Based on the user's input "{user_input}", suggest:
+1. DESTINATION: Where this file should be organized (e.g., "Projects/V2K-Website/")
+2. REASONING: Why this destination makes sense given the user's input
+3. CONFIDENCE: How confident you are (0-100%)
+
+Respond with JSON:
+{{
+    "destination": "suggested/path/",
+    "reason": "explanation based on user input",
+    "confidence": 95
+}}
+"""
+            
+            try:
+                response = self.genai_model.generate_content(enhanced_prompt)
+                response_text = response.text.strip()
+                
+                # Parse JSON response
+                if response_text.startswith('```json'):
+                    response_text = response_text[7:-3]
+                elif response_text.startswith('```'):
+                    response_text = response_text[3:-3]
+                
+                ai_response = json.loads(response_text)
+                
+                result = {
+                    'destination': ai_response.get('destination', user_input),
+                    'reason': ai_response.get('reason', f'Based on user input: {user_input}'),
+                    'confidence': ai_response.get('confidence', 80) / 100.0,
+                    'user_input': user_input,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                # Log the re-analysis
+                self._log_to_memory_file({
+                    'action': 're_analyze',
+                    'file': file_path,
+                    'user_input': user_input,
+                    'new_suggestion': result['destination'],
+                    'timestamp': datetime.now().isoformat(),
+                    'success': True
+                }, source_folder, destination_folder)
+                
+                return result
+                
+            except json.JSONDecodeError:
+                # Fallback if AI response is not valid JSON
+                return {
+                    'destination': user_input,
+                    'reason': f'Using user-specified path: {user_input}',
+                    'confidence': 0.9,
+                    'user_input': user_input,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+        except Exception as e:
+            raise Exception(f"Error re-analyzing file: {str(e)}")
+    
+    def log_file_access(self, file_path: str, action: str = 'open', user_agent: str = None) -> Dict:
+        """Log file access events for usage tracking and analytics
+        
+        Args:
+            file_path: Full path to the accessed file
+            action: Type of access ('open', 'download', 'view', 'edit', etc.)
+            user_agent: Optional user agent string for web access tracking
+        
+        Returns:
+            Dictionary with success status and details
+        """
+        try:
+            if not os.path.exists(file_path):
+                return {'success': False, 'error': f'File not found: {file_path}'}
+            
+            # Create access entry
+            access_data = {
+                'timestamp': datetime.now().isoformat(),
+                'file': os.path.basename(file_path),
+                'full_path': file_path,
+                'action': action,
+                'file_size_bytes': os.path.getsize(file_path),
+                'file_extension': Path(file_path).suffix.lower()
+            }
+            
+            # Add optional user agent for web access tracking
+            if user_agent:
+                access_data['user_agent'] = user_agent
+                
+            # Get folder containing the file
+            folder_path = os.path.dirname(file_path)
+            
+            # Log to memory file in the file's directory
+            memory_file = os.path.join(folder_path, '.homie_memory.json')
+            self._append_access_to_memory_file(memory_file, access_data)
+            
+            return {
+                'success': True,
+                'message': f'Logged {action} access for {os.path.basename(file_path)}',
+                'access_data': access_data
+            }
+            
+        except Exception as e:
+            error_msg = f"Error logging file access: {str(e)}"
+            print(f"Warning: {error_msg}")
+            return {'success': False, 'error': error_msg}
+
+    def get_file_access_analytics(self, folder_path: str, days: int = 30) -> Dict:
+        """Get file access analytics for a folder
+        
+        Args:
+            folder_path: Path to analyze
+            days: Number of days to look back (default 30)
+            
+        Returns:
+            Dictionary with access statistics and frequently accessed files
+        """
+        try:
+            memory_file = os.path.join(folder_path, '.homie_memory.json')
+            
+            if not os.path.exists(memory_file):
+                return {
+                    'success': True,
+                    'total_accesses': 0,
+                    'frequently_accessed': [],
+                    'recent_accesses': [],
+                    'access_patterns': {}
+                }
+            
+            # Load memory data
+            with open(memory_file, 'r', encoding='utf-8') as f:
+                memory_data = json.load(f)
+            
+            # Get cutoff date
+            cutoff_date = datetime.now() - timedelta(days=days)
+            
+            # Extract file accesses
+            file_accesses = memory_data.get('file_accesses', [])
+            
+            # Filter to recent accesses
+            recent_accesses = []
+            for access in file_accesses:
+                try:
+                    access_time = datetime.fromisoformat(access['timestamp'])
+                    if access_time >= cutoff_date:
+                        recent_accesses.append(access)
+                except (ValueError, KeyError):
+                    continue
+            
+            # Count access frequency
+            access_counts = {}
+            for access in recent_accesses:
+                file_name = access.get('file', 'unknown')
+                if file_name not in access_counts:
+                    access_counts[file_name] = {
+                        'count': 0,
+                        'last_access': access['timestamp'],
+                        'actions': [],
+                        'full_path': access.get('full_path', '')
+                    }
+                access_counts[file_name]['count'] += 1
+                access_counts[file_name]['actions'].append(access.get('action', 'open'))
+                # Update last access if this is more recent
+                if access['timestamp'] > access_counts[file_name]['last_access']:
+                    access_counts[file_name]['last_access'] = access['timestamp']
+            
+            # Sort by frequency
+            frequently_accessed = sorted(
+                [{'file': k, **v} for k, v in access_counts.items()],
+                key=lambda x: x['count'],
+                reverse=True
+            )
+            
+            # Analyze access patterns by hour and day
+            access_patterns = {
+                'by_hour': {},
+                'by_day': {},
+                'by_action': {}
+            }
+            
+            for access in recent_accesses:
+                try:
+                    access_time = datetime.fromisoformat(access['timestamp'])
+                    hour = access_time.hour
+                    day = access_time.strftime('%A')
+                    action = access.get('action', 'open')
+                    
+                    # Count by hour
+                    access_patterns['by_hour'][hour] = access_patterns['by_hour'].get(hour, 0) + 1
+                    
+                    # Count by day
+                    access_patterns['by_day'][day] = access_patterns['by_day'].get(day, 0) + 1
+                    
+                    # Count by action
+                    access_patterns['by_action'][action] = access_patterns['by_action'].get(action, 0) + 1
+                    
+                except (ValueError, KeyError):
+                    continue
+            
+            return {
+                'success': True,
+                'total_accesses': len(recent_accesses),
+                'frequently_accessed': frequently_accessed[:10],  # Top 10
+                'recent_accesses': recent_accesses[-10:],  # Last 10
+                'access_patterns': access_patterns,
+                'analysis_period_days': days
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Error analyzing file access: {str(e)}'
+            }
+    
+    def _log_to_memory_file(self, action_data: Dict, source_folder: str, destination_folder: str):
+        """Log actions to memory files in both source and destination folders"""
+        try:
+            # Create memory entry
+            memory_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'action': action_data,
+                'source_folder': source_folder,
+                'destination_folder': destination_folder
+            }
+            
+            # Log to source folder
+            source_memory_file = os.path.join(source_folder, '.homie_memory.json')
+            self._append_to_memory_file(source_memory_file, memory_entry)
+            
+            # Log to destination folder
+            dest_memory_file = os.path.join(destination_folder, '.homie_memory.json')
+            self._append_to_memory_file(dest_memory_file, memory_entry)
+            
+        except Exception as e:
+            print(f"Warning: Could not log to memory file: {e}")
+    
+    def _append_to_memory_file(self, memory_file_path: str, entry: Dict):
+        """Append an entry to a memory file"""
+        try:
+            # Load existing memory or create new
+            if os.path.exists(memory_file_path):
+                with open(memory_file_path, 'r', encoding='utf-8') as f:
+                    memory_data = json.load(f)
+            else:
+                memory_data = {
+                    'created': datetime.now().isoformat(),
+                    'version': '1.0',
+                    'actions': [],
+                    'file_accesses': []  # Add file access tracking array
+                }
+            
+            # Ensure file_accesses array exists (for backward compatibility)
+            if 'file_accesses' not in memory_data:
+                memory_data['file_accesses'] = []
+            
+            # Add new entry
+            memory_data['actions'].append(entry)
+            memory_data['last_updated'] = datetime.now().isoformat()
+            
+            # Save back to file
+            with open(memory_file_path, 'w', encoding='utf-8') as f:
+                json.dump(memory_data, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Warning: Could not append to memory file {memory_file_path}: {e}")
+
+    def _append_access_to_memory_file(self, memory_file_path: str, access_data: Dict):
+        """Append a file access entry to a memory file"""
+        try:
+            # Load existing memory or create new
+            if os.path.exists(memory_file_path):
+                with open(memory_file_path, 'r', encoding='utf-8') as f:
+                    memory_data = json.load(f)
+            else:
+                memory_data = {
+                    'created': datetime.now().isoformat(),
+                    'version': '1.0',
+                    'actions': [],
+                    'file_accesses': []
+                }
+            
+            # Ensure file_accesses array exists (for backward compatibility)
+            if 'file_accesses' not in memory_data:
+                memory_data['file_accesses'] = []
+            
+            # Add new access entry
+            memory_data['file_accesses'].append(access_data)
+            memory_data['last_updated'] = datetime.now().isoformat()
+            
+            # Optional: Limit file access history to prevent huge files (keep last 1000 entries)
+            if len(memory_data['file_accesses']) > 1000:
+                memory_data['file_accesses'] = memory_data['file_accesses'][-1000:]
+            
+            # Save back to file
+            with open(memory_file_path, 'w', encoding='utf-8') as f:
+                json.dump(memory_data, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Warning: Could not append access to memory file {memory_file_path}: {e}")
     
     def _detect_redundant_archives(self, downloads_files: List[Dict]) -> Dict[str, Dict]:
         """Detect archive files that likely contain already-extracted content"""
@@ -191,13 +659,15 @@ class SmartOrganizer:
     
     def _calculate_name_similarity(self, name1: str, name2: str) -> float:
         """Calculate similarity between two filenames (0.0 to 1.0)"""
-        # Simple similarity based on common words and characters
+        # Enhanced similarity detection for movie/content files
         
         # Clean names: remove common noise words and special chars
         def clean_name(name):
             # Remove year patterns, quality indicators, etc.
             name = re.sub(r'\b(19|20)\d{2}\b', '', name)  # Years
-            name = re.sub(r'\b(720p|1080p|480p|hd|dvd|bluray|webrip|hdtv)\b', '', name, flags=re.I)
+            name = re.sub(r'\b(720p|1080p|480p|4k|hd|dvd|bluray|webrip|hdtv|brrip|cam|ts|dvdscr)\b', '', name, flags=re.I)
+            name = re.sub(r'\b(x264|x265|h264|h265|xvid|divx|aac|ac3|dts)\b', '', name, flags=re.I)  # Codecs
+            name = re.sub(r'\b(extended|unrated|directors|cut|remastered|special|edition)\b', '', name, flags=re.I)  # Versions
             name = re.sub(r'[^\w\s]', ' ', name)  # Special chars to spaces
             name = re.sub(r'\s+', ' ', name).strip()  # Multiple spaces to single
             return name.lower()
@@ -207,6 +677,14 @@ class SmartOrganizer:
         
         if not clean1 or not clean2:
             return 0.0
+        
+        # Direct string similarity for very similar names
+        if clean1 == clean2:
+            return 1.0
+        
+        # Check if one is contained in the other (for cases like "Thunderbolts" and "Thunderbolts Movie")
+        if clean1 in clean2 or clean2 in clean1:
+            return 0.9
         
         # Word-based similarity
         words1 = set(clean1.split())
@@ -218,7 +696,18 @@ class SmartOrganizer:
         intersection = words1.intersection(words2)
         union = words1.union(words2)
         
-        return len(intersection) / len(union) if union else 0.0
+        jaccard_similarity = len(intersection) / len(union) if union else 0.0
+        
+        # Boost similarity if the main title words match
+        main_words1 = [w for w in words1 if len(w) > 3]  # Focus on substantial words
+        main_words2 = [w for w in words2 if len(w) > 3]
+        
+        if main_words1 and main_words2:
+            main_intersection = set(main_words1).intersection(set(main_words2))
+            if main_intersection:
+                jaccard_similarity = min(1.0, jaccard_similarity + 0.2)  # Boost for main word matches
+        
+        return jaccard_similarity
     
     def _get_compression_ratios(self, content_type: str) -> Tuple[float, float]:
         """Get expected compression ratios (min, max) for different content types"""
@@ -247,6 +736,11 @@ class SmartOrganizer:
             'type_category': self._categorize_by_extension(Path(file_path).suffix.lower()),
             'base_name_no_ext': Path(file_path).stem.lower()
         }
+        
+        # Add series detection for video files
+        if file_info['type_category'] == 'videos':
+            series_info = self._detect_series_episode(base_name)
+            file_info.update(series_info)
         
         # Add content hints for better AI analysis
         if file_info['extension'] in ['.txt', '.md', '.json', '.js', '.py', '.html', '.css']:
@@ -287,6 +781,52 @@ class SmartOrganizer:
             if ext in extensions:
                 return category
         return 'unknown'
+    
+    def _detect_series_episode(self, filename: str) -> Dict:
+        """Detect if a video file is a series episode and extract series info"""
+        # Remove extension for analysis
+        name_no_ext = Path(filename).stem
+        
+        # Common series episode patterns
+        patterns = [
+            # S01E01, S1E1, etc.
+            r'(.+?)[.\s_-]+[Ss](\d{1,2})[Ee](\d{1,2})',
+            # Season 1 Episode 1, Season 01 Episode 01
+            r'(.+?)[.\s_-]+[Ss]eason[.\s_-]*(\d{1,2})[.\s_-]*[Ee]pisode[.\s_-]*(\d{1,2})',
+            # 1x01, 1x1, etc.
+            r'(.+?)[.\s_-]+(\d{1,2})x(\d{1,2})',
+            # Part 1, Part 01, etc. (for some series)
+            r'(.+?)[.\s_-]+[Pp]art[.\s_-]*(\d{1,2})',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, name_no_ext, re.IGNORECASE)
+            if match:
+                if len(match.groups()) >= 3:
+                    series_name = match.group(1)
+                    season = match.group(2)
+                    episode = match.group(3)
+                elif len(match.groups()) == 2:  # Part pattern
+                    series_name = match.group(1)
+                    season = "1"  # Default to season 1 for part-based series
+                    episode = match.group(2)
+                else:
+                    continue
+                
+                # Clean up series name
+                series_name = re.sub(r'[.\s_-]+', ' ', series_name).strip()
+                series_name = re.sub(r'\b(19|20)\d{2}\b', '', series_name)  # Remove years
+                series_name = series_name.title()  # Title case
+                
+                return {
+                    'is_series': True,
+                    'series_name': series_name,
+                    'season': int(season),
+                    'episode': int(episode),
+                    'suggested_path': f"Series/{series_name}/Season {int(season)}"
+                }
+        
+        return {'is_series': False}
     
     def _get_text_file_hint(self, file_path: str) -> str:
         """Get content hint from text files"""
@@ -438,6 +978,16 @@ FILES TO ORGANIZE:
         for file_info in downloads_files[:20]:  # Limit to first 20 files for context
             context += f"- {file_info['name']} ({file_info['type_category']}, {file_info['size_category']}, {file_info['size_mb']}MB)"
             
+            # Add series information if available
+            if file_info.get('is_series', False):
+                context += f"\n  📺 Series: {file_info['series_name']} - Season {file_info['season']} Episode {file_info['episode']}"
+                context += f"\n  📁 Suggested Path: {file_info['suggested_path']}"
+            
+            # Add project information if available
+            if file_info.get('is_project', False):
+                context += f"\n  💻 Project: {file_info['project_type']} ({file_info['file_count']} files)"
+                context += f"\n  📁 Should go to: Projects/"
+            
             # Add document content analysis if available
             if 'content_hint' in file_info and file_info['content_hint']:
                 context += f"\n  📄 Content: {file_info['content_hint'][:100]}..."
@@ -480,12 +1030,33 @@ These archives likely contain content that isn't extracted. Consider extraction 
         prompt = f"""
 {context}{redundant_info}{extract_info}
 
-Please analyze these files and suggest how to organize them into the existing sorted folder structure. Pay special attention to document content analysis for PDFs and Word documents.
+Please analyze these files and suggest how to organize them into the existing sorted folder structure. 
+
+IMPORTANT CATEGORIZATION RULES:
+1. **Movies vs Series**: 
+   - Single movie files (.mp4, .mkv, .avi, etc.) should go to "Movies" folder
+   - Series episodes should go to "Series/[Series Name]/Season X/" structure
+   
+2. **Series Organization**: 
+   - Detect series episodes by patterns like: S01E01, Season 1, 1x01, etc.
+   - Extract series name and season number from filename
+   - Create folder structure: Series/[Series Name]/Season [X]/
+   - Examples: "Breaking.Bad.S01E01.mp4" → "Series/Breaking Bad/Season 1/"
+   
+3. **Redundant Archives**: If you see both an archive (RAR, ZIP, 7Z) AND the extracted content with similar names, suggest deleting the archive with action "delete_redundant".
+
+4. **Software/Games**: ISO files, installers, and game files should go to "Software" or "Games" folders.
+
+5. **Projects**: Software projects (especially with .git folders) should go to "Projects" folder. These are treated as single units, not individual files.
+
+6. **Document Content**: Use content analysis for PDFs and Word docs to categorize intelligently.
+
+7. **Unknown Files**: For files that don't fit clear categories, suggest action "needs_user_input" so user can specify what to do.
 
 For each file, suggest:
 
-1. DESTINATION: Which existing folder OR suggest a new folder name
-2. REASONING: Why this file belongs there (use content analysis for documents)
+1. DESTINATION: Which existing folder OR suggest a new folder name with full path
+2. REASONING: Why this file belongs there (be specific about movie vs series logic)
 3. ACTION: One of these options:
    - 'move_to_existing': Move to existing folder
    - 'create_new_folder': Create new folder and move there
@@ -493,8 +1064,16 @@ For each file, suggest:
    - 'extract_archive': Extract this archive and organize its contents
    - 'delete_folder': Delete empty folder after moving contents
    - 'create_folder': Create a new organization folder
+   - 'needs_user_input': File needs user clarification (for unknown/ambiguous files)
 
-For document files (PDFs, Word docs), use the content analysis provided to make smarter categorization decisions.
+SPECIFIC EXAMPLES:
+- "Thunderbolts.mp4" → Movies/ (single movie file)
+- "Thunderbolts.rar" + "Thunderbolts.mp4" → Delete the RAR (redundant archive)
+- "Breaking.Bad.S01E01.mp4" → Series/Breaking Bad/Season 1/ (series episode)
+- "Game.of.Thrones.1x05.mp4" → Series/Game of Thrones/Season 1/ (series episode)
+- "Ubuntu.iso" → Software/ (ISO file)
+- "my-website-project/" (with .git) → Projects/ (software project)
+- "V2K-homepage-files.zip" → needs_user_input (unclear project files)
 
 Return your response as JSON with this structure:
 {{
@@ -506,7 +1085,7 @@ Return your response as JSON with this structure:
             "current_path": "current/path",
             "action": "move_to_existing|create_new_folder|delete_redundant|extract_archive|create_folder|delete_folder",
             "destination": "destination/path",
-            "reasoning": "why this file goes here",
+            "reasoning": "why this file goes here (be specific about movie vs TV show logic)",
             "confidence": 85,
             "document_type": "contract|receipt|invoice|personal|etc" // for documents only
         }}

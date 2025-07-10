@@ -115,15 +115,20 @@
 
 ### API Endpoints
 - **File Organizer**:
-  - `GET /api/file-organizer/stats` - Get organization statistics
-  - `GET /api/file-organizer/files` - List files with AI suggestions
-  - `GET /api/file-organizer/rules` - Get organization rules
+  - `POST /api/file-organizer/organize` - AI-powered file organization analysis
+  - `POST /api/file-organizer/execute-action` - Execute file operations (move, delete)
+  - `POST /api/file-organizer/re-analyze` - Re-analyze files with user input
+  - `POST /api/file-organizer/discover` - Discover files and folders
+  - `POST /api/file-organizer/browse-folders` - Browse file system
 - **Financial Manager**:
   - `GET /api/financial/summary` - Get financial overview
   - `GET /api/financial/income` - List income entries
   - `GET /api/financial/expenses` - List expenses
   - `GET /api/financial/construction` - Get construction budget
   - `GET /api/financial/tax-report` - Get tax report
+- **System**:
+  - `GET /api/health` - System health check
+  - `GET /api/status` - API status and version
 
 ### Flutter Architecture
 

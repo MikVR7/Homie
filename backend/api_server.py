@@ -165,10 +165,16 @@ def file_organizer_organize():
         sorted_path = data['sorted_path']
         api_key = data.get('api_key')
         
+        # If no API key provided, try to get it from environment
+        if not api_key:
+            from dotenv import load_dotenv
+            load_dotenv()
+            api_key = os.getenv('GEMINI_API_KEY')
+            
         if not api_key:
             return jsonify({
                 'success': False,
-                'error': 'Gemini API key is required for AI analysis'
+                'error': 'Gemini API key is required for AI analysis. Please configure GEMINI_API_KEY in backend .env file'
             }), 400
         
         if not os.path.exists(downloads_path):
@@ -267,6 +273,106 @@ def file_organizer_organize():
                 'Check that all required parameters are provided',
                 'Contact support if the problem persists'
             ]
+        }), 500
+
+@app.route('/api/file-organizer/execute-action', methods=['POST'])
+def execute_file_action():
+    """Execute a file action (move, delete, etc.)"""
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        file_path = data.get('file_path')
+        destination_path = data.get('destination_path')
+        source_folder = data.get('source_folder')
+        destination_folder = data.get('destination_folder')
+        
+        if not action or not file_path or not source_folder or not destination_folder:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters'
+            }), 400
+        
+        # Use environment API key
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'GEMINI_API_KEY environment variable not set'
+            }), 400
+        
+        # Initialize the organizer
+        organizer = SmartOrganizer(api_key)
+        
+        # Execute the action
+        result = organizer.execute_file_action(
+            action=action,
+            file_path=file_path,
+            destination_path=destination_path,
+            source_folder=source_folder,
+            destination_folder=destination_folder
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error executing file action: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/file-organizer/re-analyze', methods=['POST'])
+def re_analyze_file():
+    """Re-analyze a file with user input"""
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path')
+        user_input = data.get('user_input')
+        source_folder = data.get('source_folder')
+        destination_folder = data.get('destination_folder')
+        
+        if not file_path or not user_input or not source_folder or not destination_folder:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters'
+            }), 400
+        
+        # Use environment API key
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'GEMINI_API_KEY environment variable not set'
+            }), 400
+        
+        # Initialize the organizer
+        organizer = SmartOrganizer(api_key)
+        
+        # Re-analyze the file with user input
+        result = organizer.re_analyze_file(
+            file_path=file_path,
+            user_input=user_input,
+            source_folder=source_folder,
+            destination_folder=destination_folder
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error re-analyzing file: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 @app.route('/api/file-organizer/browse-folders', methods=['POST'])
@@ -553,6 +659,75 @@ def financial_monthly_report():
         }), 500
 
 # ============================================================================
+# FILE ACCESS TRACKING ENDPOINTS
+# ============================================================================
+
+@app.route('/api/file-organizer/log-access', methods=['POST'])
+def log_file_access():
+    """Log file access for usage tracking"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        file_path = data.get('file_path')
+        action = data.get('action', 'open')
+        user_agent = data.get('user_agent')
+        
+        if not file_path:
+            return jsonify({'success': False, 'error': 'file_path is required'}), 400
+        
+        # Initialize smart organizer
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({'success': False, 'error': 'Gemini API key not configured'}), 500
+        
+        organizer = SmartOrganizer(api_key)
+        result = organizer.log_file_access(file_path, action, user_agent)
+        
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        print(f"[File Access] ❌ Error logging access: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/file-organizer/access-analytics', methods=['GET'])
+def get_file_access_analytics():
+    """Get file access analytics for a folder"""
+    try:
+        folder_path = request.args.get('folder_path')
+        days = request.args.get('days', 30, type=int)
+        
+        if not folder_path:
+            return jsonify({'success': False, 'error': 'folder_path parameter is required'}), 400
+        
+        if not os.path.exists(folder_path):
+            return jsonify({'success': False, 'error': f'Folder not found: {folder_path}'}), 404
+        
+        # Initialize smart organizer
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({'success': False, 'error': 'Gemini API key not configured'}), 500
+        
+        organizer = SmartOrganizer(api_key)
+        result = organizer.get_file_access_analytics(folder_path, days)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[File Access] ❌ Error getting analytics: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ============================================================================
 # FUTURE MODULE ENDPOINTS
 # ============================================================================
 
@@ -567,7 +742,11 @@ if __name__ == '__main__':
     print("  📂 File Organizer:")
     print("    POST /api/file-organizer/discover")
     print("    POST /api/file-organizer/organize")
+    print("    POST /api/file-organizer/execute-action")
+    print("    POST /api/file-organizer/re-analyze")
     print("    POST /api/file-organizer/browse-folders")
+    print("    POST /api/file-organizer/log-access")
+    print("    GET  /api/file-organizer/access-analytics")
     print("  💰 Financial Manager:")
     print("    GET  /api/financial/summary")
     print("    GET/POST /api/financial/income")
