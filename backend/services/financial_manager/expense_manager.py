@@ -63,10 +63,25 @@ class ExpenseManager:
         with open(self.expenses_file, 'w', encoding='utf-8') as f:
             json.dump([asdict(expense) for expense in self.expenses], f, indent=2, ensure_ascii=False)
     
+    def _expense_exists(self, amount: float, date: str, description: str) -> bool:
+        """Check if expense with same amount, date, and description already exists"""
+        rounded_amount = round(amount, 2)
+        return any(
+            exp.amount == rounded_amount and 
+            exp.date == date and 
+            exp.description.strip().lower() == description.strip().lower()
+            for exp in self.expenses
+        )
+    
     def add_expense(self, amount: float, date: str, category: str, description: str, receipt_path: str = None) -> bool:
-        """Add expense entry"""
+        """Add expense entry (with duplicate detection)"""
         try:
             datetime.strptime(date, '%Y-%m-%d')
+            
+            # Check for duplicates
+            if self._expense_exists(amount, date, description):
+                print(f"Duplicate expense detected: {amount} on {date} - {description}")
+                return False  # Skip duplicate
             
             is_deductible = self.categories.get(category, {}).get("deductible", False)
             
@@ -98,6 +113,11 @@ class ExpenseManager:
         """Get expenses for specific month"""
         year_month = f"{year}-{month:02d}"
         total = sum(exp.amount for exp in self.expenses if exp.date.startswith(year_month))
+        return round(total, 2)
+    
+    def get_expenses_for_period(self, start_date: str, end_date: str) -> float:
+        """Get expenses for custom date period"""
+        total = sum(exp.amount for exp in self.expenses if start_date <= exp.date <= end_date)
         return round(total, 2)
     
     def get_deductible_expenses(self, year: int) -> float:

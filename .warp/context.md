@@ -41,6 +41,14 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
 - Cash flow predictions for house construction expenses
 - Flutter interface with comprehensive financial dashboard
 
+### 🏦 **Salt Edge Open Banking Integration** (Phase 6 - In Progress 🚧)
+- **Application Created Successfully** ✅ - Salt Edge developer account and application setup complete
+- **Redirect URL Configured** ✅ - Using `http://127.0.0.1:3000/callback` for development
+- **API Integration** ✅ - Complete backend services and endpoints implemented
+- **Austrian Bank Support** ✅ - Erste Bank, Raiffeisen, Bank Austria, and more
+- **AI-Powered Categorization** ✅ - Automatic transaction categorization with construction expense detection
+- **Next**: Get API credentials and complete authentication setup
+
 ### 📱 **Mobile-First Design** (Complete ✅)
 - Primary target: Cross-platform Flutter application
 - Supports Android, iOS, Web, Windows, macOS, Linux
@@ -49,9 +57,8 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
 - Material 3 dark theme with responsive design
 
 ## Current Status
-- **Phase**: Phase 1 File Organizer - Complete ✅
-- **Phase**: Phase 5 Financial Management - Complete ✅
-- **Priority**: Implement file operations and preview mode for File Organizer
+- **Phase**: Phase 6 Salt Edge Open Banking Integration - Setting up credentials 🚧
+- **Priority**: Complete Salt Edge API credentials setup and test bank connection
 - **Location**: `/home/mikele/Projects/Homie`
 - **Target Platform**: Flutter cross-platform application
 - **Easy Startup**: Use `./start_homie.sh` to launch both services
@@ -80,7 +87,12 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
   - ✅ PDF/DOC/TXT content reading for better AI categorization
   - ✅ AI re-analysis with user input for "Specify" functionality
   - ✅ Compact button design with right-aligned actions
-  - 🚧 Next: Add file access tracking to memory files
+  - ✅ Salt Edge backend services implementation (8 API endpoints)
+  - ✅ Austrian bank integration with construction expense detection
+  - ✅ AI-powered transaction categorization system
+  - ✅ Salt Edge developer account and application creation
+  - ✅ Redirect URL configuration for OAuth flow
+  - 🚧 Current: Get Salt Edge API credentials and configure authentication
 
 ## 🚀 Easy Startup Commands
 
@@ -114,6 +126,16 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 
 ## Recent Technical Achievements
 
+### Salt Edge Open Banking Integration ✅
+- **Backend Services**: Complete Salt Edge service implementation with 8 API endpoints
+- **Bank Connection Manager**: Customer and connection persistence with status tracking
+- **Transaction Sync**: Automatic import with intelligent Austrian/German keyword categorization
+- **Data Enrichment**: AI-powered categorization using Gemini with ML models and rule-based categorization
+- **Construction Expense Detection**: Automatic detection from Austrian hardware stores and service providers
+- **Developer Account**: Successfully created Salt Edge developer account and application
+- **OAuth Configuration**: Redirect URL configured as `http://127.0.0.1:3000/callback` for development
+- **Austrian Bank Support**: Ready for Erste Bank, Raiffeisen, Bank Austria, and other Austrian banks
+
 ### Flutter Cross-Platform Implementation ✅
 - **Complete App Structure**: Full Flutter application with Material 3 design
 - **Cross-Platform Support**: Android, iOS, Web, Desktop from single codebase
@@ -144,6 +166,7 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 - **AI Integration**: Re-analysis with user input for custom specifications
 - **Memory Logging**: Automatic logging of all operations to .homie_memory.json
 - **Financial API**: Comprehensive endpoints for summary, income, expenses, construction, tax reports
+- **Salt Edge Banking API**: 8 endpoints for status, providers, connections, accounts, sync, enrichment, webhooks
 - **Folder Browsing**: `/api/browse-folders` - File system navigation for path selection
 - **Health Monitoring**: `/api/health` - System status and endpoint availability
 - **Error Standards**: Consistent HTTP status codes and structured error responses
@@ -153,32 +176,38 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 ### System Components
 - **Core Layer**: File System Abstraction, Metadata Engine, Rules Engine, Event System
 - **Service Layer**: Organization, Configuration, Monitoring, Backup services
+- **Banking Layer**: Salt Edge integration, Transaction sync, AI categorization
 - **Interface Layer**: Flutter UI, REST API, Plugin API
 
 ### Data Management
 - **Configuration**: JSON files in `backend/config/`
 - **Database**: SQLite (simple) or PostgreSQL (scale)
 - **Cache**: File hashes, thumbnails, ML models
+- **Banking Data**: Encrypted transaction storage with GDPR compliance
 
 ### Security & Privacy
 - Local processing by default
 - Optional encryption at rest
 - Minimal cloud data sharing
 - User consent for all integrations
+- PSD2 compliant banking integration
+- OAuth 2.0 secure authentication
 
 ## Current Priorities
-1. **📂 File Access Tracking**: Add file open/access timestamps to memory files
-2. **📦 Archive Operations**: Automatic extraction with password support
-3. **🏗️ API Mobile Optimization**: Enhance endpoints for mobile app performance
-4. **🔄 Batch Operations**: Implement bulk file operations with progress tracking
-5. **🎬 Media Manager Module**: Begin implementation of next module
+1. **🏦 Salt Edge API Setup**: Get API credentials from Salt Edge dashboard
+2. **🔑 Authentication Configuration**: Set up private/public keys and environment variables
+3. **🧪 Bank Connection Testing**: Test connection with Austrian bank
+4. **📱 Frontend Banking UI**: Integrate banking features into Flutter app
+5. **🔄 Transaction Sync**: Implement automatic daily transaction import
 
 ## Technology Stack (FINALIZED)
 
 ### Backend: Python 3.8+
 - **Framework**: Flask with CORS support
-- **AI Integration**: Google Gemini 1.5 Flash for file organization
+- **AI Integration**: Google Gemini 1.5 Flash for file organization and transaction categorization
 - **Document Processing**: PyPDF2, python-docx, pytesseract, pillow
+- **Banking Integration**: Salt Edge API v6 with PSD2 compliance
+- **ML Libraries**: pandas, numpy, scikit-learn for transaction categorization
 - **Testing**: pytest
 - **Code Quality**: black, flake8
 - **Database**: SQLite
@@ -198,31 +227,3 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 - **IMPORTANT: Work in small, incremental steps** - Always explain what you're doing and wait for user confirmation before proceeding to the next step
 - Use feature branches for development
 - Write comprehensive tests for file operations
-- Follow safety-first approach for file modifications
-- Update documentation with all changes
-- Check TODO.md for current sprint priorities
-- Test on multiple platforms during development
-
-## Architecture Decisions Made
-- **Technology Stack**: Python 3.8+ backend + Flutter frontend
-- **Frontend Framework**: Flutter for cross-platform mobile, web, and desktop support
-- **State Management**: Provider pattern for reactive state updates
-- **Navigation**: Go Router for declarative routing
-- **Data Flow**: Scanner → Metadata → Rules Engine → Action Executor
-- **Storage Strategy**: Local-first with optional cloud integration
-- **Security Model**: Privacy by design, local processing
-- **Error Handling**: Operation rollback, partial failure recovery, quota management
-- **Performance**: Multi-threaded, incremental scanning, resource management
-- **Communication**: REST API between Python and Flutter
-
-## Important Notes
-- Flutter implementation completed successfully
-- Technology stack: Python backend + Flutter frontend finalized
-- Cross-platform support: Single codebase for mobile, web, and desktop
-- Material 3 dark theme implemented with user preferences [[memory:2570958]]
-- Ready for next phase: File operations and preview mode implementation
-- Safety is paramount due to file system operations
-- Performance optimization is a key requirement
-- User experience should prioritize control and transparency
-- All file operations must be reversible
-- Documentation updated to reflect Flutter implementation

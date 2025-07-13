@@ -1,0 +1,202 @@
+[
+  {
+    "id": "const_20250711_215024_0",
+    "amount": 45.99,
+    "date": "2024-01-15",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUHAUS WIEN - Schrauben und Werkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:50:24.117101"
+  },
+  {
+    "id": "const_20250711_215024_1",
+    "amount": 89.9,
+    "date": "2024-01-18",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "HORNBACH SALZBURG - Holz und Farbe",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:50:24.117338"
+  },
+  {
+    "id": "const_20250711_215024_2",
+    "amount": 67.8,
+    "date": "2024-01-21",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "OBI LINZ - Gartenwerkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:50:24.118044"
+  },
+  {
+    "id": "const_20250711_215024_3",
+    "amount": 199.99,
+    "date": "2024-01-24",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUMAX GRAZ - Sanitär Zubehör ",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:50:24.118323"
+  },
+  {
+    "id": "const_20250711_215105_4",
+    "amount": 45.99,
+    "date": "2024-01-15",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUHAUS WIEN - Schrauben und Werkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:51:05.103805"
+  },
+  {
+    "id": "const_20250711_215105_5",
+    "amount": 89.9,
+    "date": "2024-01-18",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "HORNBACH SALZBURG - Holz und Farbe",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:51:05.104521"
+  },
+  {
+    "id": "const_20250711_215105_6",
+    "amount": 67.8,
+    "date": "2024-01-21",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "OBI LINZ - Gartenwerkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:51:05.105326"
+  },
+  {
+    "id": "const_20250711_215105_7",
+    "amount": 199.99,
+    "date": "2024-01-24",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUMAX GRAZ - Sanitär Zubehör ",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:51:05.106034"
+  },
+  {
+    "id": "const_20250711_215418_8",
+    "amount": 45.99,
+    "date": "2024-01-15",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUHAUS WIEN - Schrauben und Werkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:54:18.959591"
+  },
+  {
+    "id": "const_20250711_215418_9",
+    "amount": 89.9,
+    "date": "2024-01-18",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "HORNBACH SALZBURG - Holz und Farbe",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:54:18.960114"
+  },
+  {
+    "id": "const_20250711_215418_10",
+    "amount": 67.8,
+    "date": "2024-01-21",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "OBI LINZ - Gartenwerkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:54:18.960590"
+  },
+  {
+    "id": "const_20250711_215418_11",
+    "amount": 199.99,
+    "date": "2024-01-24",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUMAX GRAZ - Sanitär Zubehör ",
+    "receipt_path": null,
+    "created_at": "2025-07-11T21:54:18.961043"
+  },
+  {
+    "id": "const_20250713_134948_12",
+    "amount": 45.99,
+    "date": "2024-07-02",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUHAUS WIEN - Schrauben und Werkzeug",
+    "receipt_path": null,
+    "created_at": "2025-07-13T13:49:48.750067"
+  },
+  {
+    "id": "const_20250713_134948_13",
+    "amount": 89.9,
+    "date": "2024-07-04",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "HORNBACH SALZBURG - Holz und Farbe",
+    "receipt_path": null,
+    "created_at": "2025-07-13T13:49:48.750421"
+  },
+  {
+    "id": "const_20250713_134948_14",
+    "amount": 234.5,
+    "date": "2024-07-08",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "OBI GRAZ - Sanitär und Elektro",
+    "receipt_path": null,
+    "created_at": "2025-07-13T13:49:48.751183"
+  },
+  {
+    "id": "const_20250713_134948_15",
+    "amount": 123.45,
+    "date": "2024-07-11",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "HORNBACH LINZ - Garten und Terasse",
+    "receipt_path": null,
+    "created_at": "2025-07-13T13:49:48.751761"
+  },
+  {
+    "id": "const_20250713_134948_16",
+    "amount": 89.99,
+    "date": "2024-07-13",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "BAUMAX INNSBRUCK - Dämmmaterial",
+    "receipt_path": null,
+    "created_at": "2025-07-13T13:49:48.752093"
+  },
+  {
+    "id": "const_20250713_143217_17",
+    "amount": 1507.15,
+    "date": "2024-07-01",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "ONLINE BANKING VOM 01.07 UM 10:35 Empfänger: Fenster Deutsch Verwendungszweck: Zweite Teilrechnung - Rechnung Nr. 17524 IBAN Empfänger: AT081200010020434485 BIC Empfänger: BKAUATWWXXX",
+    "receipt_path": null,
+    "created_at": "2025-07-13T14:32:17.052683"
+  },
+  {
+    "id": "const_20250713_143217_18",
+    "amount": 22.14,
+    "date": "2024-08-29",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "Zahlungsempfänger: AMAZON PAYMENTS EUROPE S.C.A. Verwendungszweck: 304-6219785-9881920 AMZN Mktp DE BAUPINF2UZ14QA3N IBAN Zahlungsempfänger: DE87300308801908262006 BIC Zahlungsempfänger: TUBDDEDDXXX Empfänger-Kennung: DE94ZZZ00000561653 Auftraggeberreferenz: BAUPINF2UZ14QA3N Mandat: Ei(iay6gbRLV,tfIcEhBVqf,3GvvFP, 13.12.2021",
+    "receipt_path": null,
+    "created_at": "2025-07-13T14:32:17.139764"
+  },
+  {
+    "id": "const_20250713_143218_19",
+    "amount": 66.3,
+    "date": "2025-04-19",
+    "category": "Materials",
+    "vendor": "CSV Import",
+    "description": "Verwendungszweck: OBI BAU- UND HEIMWERKE FELDBACH 8330 Zahlungsreferenz: POS          66,30 AT  K3   19.04. 08:19 Kartenzahlung mit Kartenfolge-Nr.: 3",
+    "receipt_path": null,
+    "created_at": "2025-07-13T14:32:18.718332"
+  }
+]

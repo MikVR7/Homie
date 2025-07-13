@@ -79,11 +79,38 @@ class IncomeTracker:
         with open(self.self_employment_file, 'w', encoding='utf-8') as f:
             json.dump([asdict(item) for item in self.self_employment_income], f, indent=2, ensure_ascii=False)
     
+    def _employment_income_exists(self, amount: float, date: str, employer: str, description: str = None) -> bool:
+        """Check if employment income with same details already exists"""
+        rounded_amount = round(amount, 2)
+        return any(
+            inc.amount == rounded_amount and 
+            inc.date == date and 
+            inc.employer.strip().lower() == employer.strip().lower() and
+            (inc.description or '').strip().lower() == (description or '').strip().lower()
+            for inc in self.employment_income
+        )
+    
+    def _self_employment_income_exists(self, amount: float, date: str, client: str, description: str) -> bool:
+        """Check if self-employment income with same details already exists"""
+        rounded_amount = round(amount, 2)
+        return any(
+            inc.amount == rounded_amount and 
+            inc.date == date and 
+            inc.client.strip().lower() == client.strip().lower() and
+            inc.description.strip().lower() == description.strip().lower()
+            for inc in self.self_employment_income
+        )
+    
     def add_employment_income(self, amount: float, date: str, employer: str, description: str = None) -> bool:
-        """Add employment income entry"""
+        """Add employment income entry (with duplicate detection)"""
         try:
             # Validate date format
             datetime.strptime(date, '%Y-%m-%d')
+            
+            # Check for duplicates
+            if self._employment_income_exists(amount, date, employer, description):
+                print(f"Duplicate employment income detected: {amount} on {date} from {employer}")
+                return False  # Skip duplicate
             
             income_entry = EmploymentIncome(
                 id=f"emp_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.employment_income)}",
@@ -103,10 +130,15 @@ class IncomeTracker:
             return False
     
     def add_self_employment_income(self, amount: float, date: str, client: str, description: str, invoice_number: str = None) -> bool:
-        """Add self-employment income entry"""
+        """Add self-employment income entry (with duplicate detection)"""
         try:
             # Validate date format
             datetime.strptime(date, '%Y-%m-%d')
+            
+            # Check for duplicates
+            if self._self_employment_income_exists(amount, date, client, description):
+                print(f"Duplicate self-employment income detected: {amount} on {date} from {client}")
+                return False  # Skip duplicate
             
             income_entry = SelfEmploymentIncome(
                 id=f"self_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.self_employment_income)}",
@@ -157,6 +189,22 @@ class IncomeTracker:
         total = 0
         for income in self.self_employment_income:
             if income.date.startswith(year_month):
+                total += income.amount
+        return round(total, 2)
+    
+    def get_employment_income_for_period(self, start_date: str, end_date: str) -> float:
+        """Get employment income for custom date period"""
+        total = 0
+        for income in self.employment_income:
+            if start_date <= income.date <= end_date:
+                total += income.amount
+        return round(total, 2)
+    
+    def get_self_employment_income_for_period(self, start_date: str, end_date: str) -> float:
+        """Get self-employment income for custom date period"""
+        total = 0
+        for income in self.self_employment_income:
+            if start_date <= income.date <= end_date:
                 total += income.amount
         return round(total, 2)
     

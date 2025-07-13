@@ -1,0 +1,17 @@
+{
+  "main": {
+    "account_type": "main",
+    "balance": -5740.0,
+    "last_updated": "2025-07-13T15:08:34.060120"
+  },
+  "sparkonto": {
+    "account_type": "sparkonto",
+    "balance": 19835.96,
+    "last_updated": "2025-07-13T21:47:18.743280"
+  },
+  "cash": {
+    "account_type": "cash",
+    "balance": 0.0,
+    "last_updated": "2025-07-13T14:58:37.832883"
+  }
+}

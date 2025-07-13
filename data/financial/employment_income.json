@@ -1,0 +1,546 @@
+[
+  {
+    "id": "emp_20250711_215105_0",
+    "amount": 2500.0,
+    "date": "2024-01-17",
+    "employer": "CSV Import",
+    "description": "GEHALT - Monatsgehalt Januar",
+    "created_at": "2025-07-11T21:51:05.104366"
+  },
+  {
+    "id": "emp_20250711_215418_1",
+    "amount": 2500.0,
+    "date": "2024-01-17",
+    "employer": "CSV Import",
+    "description": "GEHALT - Monatsgehalt Januar",
+    "created_at": "2025-07-11T21:54:18.960043"
+  },
+  {
+    "id": "emp_20250713_134948_2",
+    "amount": 2800.0,
+    "date": "2024-07-01",
+    "employer": "CSV Import",
+    "description": "GEHALT - Monatsgehalt Juli 2024",
+    "created_at": "2025-07-13T13:49:48.749876"
+  },
+  {
+    "id": "emp_20250713_134948_3",
+    "amount": 500.0,
+    "date": "2024-07-15",
+    "employer": "CSV Import",
+    "description": "FREELANCE PROJEKT - Webentwicklung ",
+    "created_at": "2025-07-13T13:49:48.752435"
+  },
+  {
+    "id": "emp_20250713_143217_4",
+    "amount": 1000.0,
+    "date": "2024-07-12",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag.phil. Gertraud Schlacher-Fritz Zahlungsreferenz: Urlaub IBAN Auftraggeber: AT183849700003027430 BIC Auftraggeber: RZSTAT2G497",
+    "created_at": "2025-07-13T14:32:17.061392"
+  },
+  {
+    "id": "emp_20250713_143217_5",
+    "amount": 3121.09,
+    "date": "2024-07-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbHA-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 7/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.076248"
+  },
+  {
+    "id": "emp_20250713_143217_6",
+    "amount": 0.02,
+    "date": "2024-08-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a.Habenzinsen",
+    "created_at": "2025-07-13T14:32:17.080124"
+  },
+  {
+    "id": "emp_20250713_143217_7",
+    "amount": 60.0,
+    "date": "2024-08-29",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: FA Österreich - Oststeiermark Verwendungszweck: RUECKZAHLUNG 26.08.2024 Einkommensteuer Hebenstreit Mihael IBAN Auftraggeber: AT070100000005534674 BIC Auftraggeber: BUNDATWWXXX Auftraggeberreferenz: AF334620240826042913",
+    "created_at": "2025-07-13T14:32:17.137307"
+  },
+  {
+    "id": "emp_20250713_143217_8",
+    "amount": 3121.09,
+    "date": "2024-08-29",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbHA-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 8/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.137454"
+  },
+  {
+    "id": "emp_20250713_143217_9",
+    "amount": 0.02,
+    "date": "2024-09-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a. Habenzinsen      ab 01.08.24",
+    "created_at": "2025-07-13T14:32:17.139960"
+  },
+  {
+    "id": "emp_20250713_143217_10",
+    "amount": 290.0,
+    "date": "2024-09-06",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: BMK Klimabonus Verwendungszweck: Klimabonus 2024 - Kat. IV M. Hebenstreit (4795850) IBAN Auftraggeber: AT190100000005060904 BIC Auftraggeber: BUNDATWWXXX Auftraggeberreferenz: BO434920240729191083",
+    "created_at": "2025-07-13T14:32:17.158266"
+  },
+  {
+    "id": "emp_20250713_143217_11",
+    "amount": 150.0,
+    "date": "2024-09-23",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Tona Paypal Zalando IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:17.186140"
+  },
+  {
+    "id": "emp_20250713_143217_12",
+    "amount": 3121.09,
+    "date": "2024-09-27",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbHA-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 9/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.203940"
+  },
+  {
+    "id": "emp_20250713_143217_13",
+    "amount": 0.03,
+    "date": "2024-10-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a.Habenzinsen",
+    "created_at": "2025-07-13T14:32:17.213902"
+  },
+  {
+    "id": "emp_20250713_143217_14",
+    "amount": 10000.0,
+    "date": "2024-09-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.218920"
+  },
+  {
+    "id": "emp_20250713_143217_15",
+    "amount": 1000.0,
+    "date": "2024-10-12",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.293806"
+  },
+  {
+    "id": "emp_20250713_143217_16",
+    "amount": 70.0,
+    "date": "2024-10-14",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Shop Apotheke Bestellung IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:17.296589"
+  },
+  {
+    "id": "emp_20250713_143217_17",
+    "amount": 3121.09,
+    "date": "2024-10-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbHA-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 10/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.359182"
+  },
+  {
+    "id": "emp_20250713_143217_18",
+    "amount": 0.01,
+    "date": "2024-11-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a.Habenzinsen",
+    "created_at": "2025-07-13T14:32:17.368898"
+  },
+  {
+    "id": "emp_20250713_143217_19",
+    "amount": 310.0,
+    "date": "2024-11-20",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Geburtstagsgeschenk von TonaKatz IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:17.463804"
+  },
+  {
+    "id": "emp_20250713_143217_20",
+    "amount": 6827.6,
+    "date": "2024-11-28",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH Verwendungszweck: Gehalt 11/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.514362"
+  },
+  {
+    "id": "emp_20250713_143217_21",
+    "amount": 0.02,
+    "date": "2024-12-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a.Habenzinsen",
+    "created_at": "2025-07-13T14:32:17.519870"
+  },
+  {
+    "id": "emp_20250713_143217_22",
+    "amount": 1000.0,
+    "date": "2024-12-20",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.690577"
+  },
+  {
+    "id": "emp_20250713_143217_23",
+    "amount": 3112.64,
+    "date": "2024-12-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbHA-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 12/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.711986"
+  },
+  {
+    "id": "emp_20250713_143217_24",
+    "amount": 0.02,
+    "date": "2025-01-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a.Habenzinsen",
+    "created_at": "2025-07-13T14:32:17.726248"
+  },
+  {
+    "id": "emp_20250713_143217_25",
+    "amount": 129.8,
+    "date": "2025-01-16",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: TYROMOTION GMBH BAHNHOFGUERTEL 59 Verwendungszweck: Re.Nr.: BARAUSLAGEN 11/24 Re.Betr: 129,80 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX Auftraggeberreferenz: 134300100063",
+    "created_at": "2025-07-13T14:32:17.820238"
+  },
+  {
+    "id": "emp_20250713_143217_26",
+    "amount": 1000.0,
+    "date": "2025-01-17",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.824547"
+  },
+  {
+    "id": "emp_20250713_143217_27",
+    "amount": 243.41,
+    "date": "2025-01-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH Verwendungszweck: Gehalt 13/2024 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.903490"
+  },
+  {
+    "id": "emp_20250713_143217_28",
+    "amount": 3245.64,
+    "date": "2025-01-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH Verwendungszweck: Gehalt 1/2025 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:17.903774"
+  },
+  {
+    "id": "emp_20250713_143217_29",
+    "amount": 0.01,
+    "date": "2025-02-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a. Habenzinsen      ab 01.01.25",
+    "created_at": "2025-07-13T14:32:17.911112"
+  },
+  {
+    "id": "emp_20250713_143218_30",
+    "amount": 3249.71,
+    "date": "2025-02-27",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH Verwendungszweck: Gehalt 2/2025 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.116930"
+  },
+  {
+    "id": "emp_20250713_143218_31",
+    "amount": 0.01,
+    "date": "2025-03-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a. Habenzinsen      ab 01.02.25",
+    "created_at": "2025-07-13T14:32:18.122188"
+  },
+  {
+    "id": "emp_20250713_143218_32",
+    "amount": 900.0,
+    "date": "2025-03-10",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: ELFRIEDE HEBENSTREIT Verwendungszweck: EFI-SCHULDEN IBAN Auftraggeber: AT933849700000406983 BIC Auftraggeber: RZSTAT2G497",
+    "created_at": "2025-07-13T14:32:18.186734"
+  },
+  {
+    "id": "emp_20250713_143218_33",
+    "amount": 2000.0,
+    "date": "2025-03-13",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.218909"
+  },
+  {
+    "id": "emp_20250713_143218_34",
+    "amount": 1910.0,
+    "date": "2025-03-14",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Plan und Biogena IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:18.234579"
+  },
+  {
+    "id": "emp_20250713_143218_35",
+    "amount": 72.0,
+    "date": "2025-03-17",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Pascal Stark Zahlungsreferenz: Pasci für Poxy Poltern IBAN Auftraggeber: AT933807500000030114 BIC Auftraggeber: RZSTAT2G075",
+    "created_at": "2025-07-13T14:32:18.247341"
+  },
+  {
+    "id": "emp_20250713_143218_36",
+    "amount": 72.0,
+    "date": "2025-03-18",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Michael Gerstl Verwendungszweck: Poxy poltern IBAN Auftraggeber: AT732081511801011062 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.257957"
+  },
+  {
+    "id": "emp_20250713_143218_37",
+    "amount": 360.0,
+    "date": "2025-03-20",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Biogena und Eduard IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:18.270196"
+  },
+  {
+    "id": "emp_20250713_143218_38",
+    "amount": 700.0,
+    "date": "2025-03-21",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Dachsteinkönig Hotel GmbH Verwendungszweck: 2025-001 700,00 IBAN Auftraggeber: AT671500000121619639 BIC Auftraggeber: OBKLAT2LXXX",
+    "created_at": "2025-07-13T14:32:18.282358"
+  },
+  {
+    "id": "emp_20250713_143218_39",
+    "amount": 0.01,
+    "date": "2025-03-24",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Google Payment Ireland Limited Verwendungszweck: GG103WYN2M IBAN Auftraggeber: IE29CITI99005124179036 BIC Auftraggeber: CITIIE2XXXX Auftraggeberreferenz: GG103WYN2M",
+    "created_at": "2025-07-13T14:32:18.305178"
+  },
+  {
+    "id": "emp_20250713_143218_40",
+    "amount": 72.0,
+    "date": "2025-03-24",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Peter Johannes Plesch Zahlungsreferenz: Für Schnaps und Poxy IBAN Auftraggeber: AT043825200002020592 BIC Auftraggeber: RZSTAT2G252",
+    "created_at": "2025-07-13T14:32:18.305517"
+  },
+  {
+    "id": "emp_20250713_143218_41",
+    "amount": 82.0,
+    "date": "2025-03-24",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Marcel Schnalzer Zahlungsreferenz: Noppen IBAN Auftraggeber: AT593815100002020980 BIC Auftraggeber: RZSTAT2G151",
+    "created_at": "2025-07-13T14:32:18.305803"
+  },
+  {
+    "id": "emp_20250713_143218_42",
+    "amount": 72.0,
+    "date": "2025-03-26",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Kölber Martin Verwendungszweck: poltern IBAN Auftraggeber: AT396000000071649469 BIC Auftraggeber: BAWAATWWXXX",
+    "created_at": "2025-07-13T14:32:18.333921"
+  },
+  {
+    "id": "emp_20250713_143218_43",
+    "amount": 3249.98,
+    "date": "2025-03-28",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH Verwendungszweck: Gehalt 3/2025 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.342458"
+  },
+  {
+    "id": "emp_20250713_143218_44",
+    "amount": 80.0,
+    "date": "2025-03-28",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: ELFRIEDE HEBENSTREIT Verwendungszweck: EFI IBAN Auftraggeber: AT933849700000406983 BIC Auftraggeber: RZSTAT2G497",
+    "created_at": "2025-07-13T14:32:18.356812"
+  },
+  {
+    "id": "emp_20250713_143218_45",
+    "amount": 72.0,
+    "date": "2025-03-28",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Michael Grasmugg Verwendungszweck: Poxy Poltern IBAN Auftraggeber: AT641420020012883588 BIC Auftraggeber: BAWAATWWXXX",
+    "created_at": "2025-07-13T14:32:18.361270"
+  },
+  {
+    "id": "emp_20250713_143218_46",
+    "amount": 0.03,
+    "date": "2025-04-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a. Habenzinsen      ab 01.03.25",
+    "created_at": "2025-07-13T14:32:18.382100"
+  },
+  {
+    "id": "emp_20250713_143218_47",
+    "amount": 10000.0,
+    "date": "2025-04-01",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mirjana Vurusic IBAN Auftraggeber: AT362081500044324705 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.390836"
+  },
+  {
+    "id": "emp_20250713_143218_48",
+    "amount": 300.0,
+    "date": "2025-04-08",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Biogena One 3 Monate UND Netflix IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:18.578928"
+  },
+  {
+    "id": "emp_20250713_143218_49",
+    "amount": 72.0,
+    "date": "2025-04-14",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Thomas Peyerl Zahlungsreferenz: Poxy Poltern IBAN Auftraggeber: AT063815100000041970 BIC Auftraggeber: RZSTAT2G151",
+    "created_at": "2025-07-13T14:32:18.636332"
+  },
+  {
+    "id": "emp_20250713_143218_50",
+    "amount": 72.0,
+    "date": "2025-04-14",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Daniel Plaschg Verwendungszweck: Schöne Sachen IBAN Auftraggeber: AT312081500044708139 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.636722"
+  },
+  {
+    "id": "emp_20250713_143218_51",
+    "amount": 72.0,
+    "date": "2025-04-15",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Stefan Konrad Verwendungszweck: Poxy poltern IBAN Auftraggeber: AT902081500046114450 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.644549"
+  },
+  {
+    "id": "emp_20250713_143218_52",
+    "amount": 32.1,
+    "date": "2025-04-22",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: PayPal Europe S.a.r.l. et Cie S.C.A Verwendungszweck: YYW1041653430011/PAYPAL IBAN Auftraggeber: LU89751000135104200E BIC Auftraggeber: PPLXLUL2XXX Auftraggeberreferenz: YYW1041653430011",
+    "created_at": "2025-07-13T14:32:18.727672"
+  },
+  {
+    "id": "emp_20250713_143218_53",
+    "amount": 54.9,
+    "date": "2025-04-25",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: PayPal Europe S.a.r.l. et Cie S.C.A Verwendungszweck: YYW1041774236288/PAYPAL IBAN Auftraggeber: LU89751000135104200E BIC Auftraggeber: PPLXLUL2XXX Auftraggeberreferenz: YYW1041774236288",
+    "created_at": "2025-07-13T14:32:18.755884"
+  },
+  {
+    "id": "emp_20250713_143218_54",
+    "amount": 1000.0,
+    "date": "2025-04-28",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.774208"
+  },
+  {
+    "id": "emp_20250713_143218_55",
+    "amount": 3249.71,
+    "date": "2025-04-29",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH Verwendungszweck: Gehalt 4/2025 IBAN Auftraggeber: AT902081500004547816 BIC Auftraggeber: STSPAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.774616"
+  },
+  {
+    "id": "emp_20250713_143218_56",
+    "amount": 9000.0,
+    "date": "2025-04-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Verwendungszweck: Umbuchung Haus IBAN Auftraggeber: AT691948031013517003 BIC Auftraggeber: BIIWATWWXXX",
+    "created_at": "2025-07-13T14:32:18.806926"
+  },
+  {
+    "id": "emp_20250713_143218_57",
+    "amount": 0.01,
+    "date": "2025-05-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a. Habenzinsen      ab 01.04.25",
+    "created_at": "2025-07-13T14:32:18.816510"
+  },
+  {
+    "id": "emp_20250713_143218_58",
+    "amount": 75.0,
+    "date": "2025-05-02",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Thomas Leopold Zahlungsreferenz: Extrem Poltern IBAN Auftraggeber: AT451912080682935715 BIC Auftraggeber: SPBAATWWXXX",
+    "created_at": "2025-07-13T14:32:18.831144"
+  },
+  {
+    "id": "emp_20250713_143218_59",
+    "amount": 200.0,
+    "date": "2025-05-12",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mag. phil. Antonia Hebenstreit Zahlungsreferenz: Shop Apotheke und Netflix IBAN Auftraggeber: AT301700000487051209 BIC Auftraggeber: BFKKAT2KXXX",
+    "created_at": "2025-07-13T14:32:18.900623"
+  },
+  {
+    "id": "emp_20250713_143218_60",
+    "amount": 400.0,
+    "date": "2025-05-19",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:18.978899"
+  },
+  {
+    "id": "emp_20250713_143219_61",
+    "amount": 1000.0,
+    "date": "2025-05-21",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:19.024764"
+  },
+  {
+    "id": "emp_20250713_143219_62",
+    "amount": 3249.71,
+    "date": "2025-05-28",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH                         A-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 5/2025 IBAN Auftraggeber: AT891200010012376595 BIC Auftraggeber: BKAUATWWXXX",
+    "created_at": "2025-07-13T14:32:19.094550"
+  },
+  {
+    "id": "emp_20250713_143219_63",
+    "amount": 0.01,
+    "date": "2025-06-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a. Habenzinsen      ab 01.05.25",
+    "created_at": "2025-07-13T14:32:19.110878"
+  },
+  {
+    "id": "emp_20250713_143219_64",
+    "amount": 1000.0,
+    "date": "2025-06-13",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:19.274190"
+  },
+  {
+    "id": "emp_20250713_143219_65",
+    "amount": 7157.04,
+    "date": "2025-06-30",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Tyromotion GmbH                         A-8020 Graz, Bahnhofsgürtel 59 Verwendungszweck: Gehalt 6/2025 IBAN Auftraggeber: AT891200010012376595 BIC Auftraggeber: BKAUATWWXXX",
+    "created_at": "2025-07-13T14:32:19.444416"
+  },
+  {
+    "id": "emp_20250713_143219_66",
+    "amount": 0.01,
+    "date": "2025-07-01",
+    "employer": "CSV Import",
+    "description": "Zahlungsreferenz: 0,01 % p.a.Habenzinsen",
+    "created_at": "2025-07-13T14:32:19.461059"
+  },
+  {
+    "id": "emp_20250713_143219_67",
+    "amount": 9000.0,
+    "date": "2025-07-09",
+    "employer": "CSV Import",
+    "description": "Auftraggeber: Mihael Hebenstreit Zahlungsreferenz: Online Sparen Auszahlung IBAN Auftraggeber: AT163800060607130719 BIC Auftraggeber: RZSTAT2GXXX",
+    "created_at": "2025-07-13T14:32:19.540235"
+  }
+]

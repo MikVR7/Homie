@@ -67,10 +67,26 @@ class ConstructionBudgetManager:
         with open(self.expenses_file, 'w', encoding='utf-8') as f:
             json.dump([asdict(expense) for expense in self.expenses], f, indent=2, ensure_ascii=False)
     
+    def _expense_exists(self, amount: float, date: str, vendor: str, description: str) -> bool:
+        """Check if construction expense with same details already exists"""
+        rounded_amount = round(amount, 2)
+        return any(
+            exp.amount == rounded_amount and 
+            exp.date == date and 
+            exp.vendor.strip().lower() == vendor.strip().lower() and
+            exp.description.strip().lower() == description.strip().lower()
+            for exp in self.expenses
+        )
+    
     def add_expense(self, amount: float, date: str, category: str, vendor: str, description: str, receipt_path: str = None) -> bool:
-        """Add construction expense"""
+        """Add construction expense (with duplicate detection)"""
         try:
             datetime.strptime(date, '%Y-%m-%d')
+            
+            # Check for duplicates
+            if self._expense_exists(amount, date, vendor, description):
+                print(f"Duplicate construction expense detected: {amount} on {date} from {vendor}")
+                return False  # Skip duplicate
             
             expense = ConstructionExpense(
                 id=f"const_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.expenses)}",
