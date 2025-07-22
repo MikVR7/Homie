@@ -12,9 +12,15 @@ This document contains general rules and guidelines that apply across all projec
 - Always include dates for significant updates and completions
 - Update historical records with correct dates
 
-## 💬 Git Commit Message Format
+## 💬 Git Workflow
 
-### Required Format
+### Commit and Push Process
+**Always complete the full git workflow:**
+1. `git add -A` (stage all changes)
+2. `git commit -m "TopicOfJob: Description"`
+3. `git push` (push to remote repository)
+
+### Required Commit Message Format
 ```
 TopicOfJob: Detailed description of what we have done in one sentence
 ```
@@ -60,6 +66,7 @@ git commit -m "Module scripts"
 - Update documentation alongside code changes
 - Follow established project architecture patterns
 - Clean up temporary files and unused code
+- Always complete full git workflow: add → commit → push
 
 ### File Organization
 - Use descriptive file names

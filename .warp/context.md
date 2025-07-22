@@ -342,6 +342,7 @@ cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/financia
 ## Development Guidelines 📋
 **See `docs/GENERAL_RULES.md` for complete development guidelines including:**
 - Date management for AI assistants
+- Git workflow: always add → commit → push
 - Git commit message format: `TopicOfJob: Description`
 - Documentation standards
 - Development practices
