@@ -34,12 +34,93 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
 - Document OCR and automatic categorization
 
 ### 💰 **Financial Management** (Phase 5 - Complete ✅)
+- **Account Management System**: Create, delete, and manage user accounts with different types (checking, savings, investment, cash)
+- **Legacy Account Controls**: Enhanced management for system accounts (Main, Sparkonto, Aktien, Fonds) with popup menus
+- **Manual Balance Date Tracking**: Set account balances with date tracking for historical accuracy and CSV import filtering
+- **CSV Import with Date Filtering**: Import transactions only after manual balance date to prevent double-counting
+- **Securities Portfolio**: Track investments with symbol, quantity, prices, and real-time gain/loss calculations
+- **Inter-Account Transfers**: Transfer money between accounts with validation and history tracking
+- **Enhanced UI/UX**: Comprehensive AccountManagementDialog with clean, professional design following user preferences
 - Invoice tracking for Austrian tax requirements (incoming/outgoing)
 - House construction cost tracking and budgeting
 - Credit/loan management and payment predictions
 - Future financial planning and affordability analysis
 - Cash flow predictions for house construction expenses
-- Flutter interface with comprehensive financial dashboard
+- Flutter interface with comprehensive financial dashboard and account management
+
+## 🚨 **CRITICAL: Flutter Linux Desktop Issues**
+
+### **SEVERE RENDERING PROBLEMS ON LINUX MINT**
+**Flutter on Linux desktop has fundamental rendering issues affecting production readiness:**
+
+#### **Primary Issues Discovered:**
+1. **UI Flickering**: Constant visual flickering during animations and UI updates
+2. **Black Popup Dialogs**: Dialogs render completely black with missing input fields
+3. **RenderShrinkWrappingViewport Errors**: Cascading `semantics.parentDataDirty` rendering failures
+4. **Widget Tree Corruption**: State updates during build cycles corrupt the entire widget tree
+5. **Debug Flag Interference**: Flutter debug flags cause additional visual artifacts
+6. **ListView.builder Failures**: Scrollable content triggers infinite layout errors
+7. **Dialog State Management**: Provider context conflicts destroy dialog functionality
+
+#### **Error Messages Encountered:**
+```
+RenderShrinkWrappingViewport object was given an infinite size during layout.
+The relevant error-causing widget was: ListView
+semantics.parentDataDirty
+════════ Exception caught by widgets library ════════
+setState() called during build.
+```
+
+#### **ALL ATTEMPTED FIXES FAILED:**
+- ✗ Disabling all debug flags (`debugRepaintRainbowEnabled = false`)
+- ✗ Wrapping widgets with `RepaintBoundary`
+- ✗ Disabling semantics (`Semantics(enabled: false)`)
+- ✗ Replacing `ListView.builder` with `Column` widgets
+- ✗ Simplifying dialog structures and layouts
+- ✗ Adding `mounted` checks and proper state management
+- ✗ Isolating Provider context in dialogs with Consumer widgets
+- ✗ Using callback patterns instead of direct Provider access
+- ✗ Removing nested scrollable widgets
+- ✗ Adding explicit error handling in async operations
+
+#### **WORKAROUND: Use Flutter Web**
+**SOLUTION: Development must use Flutter Web on Linux:**
+```bash
+# Use this instead of flutter run -d linux
+./start_frontend_web.sh
+cd mobile_app && flutter run -d chrome
+```
+
+### **Tab Structure Configuration Issues**
+
+#### **Critical Requirement:**
+- **Financial Manager tabs**: ONLY "Overview" and "Construction" 
+- **NO "Securities" tab** - this was incorrectly added and caused user frustration
+- **Add Security functionality**: Must be button in Overview tab, NOT separate tab
+
+#### **Correct Implementation:**
+```dart
+TabController(length: 2, vsync: this);  // EXACTLY 2 TABS
+
+tabs: const [
+  Tab(text: 'Overview'),     // Tab 0 - contains Add Security button
+  Tab(text: 'Construction'), // Tab 1 - construction budget tracking
+  // NEVER add Securities tab here!
+]
+```
+
+#### **Add Security Dialog Black Popup Issue:**
+**PERSISTENT PROBLEM**: Dialog becomes black screen when AI response arrives
+- **Occurs on**: Both Linux desktop AND Flutter web
+- **Trigger**: AI lookup response from backend causes widget corruption
+- **Symptoms**: Input fields disappear, dialog becomes black, rendering errors
+- **Status**: UNRESOLVED despite multiple fix attempts
+
+#### **User Interface Requirements:**
+- **Design**: Clean, professional, minimal, uncluttered interface
+- **Theme**: Dark theme preferred
+- **No useless descriptions**: Avoid information overload in UI sections
+- **Mobile-first**: Optimized for cross-platform use (Android, iOS, Web, Desktop)
 
 ### 🏦 **Salt Edge Open Banking Integration** (Phase 6 - In Progress 🚧)
 - **Application Created Successfully** ✅ - Salt Edge developer account and application setup complete
@@ -92,6 +173,14 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
   - ✅ AI-powered transaction categorization system
   - ✅ Salt Edge developer account and application creation
   - ✅ Redirect URL configuration for OAuth flow
+  - ✅ Account Management System: User account creation/deletion, legacy account controls
+  - ✅ Enhanced CSV Import: Date-based filtering to prevent double-counting transactions
+  - ✅ Securities Portfolio: Investment tracking with gain/loss calculations
+  - ✅ Manual Balance Date Tracking: Historical accuracy with manual_balance_date field
+  - ✅ Inter-Account Transfers: Money transfers between accounts with validation
+  - ✅ AccountManagementDialog: Comprehensive UI for all account operations
+  - ✅ Enhanced FinancialManager: UserAccount/Security dataclasses, enhanced API endpoints
+  - ✅ UI/UX Improvements: Clean account management interface, removed clutter
   - 🚧 Current: Get Salt Edge API credentials and configure authentication
 
 ## 🚀 Easy Startup Commands
@@ -125,6 +214,17 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 6. **Cross-platform compatibility** - Single codebase for all platforms
 
 ## Recent Technical Achievements
+
+### Account Management System ✅
+- **User Account Management**: Complete CRUD operations for user-created accounts with different types (checking, savings, investment, cash)
+- **Legacy Account Enhancement**: Enhanced controls for system accounts (Main Account, Sparkonto, Aktien, Fonds) with popup menus
+- **Manual Balance Date Tracking**: AccountBalance dataclass enhanced with manual_balance_date field for historical accuracy
+- **CSV Import Date Filtering**: Core logic to only process transactions after manual balance date, preventing double-counting
+- **Securities Portfolio**: New Security dataclass for investment tracking with symbol, quantity, prices, and gain/loss calculations
+- **Inter-Account Transfers**: Transfer functionality with validation and history tracking
+- **Enhanced API Endpoints**: 10+ new endpoints for account creation, deletion, balance setting, transfers, and securities
+- **Comprehensive UI**: AccountManagementDialog with clean, professional design following user preferences for minimal interface
+- **Data Persistence**: Enhanced FinancialManager with proper JSON serialization and backward compatibility
 
 ### Salt Edge Open Banking Integration ✅
 - **Backend Services**: Complete Salt Edge service implementation with 8 API endpoints

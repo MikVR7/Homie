@@ -110,6 +110,31 @@
 - [x] **Tax Reporting**: Austrian tax-compliant reporting structure
 - [x] **Flutter UI**: Complete mobile interface for financial management
 
+### Account Management System ✅ COMPLETED
+- [x] **User Account Creation**: Create custom accounts with different types (checking, savings, investment, cash)
+- [x] **Account Deletion**: Delete user-created accounts with validation
+- [x] **Legacy Account Management**: Enhanced controls for system accounts (Main, Sparkonto, etc.)
+- [x] **Manual Balance Setting**: Set account balances with date tracking for historical accuracy
+- [x] **Inter-Account Transfers**: Transfer money between accounts with validation
+- [x] **Securities Portfolio**: Track investments with real-time gain/loss calculations
+- [x] **Enhanced UI**: Comprehensive account management dialog with clean, professional design
+
+### CSV Import Enhancement ✅ COMPLETED
+- [x] **Date-Based Filtering**: Only import transactions after manual balance date
+- [x] **Duplicate Prevention**: Prevent double-counting when manual balances are set
+- [x] **Transaction Skipping**: Automatically skip older transactions based on manual_balance_date
+- [x] **Import Statistics**: Show count of processed vs skipped transactions
+- [x] **Backend Integration**: Enhanced FinancialManager with date filtering logic
+
+### Recently Completed ✅
+- [x] **AccountBalance Enhancement**: Added manual_balance_date field for tracking when balances were manually set
+- [x] **UserAccount Dataclass**: New dataclass for user-created accounts with comprehensive metadata
+- [x] **Security Dataclass**: Investment tracking with symbol, quantity, prices, and gain/loss calculations
+- [x] **Enhanced API Endpoints**: Account creation, deletion, balance setting with date tracking
+- [x] **Frontend Account Management**: Comprehensive AccountManagementDialog with all features
+- [x] **CSV Import Date Logic**: Core filtering logic to process only newer transactions
+- [x] **UI/UX Improvements**: Removed clutter, added "Manage Accounts" button, redesigned interface
+
 ### Future Financial Enhancements
 - [ ] **Invoice Management**:
   - [ ] Incoming invoice tracking for business expenses
@@ -130,6 +155,12 @@
   - [ ] House construction affordability timeline
   - [ ] Major purchase planning and savings goals
   - [ ] Emergency fund tracking and recommendations
+- [ ] **Advanced Account Features**:
+  - [ ] Account categories and tagging
+  - [ ] Recurring transaction templates
+  - [ ] Budget allocation per account
+  - [ ] Transaction history export
+  - [ ] Account performance analytics
 
 ## 🔧 **Technical Infrastructure** (Ongoing)
 

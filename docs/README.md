@@ -58,7 +58,7 @@ Homie is built as a **Flutter cross-platform application** that works seamlessly
 
 ### Current Modules
 - **📁 File Organizer**: AI-powered file organization with real operations and memory tracking
-- **💰 Financial Manager**: Austrian tax-compliant financial tracking
+- **💰 Financial Manager**: Comprehensive financial management with account creation, CSV import with date filtering, securities tracking, and Austrian tax compliance
 - **🏠 Media Manager**: Coming soon - Netflix-style media library
 - **📄 Document Manager**: Coming soon - Austrian business document management
 

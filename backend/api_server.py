@@ -476,27 +476,301 @@ financial_manager = FinancialManager()
 
 @app.route('/api/financial/summary', methods=['GET'])
 def financial_summary():
-    """Get financial summary and overview"""
+    """Get financial summary with optional time period filtering"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
+        # Initialize sub-managers if not already done
+        if not financial_manager.income_tracker:
+            financial_manager.initialize_sub_managers()
+        
+        # Get query parameters for time period filtering
+        year = request.args.get('year', type=int)
         month = request.args.get('month', type=int)
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         
-        summary = financial_manager.get_financial_summary(
+        # Get summary data with period filtering
+        summary_data = financial_manager.get_financial_summary(
             year=year, 
             month=month, 
             start_date=start_date, 
             end_date=end_date
         )
         
+        # Convert to dict for JSON serialization
+        summary_dict = {
+            'total_employment_income': summary_data.total_employment_income,
+            'total_self_employment_income': summary_data.total_self_employment_income,
+            'total_expenses': summary_data.total_expenses,
+            'total_tax_liability': summary_data.total_tax_liability,
+            'construction_budget_used': summary_data.construction_budget_used,
+            'construction_budget_remaining': summary_data.construction_budget_remaining,
+            'net_balance': summary_data.net_balance,
+            'monthly_cash_flow': summary_data.monthly_cash_flow,
+            'main_account_balance': summary_data.main_account_balance,
+            'sparkonto_balance': summary_data.sparkonto_balance,
+            'cash_on_hand': summary_data.cash_on_hand,
+            'cash_account_balance': summary_data.cash_account_balance,
+            'aktien_balance': summary_data.aktien_balance,
+            'fonds_balance': summary_data.fonds_balance,
+            'total_transfers_from_sparkonto': summary_data.total_transfers_from_sparkonto,
+            'total_investment_value': summary_data.total_investment_value
+        }
+        
         return jsonify({
             'success': True,
-            'data': summary.__dict__
+            'data': summary_dict
         })
         
     except Exception as e:
         print(f"[Financial] ❌ Error getting summary: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Account Management Endpoints
+@app.route('/api/financial/accounts', methods=['GET', 'POST'])
+def financial_accounts():
+    """Get all user accounts or create a new account"""
+    try:
+        if request.method == 'GET':
+            # Get all user-created accounts
+            accounts = financial_manager.get_user_accounts()
+            return jsonify({
+                'success': True,
+                'data': accounts
+            })
+        
+        elif request.method == 'POST':
+            # Create new account
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+            name = data.get('name')
+            account_type = data.get('type', 'checking')  # checking, savings, investment, cash
+            initial_balance = float(data.get('initial_balance', 0))
+            
+            if not name:
+                return jsonify({'success': False, 'error': 'Account name is required'}), 400
+            
+            success = financial_manager.create_user_account(name, account_type, initial_balance)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'Account "{name}" created successfully'
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to create account'}), 500
+                
+    except Exception as e:
+        print(f"[Financial] ❌ Error with accounts: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/financial/accounts/<account_id>', methods=['DELETE'])
+def delete_account(account_id):
+    """Delete a user account"""
+    try:
+        success = financial_manager.delete_user_account(account_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Account deleted successfully'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to delete account or account not found'}), 404
+            
+    except Exception as e:
+        print(f"[Financial] ❌ Error deleting account: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Legacy account balance endpoints (for backwards compatibility)
+@app.route('/api/financial/legacy-accounts', methods=['GET'])
+def financial_legacy_accounts():
+    """Get legacy account balances"""
+    try:
+        accounts = {
+            'main': financial_manager.get_account_balance('main'),
+            'sparkonto': financial_manager.get_account_balance('sparkonto'),
+            'cash_on_hand': financial_manager.get_account_balance('cash_on_hand'),
+            'cash_account': financial_manager.get_account_balance('cash_account'),
+            'aktien': financial_manager.get_account_balance('aktien'),
+            'fonds': financial_manager.get_account_balance('fonds')
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': accounts
+        })
+        
+    except Exception as e:
+        print(f"[Financial] ❌ Error getting account balances: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/financial/accounts/<account_type>/balance', methods=['POST'])
+def set_account_balance(account_type):
+    """Set account balance (for initial setup)"""
+    try:
+        data = request.get_json()
+        if not data or 'balance' not in data:
+            return jsonify({'success': False, 'error': 'Balance not provided'}), 400
+        
+        balance = float(data['balance'])
+        manual_balance_date = data.get('manual_balance_date')  # Optional date when balance was set
+        
+        financial_manager.set_account_balance(account_type, balance, manual_balance_date)
+        
+        date_info = f" as of {manual_balance_date}" if manual_balance_date else ""
+        return jsonify({
+            'success': True,
+            'message': f'{account_type} balance set to €{balance:.2f}{date_info}'
+        })
+        
+    except Exception as e:
+        print(f"[Financial] ❌ Error setting account balance: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Securities/Investment Management
+@app.route('/api/financial/securities', methods=['GET', 'POST'])
+def financial_securities():
+    """Get securities portfolio or add new security"""
+    try:
+        if request.method == 'GET':
+            # Get all securities
+            securities = financial_manager.get_securities_portfolio()
+            return jsonify({
+                'success': True,
+                'data': securities
+            })
+        
+        elif request.method == 'POST':
+            # Add new security
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+            symbol = data.get('symbol')
+            name = data.get('name')
+            quantity = float(data.get('quantity', 0))
+            purchase_price = float(data.get('purchase_price', 0))
+            purchase_date = data.get('purchase_date')  # Optional purchase date
+            
+            if not symbol or not name:
+                return jsonify({'success': False, 'error': 'Symbol and name are required'}), 400
+            
+            success = financial_manager.add_security(symbol, name, quantity, purchase_price, purchase_date)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'Security "{symbol}" added successfully'
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to add security'}), 500
+                
+    except Exception as e:
+        print(f"[Financial] ❌ Error with securities: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/financial/securities/<symbol>/price', methods=['GET'])
+def get_security_price(symbol):
+    """Get current price for a security"""
+    try:
+        price_data = financial_manager.get_security_current_price(symbol)
+        
+        if price_data:
+            return jsonify({
+                'success': True,
+                'data': price_data
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to fetch price data'}), 404
+            
+    except Exception as e:
+        print(f"[Financial] ❌ Error getting security price: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/financial/securities/<symbol>/history', methods=['GET'])
+def get_security_history(symbol):
+    """Get price history for a security"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        history_data = financial_manager.get_security_price_history(symbol, days)
+        
+        if history_data:
+            return jsonify({
+                'success': True,
+                'data': history_data
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to fetch price history'}), 404
+            
+    except Exception as e:
+        print(f"[Financial] ❌ Error getting security history: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/financial/securities/<security_id>', methods=['DELETE'])
+def delete_security(security_id):
+    """Delete a security from portfolio"""
+    try:
+        success = financial_manager.delete_security(security_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Security deleted successfully'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to delete security or security not found'}), 404
+            
+    except Exception as e:
+        print(f"[Financial] ❌ Error deleting security: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/financial/securities/lookup', methods=['POST'])
+def lookup_security():
+    """AI-powered security symbol lookup"""
+    try:
+        data = request.get_json()
+        if not data or 'query' not in data:
+            return jsonify({'success': False, 'error': 'Search query not provided'}), 400
+        
+        search_query = data.get('query', '').strip()
+        if not search_query:
+            return jsonify({'success': False, 'error': 'Search query cannot be empty'}), 400
+        
+        result = financial_manager.lookup_security_symbol(search_query)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[Financial] ❌ Error in security lookup: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -724,54 +998,6 @@ def financial_transactions():
             'error': str(e)
         }), 500
 
-@app.route('/api/financial/accounts', methods=['GET'])
-def financial_accounts():
-    """Get account balances"""
-    try:
-        accounts = {
-            'main': financial_manager.get_account_balance('main'),
-            'sparkonto': financial_manager.get_account_balance('sparkonto'),
-            'cash_on_hand': financial_manager.get_account_balance('cash_on_hand'),
-            'cash_account': financial_manager.get_account_balance('cash_account'),
-            'aktien': financial_manager.get_account_balance('aktien'),
-            'fonds': financial_manager.get_account_balance('fonds')
-        }
-        
-        return jsonify({
-            'success': True,
-            'data': accounts
-        })
-        
-    except Exception as e:
-        print(f"[Financial] ❌ Error getting account balances: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/financial/accounts/<account_type>/balance', methods=['POST'])
-def set_account_balance(account_type):
-    """Set account balance (for initial setup)"""
-    try:
-        data = request.get_json()
-        if not data or 'balance' not in data:
-            return jsonify({'success': False, 'error': 'Balance not provided'}), 400
-        
-        balance = float(data['balance'])
-        financial_manager.set_account_balance(account_type, balance)
-        
-        return jsonify({
-            'success': True,
-            'message': f'{account_type} balance set to €{balance:.2f}'
-        })
-        
-    except Exception as e:
-        print(f"[Financial] ❌ Error setting account balance: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 @app.route('/api/financial/cash-expense', methods=['POST'])
 def add_cash_expense():
     """Add cash expense (e.g., construction worker payment)"""
@@ -976,6 +1202,17 @@ def financial_import_csv():
                 # Get account type for this transaction
                 current_account = row.get('account_type', 'main')
                 
+                # Check if transaction should be processed based on manual balance date
+                account_balance = financial_manager.account_balances.get(current_account)
+                if account_balance and account_balance.manual_balance_date:
+                    # Skip transactions that occurred before the manual balance date
+                    if date <= account_balance.manual_balance_date:
+                        skipped_transactions.append({
+                            'row': row,
+                            'reason': f'Transaction date {date} is before manual balance date {account_balance.manual_balance_date}'
+                        })
+                        continue
+                
                 # Determine transaction type and add to appropriate category
                 if amount > 0:
                     if current_account == 'sparkonto':
@@ -1126,16 +1363,26 @@ def financial_import_csv():
                     'reason': f'Processing error: {str(e)}'
                 })
         
+        # Get manual balance date info for response
+        account_balance = financial_manager.account_balances.get(account_type)
+        manual_balance_date = account_balance.manual_balance_date if account_balance else None
+        
+        # Count transactions skipped due to date filtering
+        date_filtered_count = sum(1 for t in skipped_transactions 
+                                 if 'before manual balance date' in t.get('reason', ''))
+        
         return jsonify({
             'success': True,
             'message': f'CSV import completed for {account_type} account',
             'account_type': account_type,
+            'manual_balance_date': manual_balance_date,
             'total_rows': len(csv_data),
             'added_income': sum(1 for t in processed_transactions if t['category'] in ['Income', 'Interest', 'Deposit', 'Sparkonto Income', 'Employment Income']),
             'added_expenses': sum(1 for t in processed_transactions if t['category'] not in ['Income', 'Interest', 'Deposit', 'Sparkonto Income', 'Employment Income', 'Construction', 'Transfer to Main Account', 'Transfer from Sparkonto']),
             'added_construction': sum(1 for t in processed_transactions if t['category'] == 'Construction'),
             'added_transfers': sum(1 for t in processed_transactions if t['category'] in ['Transfer to Main Account', 'Transfer from Sparkonto']),
             'skipped': len(skipped_transactions),
+            'skipped_due_to_date': date_filtered_count,
             'duplicates': duplicate_count,
             'processed_transactions': processed_transactions,
             'skipped_transactions': skipped_transactions[:5]  # Show first 5 skipped for debugging

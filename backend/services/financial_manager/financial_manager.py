@@ -16,6 +16,30 @@ class AccountBalance:
     account_type: str  # 'main', 'sparkonto', 'cash_on_hand', 'cash_account', 'aktien', 'fonds'
     balance: float
     last_updated: str
+    manual_balance_date: str = None  # Date when balance was manually set (for CSV import filtering)
+
+@dataclass
+class UserAccount:
+    """User-created account"""
+    id: str
+    name: str
+    account_type: str  # 'checking', 'savings', 'investment', 'cash'
+    balance: float
+    created_at: str
+    last_updated: str
+
+@dataclass
+class Security:
+    """Investment security (stock, ETF, crypto, etc.)"""
+    id: str
+    symbol: str  # e.g., 'AAPL', 'BTC-EUR', 'IWDA.AS'
+    name: str
+    quantity: float
+    purchase_price: float
+    current_price: float
+    purchase_date: str  # Date when this specific lot was purchased
+    last_price_update: str
+    created_at: str
 
 @dataclass
 class TransactionDetail:
@@ -90,6 +114,10 @@ class FinancialManager:
         self.transactions = self._load_transactions()
         self.account_balances = self._load_account_balances()
         
+        # User account and securities tracking
+        self.user_accounts = self._load_user_accounts()
+        self.securities = self._load_securities()
+    
     def _load_config(self) -> Dict:
         """Load financial configuration"""
         config_path = os.path.join(self.data_dir, 'config.json')
@@ -181,7 +209,13 @@ class FinancialManager:
         try:
             with open(balances_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return {k: AccountBalance(**v) for k, v in data.items()}
+                balances = {}
+                for k, v in data.items():
+                    # Handle backward compatibility for existing data without manual_balance_date
+                    if 'manual_balance_date' not in v:
+                        v['manual_balance_date'] = None
+                    balances[k] = AccountBalance(**v)
+                return balances
         except (json.JSONDecodeError, TypeError):
             return {}
     
@@ -191,6 +225,50 @@ class FinancialManager:
         balances_to_save = balances or self.account_balances
         with open(balances_file, 'w', encoding='utf-8') as f:
             json.dump({k: asdict(v) for k, v in balances_to_save.items()}, f, indent=2, ensure_ascii=False)
+    
+    def _load_user_accounts(self) -> Dict[str, UserAccount]:
+        """Load user-created accounts"""
+        accounts_file = os.path.join(self.data_dir, 'user_accounts.json')
+        if not os.path.exists(accounts_file):
+            return {}
+        
+        try:
+            with open(accounts_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return {k: UserAccount(**v) for k, v in data.items()}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    
+    def _save_user_accounts(self):
+        """Save user-created accounts"""
+        accounts_file = os.path.join(self.data_dir, 'user_accounts.json')
+        with open(accounts_file, 'w', encoding='utf-8') as f:
+            json.dump({k: asdict(v) for k, v in self.user_accounts.items()}, f, indent=2, ensure_ascii=False)
+    
+    def _load_securities(self) -> Dict[str, Security]:
+        """Load securities portfolio"""
+        securities_file = os.path.join(self.data_dir, 'securities.json')
+        if not os.path.exists(securities_file):
+            return {}
+        
+        try:
+            with open(securities_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                securities = {}
+                for k, v in data.items():
+                    # Handle backward compatibility for existing data without purchase_date
+                    if 'purchase_date' not in v:
+                        v['purchase_date'] = v.get('created_at', datetime.now().strftime('%Y-%m-%d'))
+                    securities[k] = Security(**v)
+                return securities
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    
+    def _save_securities(self):
+        """Save securities portfolio"""
+        securities_file = os.path.join(self.data_dir, 'securities.json')
+        with open(securities_file, 'w', encoding='utf-8') as f:
+            json.dump({k: asdict(v) for k, v in self.securities.items()}, f, indent=2, ensure_ascii=False)
     
     def get_financial_summary(self, year: int = None, month: int = None, start_date: str = None, end_date: str = None) -> FinancialSummary:
         """Get comprehensive financial summary with optional time period filtering"""
@@ -487,13 +565,21 @@ class FinancialManager:
         """Get current balance for specific account"""
         return self.account_balances.get(account_type, AccountBalance(account_type, 0.0, '')).balance
     
-    def set_account_balance(self, account_type: str, balance: float):
+    def set_account_balance(self, account_type: str, balance: float, manual_balance_date: str = None):
         """Set account balance (for initial setup or corrections)"""
         if account_type not in self.account_balances:
             self.account_balances[account_type] = AccountBalance(account_type, 0.0, datetime.now().isoformat())
         
         self.account_balances[account_type].balance = round(balance, 2)
         self.account_balances[account_type].last_updated = datetime.now().isoformat()
+        
+        # Set manual balance date (for CSV import filtering)
+        if manual_balance_date:
+            self.account_balances[account_type].manual_balance_date = manual_balance_date
+        else:
+            # If no date provided, use today's date
+            self.account_balances[account_type].manual_balance_date = datetime.now().strftime('%Y-%m-%d')
+            
         self._save_account_balances()
     
     def record_investment_purchase(self, amount: float, date: str, investment_type: str, description: str) -> bool:
@@ -564,3 +650,371 @@ class FinancialManager:
                 account_to='cash_account',
                 transaction_type='transfer'
             ) 
+    
+    # User Account Management Methods
+    def get_user_accounts(self) -> List[Dict]:
+        """Get all user-created accounts"""
+        accounts = []
+        for account_id, account in self.user_accounts.items():
+            accounts.append({
+                'id': account.id,
+                'name': account.name,
+                'type': account.account_type,
+                'balance': account.balance,
+                'created_at': account.created_at,
+                'last_updated': account.last_updated
+            })
+        return accounts
+    
+    def create_user_account(self, name: str, account_type: str, initial_balance: float = 0.0) -> bool:
+        """Create a new user account"""
+        try:
+            import uuid
+            account_id = str(uuid.uuid4())
+            
+            account = UserAccount(
+                id=account_id,
+                name=name,
+                account_type=account_type,
+                balance=round(initial_balance, 2),
+                created_at=datetime.now().isoformat(),
+                last_updated=datetime.now().isoformat()
+            )
+            
+            self.user_accounts[account_id] = account
+            self._save_user_accounts()
+            
+            # Record initial balance transaction if > 0
+            if initial_balance > 0:
+                self.add_transaction(
+                    amount=initial_balance,
+                    date=datetime.now().strftime('%Y-%m-%d'),
+                    description=f'Initial balance for {name}',
+                    category='Initial Balance',
+                    account_from='external',
+                    account_to=account_id,
+                    transaction_type='initial_balance'
+                )
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error creating user account: {e}")
+            return False
+    
+    def delete_user_account(self, account_id: str) -> bool:
+        """Delete a user account"""
+        try:
+            if account_id not in self.user_accounts:
+                return False
+            
+            # Remove account
+            del self.user_accounts[account_id]
+            self._save_user_accounts()
+            
+            # TODO: Handle transactions related to this account
+            # For now, we'll leave transactions as they are for data integrity
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error deleting user account: {e}")
+            return False
+    
+    def update_user_account_balance(self, account_id: str, new_balance: float) -> bool:
+        """Update user account balance"""
+        try:
+            if account_id not in self.user_accounts:
+                return False
+            
+            self.user_accounts[account_id].balance = round(new_balance, 2)
+            self.user_accounts[account_id].last_updated = datetime.now().isoformat()
+            self._save_user_accounts()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error updating user account balance: {e}")
+            return False
+    
+    # Securities Management Methods
+    def get_securities_portfolio(self) -> List[Dict]:
+        """Get all securities in portfolio"""
+        securities = []
+        for security_id, security in self.securities.items():
+            total_value = security.quantity * security.current_price
+            gain_loss = (security.current_price - security.purchase_price) * security.quantity
+            gain_loss_percent = ((security.current_price - security.purchase_price) / security.purchase_price * 100) if security.purchase_price > 0 else 0
+            
+            securities.append({
+                'id': security.id,
+                'symbol': security.symbol,
+                'name': security.name,
+                'quantity': security.quantity,
+                'purchase_price': security.purchase_price,
+                'current_price': security.current_price,
+                'purchase_date': security.purchase_date,
+                'total_value': total_value,
+                'gain_loss': gain_loss,
+                'gain_loss_percent': gain_loss_percent,
+                'last_price_update': security.last_price_update,
+                'created_at': security.created_at
+            })
+        return securities
+    
+    def add_security(self, symbol: str, name: str, quantity: float, purchase_price: float, purchase_date: str = None) -> bool:
+        """Add a new security to portfolio (allows multiple purchases of same symbol)"""
+        try:
+            import uuid
+            security_id = str(uuid.uuid4())
+            
+            # Use provided purchase_date or default to today
+            if not purchase_date:
+                purchase_date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Fetch current price (initially set to purchase price)
+            current_price = purchase_price  # We'll update this with real data later
+            
+            security = Security(
+                id=security_id,
+                symbol=symbol.upper(),
+                name=name,
+                quantity=quantity,
+                purchase_price=purchase_price,
+                current_price=current_price,
+                purchase_date=purchase_date,
+                last_price_update=datetime.now().isoformat(),
+                created_at=datetime.now().isoformat()
+            )
+            
+            self.securities[security_id] = security
+            self._save_securities()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error adding security: {e}")
+            return False
+    
+    def delete_security(self, security_id: str) -> bool:
+        """Delete a security from portfolio"""
+        try:
+            if security_id not in self.securities:
+                return False
+            
+            # Remove security
+            del self.securities[security_id]
+            self._save_securities()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error deleting security: {e}")
+            return False
+    
+    def lookup_security_symbol(self, search_query: str) -> Dict:
+        """Use AI to find correct security symbol/name from search query"""
+        try:
+            # Use the same AI service as file organizer
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                return {
+                    'success': False,
+                    'error': 'AI service not available - GEMINI_API_KEY not configured',
+                    'suggestions': []
+                }
+            
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            prompt = f"""
+You are a financial data expert. The user is searching for a security (stock, ETF, cryptocurrency, etc.) and wants to find the correct symbol.
+
+USER SEARCH QUERY: "{search_query}"
+
+Please help identify the most likely securities they're looking for. Consider:
+- Company names (e.g., "nvidia" → NVDA)
+- Popular stock symbols (e.g., "apple" → AAPL)
+- ETFs (e.g., "msci world" → IWDA.AS or VTI)
+- Cryptocurrencies (e.g., "bitcoin" → BTC-EUR)
+- Austrian/European markets (Vienna Stock Exchange uses .VI suffix)
+
+Return your response as JSON with this structure:
+{{
+    "suggestions": [
+        {{
+            "symbol": "NVDA",
+            "name": "NVIDIA Corporation",
+            "market": "NASDAQ",
+            "type": "stock",
+            "confidence": 95,
+            "description": "Leading graphics processing unit manufacturer"
+        }},
+        {{
+            "symbol": "BTC-EUR",
+            "name": "Bitcoin",
+            "market": "Crypto",
+            "type": "cryptocurrency", 
+            "confidence": 90,
+            "description": "Largest cryptocurrency by market cap"
+        }}
+    ],
+    "search_performed": "{search_query}",
+    "total_suggestions": 2
+}}
+
+Provide 3-5 most relevant suggestions, ordered by confidence. Include Austrian/European options when relevant.
+"""
+            
+            response = model.generate_content(prompt)
+            json_text = response.text.strip()
+            
+            # Clean JSON response
+            if json_text.startswith('```json'):
+                json_text = json_text[7:]
+            if json_text.endswith('```'):
+                json_text = json_text[:-3]
+            
+            ai_response = json.loads(json_text.strip())
+            
+            return {
+                'success': True,
+                'suggestions': ai_response.get('suggestions', []),
+                'search_query': search_query,
+                'total_suggestions': len(ai_response.get('suggestions', []))
+            }
+            
+        except Exception as e:
+            print(f"Error in security lookup: {e}")
+            # Fallback to basic suggestions based on common patterns
+            fallback_suggestions = self._get_fallback_security_suggestions(search_query)
+            return {
+                'success': True,
+                'suggestions': fallback_suggestions,
+                'search_query': search_query,
+                'total_suggestions': len(fallback_suggestions),
+                'note': 'AI lookup failed, using fallback suggestions'
+            }
+    
+    def _get_fallback_security_suggestions(self, search_query: str) -> List[Dict]:
+        """Fallback security suggestions when AI fails"""
+        query_lower = search_query.lower()
+        suggestions = []
+        
+        # Common stock mappings
+        stock_mappings = {
+            'nvidia': {'symbol': 'NVDA', 'name': 'NVIDIA Corporation', 'market': 'NASDAQ'},
+            'apple': {'symbol': 'AAPL', 'name': 'Apple Inc.', 'market': 'NASDAQ'},
+            'microsoft': {'symbol': 'MSFT', 'name': 'Microsoft Corporation', 'market': 'NASDAQ'},
+            'google': {'symbol': 'GOOGL', 'name': 'Alphabet Inc.', 'market': 'NASDAQ'},
+            'tesla': {'symbol': 'TSLA', 'name': 'Tesla Inc.', 'market': 'NASDAQ'},
+            'amazon': {'symbol': 'AMZN', 'name': 'Amazon.com Inc.', 'market': 'NASDAQ'},
+            'bitcoin': {'symbol': 'BTC-EUR', 'name': 'Bitcoin', 'market': 'Crypto'},
+            'ethereum': {'symbol': 'ETH-EUR', 'name': 'Ethereum', 'market': 'Crypto'},
+        }
+        
+        # Check for direct matches
+        for key, info in stock_mappings.items():
+            if key in query_lower or query_lower in key:
+                suggestions.append({
+                    'symbol': info['symbol'],
+                    'name': info['name'],
+                    'market': info['market'],
+                    'type': 'cryptocurrency' if 'Crypto' in info['market'] else 'stock',
+                    'confidence': 80,
+                    'description': f"Popular {info['market']} security"
+                })
+        
+        # If no matches, suggest to search manually
+        if not suggestions:
+            suggestions.append({
+                'symbol': search_query.upper(),
+                'name': f"Manual entry: {search_query}",
+                'market': 'Unknown',
+                'type': 'manual',
+                'confidence': 30,
+                'description': "Please verify this symbol manually"
+            })
+        
+        return suggestions
+    
+    def get_security_current_price(self, symbol: str) -> Dict:
+        """Get current price for a security from external API"""
+        try:
+            # For demo purposes, we'll return mock data
+            # In production, integrate with Alpha Vantage, Yahoo Finance, or similar
+            import random
+            
+            # Mock price data - replace with real API calls
+            mock_prices = {
+                'AAPL': 190.50,
+                'MSFT': 410.20,
+                'GOOGL': 140.75,
+                'TSLA': 240.10,
+                'BTC-EUR': 42000.00,
+                'ETH-EUR': 2800.00,
+                'IWDA.AS': 85.40,  # iShares Core MSCI World
+            }
+            
+            base_price = mock_prices.get(symbol, 100.0)
+            # Add some random variation (-5% to +5%)
+            variation = random.uniform(-0.05, 0.05)
+            current_price = base_price * (1 + variation)
+            
+            return {
+                'symbol': symbol,
+                'current_price': round(current_price, 2),
+                'currency': 'EUR',
+                'last_updated': datetime.now().isoformat(),
+                'market_status': 'open'  # Mock status
+            }
+            
+        except Exception as e:
+            print(f"Error fetching price for {symbol}: {e}")
+            return None
+    
+    def get_security_price_history(self, symbol: str, days: int = 30) -> List[Dict]:
+        """Get price history for a security"""
+        try:
+            # Mock historical data - replace with real API calls
+            import random
+            from datetime import timedelta
+            
+            history = []
+            base_price = 100.0
+            current_date = datetime.now() - timedelta(days=days)
+            
+            for i in range(days):
+                # Generate mock price movement
+                change = random.uniform(-0.03, 0.03)  # -3% to +3% daily change
+                base_price *= (1 + change)
+                
+                history.append({
+                    'date': current_date.strftime('%Y-%m-%d'),
+                    'price': round(base_price, 2),
+                    'volume': random.randint(1000, 100000)
+                })
+                
+                current_date += timedelta(days=1)
+            
+            return history
+            
+        except Exception as e:
+            print(f"Error fetching price history for {symbol}: {e}")
+            return []
+    
+    def update_security_price(self, symbol: str, new_price: float) -> bool:
+        """Update current price for a security"""
+        try:
+            for security_id, security in self.securities.items():
+                if security.symbol == symbol:
+                    security.current_price = new_price
+                    security.last_price_update = datetime.now().isoformat()
+            
+            self._save_securities()
+            return True
+            
+        except Exception as e:
+            print(f"Error updating security price: {e}")
+            return False 

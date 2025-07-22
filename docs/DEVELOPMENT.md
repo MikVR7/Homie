@@ -7,6 +7,153 @@
 - Flutter SDK 3.0+ (https://flutter.dev/docs/get-started/install)
 - Google Gemini API key (for AI-powered organization)
 
+## 🚨 **CRITICAL: Flutter Linux Desktop Issues**
+
+### Known Flutter Linux Problems
+**Flutter on Linux desktop (especially Linux Mint) has severe rendering issues that affect production readiness:**
+
+#### Primary Issues Discovered:
+1. **UI Flickering**: Constant visual flickering during animations and state updates
+2. **Black Popup Dialogs**: Dialogs render as black screens with missing input fields
+3. **RenderShrinkWrappingViewport Errors**: `semantics.parentDataDirty` cascading rendering failures
+4. **Widget Tree Corruption**: State updates during build cycles cause widget corruption
+5. **Debug Flag Interference**: `debugRepaintRainbowEnabled` and similar flags cause additional flickering
+6. **ListView.builder Issues**: `RenderShrinkWrappingViewport` errors in scrollable content
+7. **Dialog State Management**: Provider context conflicts during dialog lifecycle
+
+#### Error Messages Encountered:
+```
+RenderShrinkWrappingViewport object was given an infinite size during layout.
+The relevant error-causing widget was: ListView
+semantics.parentDataDirty
+════════ Exception caught by widgets library ════════
+setState() called during build.
+```
+
+#### Attempted Fixes (FAILED):
+- ✗ Disabling all debug flags (`debugRepaintRainbowEnabled = false`)
+- ✗ Wrapping with `RepaintBoundary` widgets
+- ✗ Disabling semantics (`Semantics(enabled: false)`)
+- ✗ Replacing `ListView.builder` with `Column` widgets
+- ✗ Simplifying dialog structures
+- ✗ Adding `mounted` checks and proper state management
+- ✗ Isolating Provider context in dialogs
+- ✗ Using callbacks instead of direct Provider access
+
+#### Workaround: Flutter Web Development
+**SOLUTION: Use Flutter Web for development on Linux:**
+```bash
+# Use web instead of Linux desktop
+./start_frontend_web.sh
+# or manually:
+cd mobile_app && flutter run -d chrome
+```
+
+### Flutter Tab Structure Issues
+
+#### Critical Tab Configuration Problem:
+**User requirement**: Financial Manager should ONLY have "Overview" and "Construction" tabs
+**Problem**: Mistakenly added "Securities" tab causing user frustration
+
+#### Correct Tab Structure:
+```dart
+TabController(length: 2, vsync: this);  // ONLY 2 TABS!
+
+tabs: const [
+  Tab(text: 'Overview'),     // Tab 0
+  Tab(text: 'Construction'), // Tab 1
+  // NO SECURITIES TAB!
+],
+
+TabBarView(
+  children: [
+    _buildOverviewTab(provider),      // Tab 0 content
+    _buildConstructionTab(provider),  // Tab 1 content
+    // NO SECURITIES TAB CONTENT!
+  ],
+)
+```
+
+#### Securities Functionality Location:
+- **Add Security Button**: Located in Overview tab, not separate tab
+- **Design**: Blue gradient button after "Manage Accounts" button
+- **Function**: Calls `_showAddSecurityDialog()` method
+
+### Add Security Dialog Issues
+
+#### Black Popup Problem:
+**Primary Issue**: Dialog renders as black screen when AI response arrives
+
+#### Root Causes Identified:
+1. **State Updates During Build**: `setState()` called during widget build cycle
+2. **Provider Double Notifications**: Multiple `notifyListeners()` calls
+3. **Dialog Context Corruption**: Provider context conflicts during dialog lifecycle
+4. **Missing Error Handling**: Exceptions during AI lookup corrupt widget tree
+5. **Complex Layout Structures**: Nested scrollable widgets cause rendering failures
+
+#### Attempted Fixes:
+```dart
+// FAILED: Provider isolation
+Consumer<FinancialProvider>(builder: (context, provider, child) { ... })
+
+// FAILED: Callback pattern
+onLookupSecurity: (symbol) async { ... }
+onAddSecurity: (security) async { ... }
+
+// FAILED: State management
+bool _isLoading = false;
+if (!mounted) return;
+
+// FAILED: Layout simplification
+Column(children: suggestions) // instead of ListView.builder
+```
+
+#### Current Status:
+- Black popup still occurs on both Linux desktop AND web
+- AI lookup triggers rendering corruption
+- Input fields disappear when AI response arrives
+- Error persists across all attempted fixes
+
+### Development Recommendations
+
+#### Platform Strategy:
+1. **Primary Development**: Use Flutter Web (`flutter run -d chrome`)
+2. **Testing**: Test on actual mobile devices (Android/iOS)
+3. **Linux Desktop**: Avoid for development until Flutter engine fixes
+4. **Production**: Target mobile platforms primarily
+
+#### Debug Configuration:
+```dart
+// main.dart - DISABLE ALL DEBUG FLAGS
+void main() {
+  // debugRepaintRainbowEnabled = false; // KEEP DISABLED
+  // debugPrintRebuildDirtyWidgets = false; // KEEP DISABLED
+  // debugProfileBuildsEnabled = false; // KEEP DISABLED
+  runApp(const HomieApp());
+}
+```
+
+#### Dialog Best Practices:
+```dart
+// Use simple, static dialogs
+showDialog(
+  context: context,
+  builder: (context) => AlertDialog(
+    // Avoid complex state management
+    // Avoid nested Provider access
+    // Use callbacks for data operations
+  ),
+);
+```
+
+### Flutter Web Setup Script
+**Created**: `start_frontend_web.sh` for web development
+```bash
+#!/bin/bash
+cd mobile_app
+flutter run -d chrome
+```
+
 ### Quick Setup & Start
 
 #### 🚀 Easy Way (Recommended)
@@ -20,7 +167,10 @@
 # Backend only
 ./start_backend.sh
 
-# Frontend only
+# Frontend only (WEB - recommended for Linux)
+./start_frontend_web.sh
+
+# Frontend only (Desktop - problematic on Linux)
 ./start_frontend.sh
 ```
 
@@ -126,6 +276,15 @@
   - `GET /api/financial/expenses` - List expenses
   - `GET /api/financial/construction` - Get construction budget
   - `GET /api/financial/tax-report` - Get tax report
+  - `GET /api/financial/account-balances` - Get all account balances
+  - `POST /api/financial/accounts` - Create new user account
+  - `DELETE /api/financial/accounts/{id}` - Delete user account
+  - `GET /api/financial/accounts` - Get all user accounts
+  - `POST /api/financial/accounts/{type}/balance` - Set account balance with optional date tracking
+  - `POST /api/financial/transfer` - Transfer money between accounts
+  - `POST /api/financial/import-csv` - Import CSV transactions with date filtering
+  - `GET /api/financial/securities` - Get securities portfolio
+  - `POST /api/financial/securities` - Add new security to portfolio
 - **System**:
   - `GET /api/health` - System health check
   - `GET /api/status` - API status and version
@@ -137,7 +296,7 @@
 - **Providers**:
   - `AppState`: Global application state
   - `FileOrganizerProvider`: File organization data and operations
-  - `FinancialProvider`: Financial data and operations
+  - `FinancialProvider`: Financial data and operations with account management
 
 #### Navigation
 - **Go Router**: Declarative routing system
@@ -170,9 +329,27 @@ mobile_app/
 │       ├── module_card.dart
 │       ├── file_organizer/
 │       └── financial/
+│           └── account_management_dialog.dart  # Comprehensive account management
 ├── test/                           # Widget and integration tests
 └── pubspec.yaml                    # Dependencies and configuration
 ```
+
+## New Features - Account Management
+
+### Backend Enhancements
+- **AccountBalance**: Enhanced with `manual_balance_date` field for CSV import filtering
+- **UserAccount**: New dataclass for user-created accounts with id, name, type, balance, timestamps
+- **Security**: New dataclass for investment tracking with symbol, quantity, prices, gain/loss
+- **Enhanced FinancialManager**: Account CRUD operations, balance setting with dates, transfers, securities management
+- **CSV Import Logic**: Date-based filtering to only process transactions after manual balance date
+
+### Frontend Features
+- **AccountManagementDialog**: Comprehensive dialog for all account operations
+- **User Account Section**: Create/delete custom accounts with type selection
+- **Legacy Account Section**: Enhanced controls with popup menus (Set Balance, Import CSV, View Transactions, Transfer)
+- **Balance Setting**: Radio buttons for Set/Add/Subtract with date picker and live preview
+- **Securities Section**: Add/view investment portfolio
+- **Transfer Functionality**: Between accounts with validation
 
 ## Development Workflow
 

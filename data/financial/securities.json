@@ -1,0 +1,24 @@
+{
+  "3b3d8568-3392-4e54-906d-317ebeb3842d": {
+    "id": "3b3d8568-3392-4e54-906d-317ebeb3842d",
+    "symbol": "NVDA",
+    "name": "NVIDIA Corporation",
+    "quantity": 10.0,
+    "purchase_price": 450.0,
+    "current_price": 450.0,
+    "purchase_date": "2024-01-15",
+    "last_price_update": "2025-07-16T12:09:46.184891",
+    "created_at": "2025-07-16T12:09:46.184905"
+  },
+  "417ced44-ccb9-4164-84e3-ee707f11aff7": {
+    "id": "417ced44-ccb9-4164-84e3-ee707f11aff7",
+    "symbol": "NVDA",
+    "name": "NVIDIA Corporation",
+    "quantity": 20.0,
+    "purchase_price": 480.0,
+    "current_price": 480.0,
+    "purchase_date": "2024-02-15",
+    "last_price_update": "2025-07-16T12:09:46.185155",
+    "created_at": "2025-07-16T12:09:46.185158"
+  }
+}
