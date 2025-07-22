@@ -1,5 +1,8 @@
 # Development Guide
 
+## Development Guidelines 📋
+**See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
+
 ## Setup Instructions
 
 ### Prerequisites
@@ -174,6 +177,17 @@ flutter run -d chrome
 ./start_frontend.sh
 ```
 
+#### 📱 Module-Specific Services (NEW! ✅)
+```bash
+# File Organizer Module Only (no back button, focused experience)
+./start_file_organizer.sh      # Linux desktop version
+./start_file_organizer_web.sh  # Web version (recommended for Linux)
+
+# Financial Manager Module Only (no back button, focused experience)  
+./start_financial.sh           # Linux desktop version
+./start_financial_web.sh       # Web version (recommended for Linux)
+```
+
 ### Manual Setup (First Time)
 
 #### Backend Setup
@@ -333,6 +347,39 @@ mobile_app/
 ├── test/                           # Widget and integration tests
 └── pubspec.yaml                    # Dependencies and configuration
 ```
+
+## New Features - Module-Specific Launch Scripts ✅ COMPLETED (2025-07-22)
+
+### Standalone Module Scripts
+- **File Organizer Scripts**: `start_file_organizer.sh` and `start_file_organizer_web.sh` launch only File Organizer module
+- **Financial Manager Scripts**: `start_financial.sh` and `start_financial_web.sh` launch only Financial Manager module
+- **No Back Button**: Standalone launches remove back button for focused, single-purpose application experience
+- **Command Line Arguments**: Uses `--dart-entrypoint-args="--route=/module"` for runtime route specification
+
+### Technical Implementation
+- **Flutter App Enhancement**: Modified `main.dart` to accept runtime route arguments via `main(List<String> args)`
+- **Route Parsing**: App detects `--route=` arguments and sets initial location dynamically
+- **Conditional UI**: Screens conditionally hide back buttons based on `isStandaloneLaunch` parameter
+- **Single Codebase**: Maintained unified architecture; no module exclusion from builds
+
+### Usage Examples
+```bash
+# Launch only File Organizer (no dashboard, no back button)
+./start_file_organizer_web.sh
+
+# Launch only Financial Manager (no dashboard, no back button)
+./start_financial_web.sh
+
+# Launch full application with dashboard and navigation
+./start_frontend_web.sh
+```
+
+### Architecture Decision: No Module Exclusion
+**Recommendation**: Keep single codebase architecture instead of excluding modules from builds
+- **Flutter Tree Shaking**: Automatically removes unused code during builds
+- **Shared Dependencies**: Modules share providers, themes, models, and services
+- **Maintenance Simplicity**: Avoids complexity of multiple build configurations
+- **Future-Proof**: Easy to add new modules or launch modes
 
 ## New Features - Account Management
 

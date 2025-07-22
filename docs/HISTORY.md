@@ -1,8 +1,15 @@
 # Project History
 
+## Development Guidelines 📋
+**See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
+
 ## Timeline
 
-### 2025-01-09
+### 2025-07-22
+- **Module-Specific Launch Scripts**: Created standalone module launch scripts for focused user experience
+- **Command Line Route Arguments**: Implemented Flutter app support for runtime route specification
+- **Conditional Navigation**: Added back button removal for standalone module launches
+- **Architecture Decision**: Decided to maintain single codebase instead of module exclusion from builds
 - **Flutter Linux Issues Discovered**: Identified severe rendering problems on Linux Mint
 - **Black Popup Dialog Investigation**: Extensive troubleshooting of Add Security dialog corruption
 - **Tab Structure Corrections**: Fixed Financial Manager tab configuration (Overview + Construction only)
@@ -64,12 +71,16 @@
 - **Feature location matters**: Functionality placement (button vs tab) is critical for UX
 - **UI design preferences**: Clean, minimal, professional design without information overload
 - **Platform targeting**: Mobile-first approach essential for cross-platform compatibility
+- **Focused User Experience**: Users prefer dedicated module launches without navigation distractions
+- **Single-Purpose Apps**: Back button removal enhances focused workflow experience
 
 ### Technical Debt & Solutions
 - **Flutter Web workaround**: Use Chrome for development on Linux systems
 - **State management complexity**: Simple, static dialogs preferred over complex Provider patterns
 - **Error cascade prevention**: Single point of failure in dialog state can corrupt entire widget tree
 - **Documentation importance**: Comprehensive issue tracking prevents repeated failed attempts
+- **Architecture Simplicity**: Single codebase with conditional UI preferred over build complexity
+- **Runtime Configuration**: Command line arguments enable flexible app behavior without build changes
 
 ## Future Considerations
 

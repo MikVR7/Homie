@@ -1,8 +1,20 @@
 # TODO & Future Plans - Homie Ecosystem
 
-## 🎯 **Current Status: Flutter Implementation Complete ✅**
+## Development Guidelines 📋
+**See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
 
-### Recently Completed ✅
+## 🎯 **Current Status: Module-Specific Launch Scripts Complete ✅**
+
+### Recently Completed ✅ (2025-07-22)
+- [x] **Module-Specific Launch Scripts**: Created 4 standalone startup scripts for focused user experience
+- [x] **File Organizer Scripts**: `start_file_organizer.sh` and `start_file_organizer_web.sh` launch only File Organizer
+- [x] **Financial Manager Scripts**: `start_financial.sh` and `start_financial_web.sh` launch only Financial Manager  
+- [x] **Command Line Route Arguments**: Flutter app accepts `--route=/module` arguments via `main(List<String> args)`
+- [x] **Conditional Back Button**: Back buttons hidden in standalone launches using `isStandaloneLaunch` parameter
+- [x] **Architecture Decision**: Maintained single codebase; no module exclusion from builds (Flutter tree-shaking handles optimization)
+- [x] **Focused User Experience**: Standalone scripts provide single-purpose application experience without navigation distractions
+
+### Previously Completed ✅
 - [x] **Flutter Project Setup**: Complete Flutter app structure with dependencies
 - [x] **Cross-Platform Support**: Android, iOS, Web, Desktop compatibility
 - [x] **Dark Theme Implementation**: Material 3 dark theme with modern design

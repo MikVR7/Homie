@@ -190,10 +190,22 @@ tabs: const [
 ./start_homie.sh          # Starts both backend and frontend
 ```
 
-### Individual Services
+### Full Application Services
 ```bash
 ./start_backend.sh        # Python API server (localhost:8000)
-./start_frontend.sh       # Flutter app (localhost:3000)
+./start_frontend.sh       # Flutter app full dashboard (localhost:3000)
+./start_frontend_web.sh   # Flutter web app full dashboard (localhost:33317)
+```
+
+### Module-Specific Services (NEW! ✅)
+```bash
+# File Organizer Module Only (no back button, focused experience)
+./start_file_organizer.sh      # Linux desktop version
+./start_file_organizer_web.sh  # Web version (recommended for Linux)
+
+# Financial Manager Module Only (no back button, focused experience)  
+./start_financial.sh           # Linux desktop version
+./start_financial_web.sh       # Web version (recommended for Linux)
 ```
 
 ### Manual Commands
@@ -201,8 +213,12 @@ tabs: const [
 # Backend
 cd backend && source venv/bin/activate && python api_server.py
 
-# Frontend
+# Full Frontend
 cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 3000
+
+# Module-Specific Frontend (using command line arguments)
+cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/file-organizer"
+cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/financial"
 ```
 
 ## Key Architecture Principles
@@ -214,6 +230,16 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 6. **Cross-platform compatibility** - Single codebase for all platforms
 
 ## Recent Technical Achievements
+
+### Module-Specific Launch Scripts ✅ COMPLETED (2025-07-22)
+- **Standalone Module Scripts**: Created 4 new startup scripts for focused single-module experience
+- **File Organizer Scripts**: `start_file_organizer.sh` and `start_file_organizer_web.sh` launch only File Organizer
+- **Financial Manager Scripts**: `start_financial.sh` and `start_financial_web.sh` launch only Financial Manager
+- **No Back Button**: Standalone launches remove back button for focused, single-purpose experience
+- **Command Line Arguments**: Uses `--dart-entrypoint-args="--route=/module"` for runtime route specification
+- **Flutter App Enhancement**: Modified main.dart to accept runtime route arguments via `main(List<String> args)`
+- **Conditional UI**: Screens conditionally hide back buttons based on `isStandaloneLaunch` parameter
+- **Architecture Decision**: Kept single codebase architecture; no module exclusion from builds (Flutter tree-shaking handles optimization)
 
 ### Account Management System ✅
 - **User Account Management**: Complete CRUD operations for user-created accounts with different types (checking, savings, investment, cash)
@@ -299,6 +325,26 @@ cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 300
 3. **🧪 Bank Connection Testing**: Test connection with Austrian bank
 4. **📱 Frontend Banking UI**: Integrate banking features into Flutter app
 5. **🔄 Transaction Sync**: Implement automatic daily transaction import
+
+## Module-Specific Launch Architecture ✅ COMPLETED (2025-07-22)
+
+### New Startup Scripts Available:
+- **Full Dashboard**: `./start_frontend.sh`, `./start_frontend_web.sh`
+- **File Organizer Only**: `./start_file_organizer.sh`, `./start_file_organizer_web.sh`
+- **Financial Manager Only**: `./start_financial.sh`, `./start_financial_web.sh`
+
+### Technical Implementation:
+- **Runtime Route Arguments**: Flutter app accepts `--route=/module` arguments via `main(List<String> args)`
+- **Conditional Navigation**: Back buttons hidden in standalone launches using `isStandaloneLaunch` parameter
+- **Single Codebase**: No module exclusion from builds; Flutter tree-shaking optimizes unused code
+- **User Experience**: Focused, single-purpose application experience for specific workflows
+
+## Development Guidelines 📋
+**See `docs/GENERAL_RULES.md` for complete development guidelines including:**
+- Date management for AI assistants
+- Git commit message format: `TopicOfJob: Description`
+- Documentation standards
+- Development practices
 
 ## Technology Stack (FINALIZED)
 

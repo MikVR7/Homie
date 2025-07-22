@@ -1,5 +1,8 @@
 # Project Overview
 
+## Development Guidelines 📋
+**See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
+
 Welcome to the Homie project! Homie is your intelligent home management ecosystem, designed as a mobile-first application suite that evolves from a smart file organizer into a complete personal management platform.
 
 ## Infrastructure Overview
@@ -72,13 +75,25 @@ Homie is built as a **Flutter cross-platform application** that works seamlessly
 ```
 This starts both backend and frontend services automatically!
 
-**Individual Services:**
+**Full Application Services:**
 ```bash
 # Backend only
 ./start_backend.sh
 
-# Frontend only  
-./start_frontend.sh
+# Frontend full dashboard
+./start_frontend.sh        # Linux desktop
+./start_frontend_web.sh    # Web browser (recommended for Linux)
+```
+
+**Module-Specific Services (NEW! ✅):**
+```bash
+# File Organizer Only (focused experience, no back button)
+./start_file_organizer.sh      # Linux desktop
+./start_file_organizer_web.sh  # Web browser (recommended)
+
+# Financial Manager Only (focused experience, no back button)
+./start_financial.sh           # Linux desktop
+./start_financial_web.sh       # Web browser (recommended)
 ```
 
 ### Manual Startup Commands
@@ -90,7 +105,12 @@ cd backend && source venv/bin/activate && python api_server.py
 
 **Frontend (Flutter App):**
 ```bash
+# Full dashboard
 cd mobile_app && flutter run -d web-server --web-hostname 0.0.0.0 --web-port 3000
+
+# Module-specific (examples)
+cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/file-organizer"
+cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/financial"
 ```
 
 ### Access Points

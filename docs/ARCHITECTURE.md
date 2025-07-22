@@ -1,5 +1,8 @@
 # Architecture
 
+## Development Guidelines 📋
+**See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
+
 ## System Overview
 
 Homie is a comprehensive intelligent home management ecosystem designed as a mobile-first application suite. It provides integrated modules for complete personal and household management, evolving from a file organizer into a full-featured home automation and management platform.
@@ -235,7 +238,29 @@ While Homie operates as a self-hosted home server, AWS services may enhance func
 - **Error Tracking**: Detailed logging with severity levels
 - **User Notifications**: Progress updates and issue alerts
 
-## Current Implementation (Phase 1 Complete)
+## Current Implementation (Phase 1 Complete + Module Launch Scripts)
+
+### Module-Specific Launch System ✅ COMPLETED (2025-07-22)
+
+**Startup Scripts Architecture:**
+```
+Root Directory:
+├── start_homie.sh                 # 🚀 Full system (backend + frontend)
+├── start_backend.sh               # 🔧 Backend API only  
+├── start_frontend.sh              # 📱 Full dashboard (Linux desktop)
+├── start_frontend_web.sh          # 🌐 Full dashboard (web browser)
+├── start_file_organizer.sh        # 📁 File Organizer only (Linux desktop)
+├── start_file_organizer_web.sh    # 📁 File Organizer only (web browser)
+├── start_financial.sh             # 💰 Financial Manager only (Linux desktop)
+└── start_financial_web.sh         # 💰 Financial Manager only (web browser)
+```
+
+**Technical Implementation:**
+- **Runtime Route Arguments**: Flutter app accepts `--dart-entrypoint-args="--route=/module"`
+- **Dynamic Initial Location**: Modified `main.dart` to parse command line arguments via `main(List<String> args)`
+- **Conditional UI**: Screens hide back buttons when `isStandaloneLaunch = true`
+- **Single Codebase**: No module exclusion; Flutter tree-shaking optimizes builds automatically
+- **Focused Experience**: Standalone launches bypass dashboard for single-purpose workflows
 
 ### Integrated AI-Powered System ✅
 
