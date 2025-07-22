@@ -185,33 +185,177 @@ While Homie operates as a self-hosted home server, AWS services may enhance func
 - **WebSocket**: Real-time updates and progress streaming
 - **Plugin API**: Third-party extension support
 
-### Data Storage
+### Data Storage & Database Architecture
 
-#### Configuration Storage
-- **Format**: YAML/TOML for human readability
-- **Location**: `~/.config/homie/` or `./config/`
-- **Contents**: Rules, preferences, connection settings
+#### **Multi-Backend Database Design** 💾
 
-#### Metadata Database
-- **Type**: SQLite for simplicity, PostgreSQL for scale
-- **Schema**: Files, metadata, organization history, user actions
-- **Indexes**: Content hashes, file paths, metadata fields
+##### **SQLite Database Structure** (Primary Implementation)
+```sql
+-- Central destination memory and user preferences
+CREATE TABLE destination_mappings (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    file_category TEXT NOT NULL,        -- 'videos', 'documents', 'images'
+    destination_path TEXT NOT NULL,     -- '/drive1/Movies', '/OneDrive/eBooks'
+    drive_info TEXT,                    -- JSON: drive type, mount point
+    confidence_score REAL DEFAULT 0.5,
+    usage_count INTEGER DEFAULT 1,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-#### Cache Layer
-- **File Hashes**: Content-based deduplication
-- **Thumbnails**: Generated previews for media files
-- **ML Models**: Local models for content classification
+-- Series-specific mappings for consistent TV show organization
+CREATE TABLE series_mappings (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    series_name TEXT NOT NULL,
+    destination_path TEXT NOT NULL,     -- '/drive1/Series/Breaking Bad'
+    season_structure TEXT,              -- JSON: season folder patterns
+    usage_count INTEGER DEFAULT 1,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Available drives and mount points
+CREATE TABLE user_drives (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    drive_path TEXT NOT NULL,
+    drive_type TEXT NOT NULL,           -- 'local', 'network', 'cloud', 'usb'
+    drive_name TEXT,
+    filesystem TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User preferences and settings
+CREATE TABLE user_preferences (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    preference_key TEXT NOT NULL,
+    preference_value TEXT,
+    module_name TEXT,                   -- 'file_organizer', 'financial', etc.
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- File action history (migrated from .homie_memory.json)
+CREATE TABLE file_actions (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    action_type TEXT NOT NULL,          -- 'move', 'delete', 're_analyze'
+    file_name TEXT NOT NULL,
+    source_path TEXT,
+    destination_path TEXT,
+    success BOOLEAN,
+    error_message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User accounts and authentication
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,                -- UUID
+    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE,
+    password_hash TEXT,                 -- For cloud backend
+    subscription_tier TEXT DEFAULT 'free',
+    backend_type TEXT DEFAULT 'local', -- 'local', 'cloud'
+    backend_url TEXT,                   -- User's backend endpoint
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+```
+
+##### **Backend Deployment Scenarios**
+
+**Scenario 1: Home Server/NAS Backend** 🏠
+- **Database Location**: `~/homie/data/homie.db` on user's NAS
+- **Access Pattern**: Direct SQLite file access
+- **Benefits**: Full data control, no cloud dependency
+- **Use Case**: Privacy-conscious users with technical setup
+
+**Scenario 2: Cloud Backend Service** ☁️
+- **Database Location**: AWS RDS PostgreSQL (multi-tenant)
+- **Access Pattern**: Authenticated API calls with user isolation
+- **Benefits**: No setup required, access from anywhere
+- **Use Case**: Convenience-focused users willing to pay
+
+**Scenario 3: Development/Localhost** 🔧
+- **Database Location**: `backend/data/homie.db`
+- **Access Pattern**: Direct SQLite for rapid iteration
+- **Benefits**: Fast development, easy testing
+- **Use Case**: Development and feature testing
+
+#### Legacy Configuration Storage
+- **Format**: JSON for compatibility
+- **Location**: `backend/config/`
+- **Contents**: Migration data, templates, folder maps
+- **Status**: Being migrated to SQLite database
+
+#### Cache Layer & Performance
+- **File Hashes**: Stored in database for deduplication
+- **Thumbnails**: Generated previews in `backend/cache/`
+- **AI Results**: Cached organization suggestions
+- **Drive Discovery**: Cached mount point information
+
+### Centralized Authentication & Multi-User Architecture
+
+#### **Authentication Outside Module Apps** 🔐
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Homie App     │    │  Auth Service    │    │ Backend Server  │
+│  (Flutter)      │───▶│  (Unified Login) │───▶│   (API + DB)    │
+│                 │    │                  │    │                 │
+│ • File Organizer│    │ • User Accounts  │    │ • File Organizer│
+│ • Finance Mgr   │    │ • Server Discovery│    │ • Finance Mgr   │
+│ • Media Mgr     │    │ • Connection Mgmt│    │ • Media Mgr     │
+│ • Future Modules│    │ • Subscription   │    │ • Future Modules│
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+#### **Login Flow Design**
+1. **Server Discovery**: App detects available backends (local NAS, cloud service)
+2. **Authentication**: Single login works across all modules
+3. **Connection Management**: Seamless switching between local/cloud backends
+4. **Module Access**: Each module checks user permissions/subscriptions
+
+#### **Unified API Design**
+```python
+# All modules share same authentication and database access
+class BaseModule:
+    def __init__(self, user_id: str, db_connection):
+        self.user_id = user_id
+        self.db = db_connection
+    
+    def get_user_preferences(self, module_name: str):
+        # Shared preferences system
+        pass
+    
+    def log_action(self, action_type: str, details: dict):
+        # Shared action logging
+        pass
+
+class FileOrganizerModule(BaseModule):
+    def get_destination_mappings(self):
+        # File organizer specific logic
+        pass
+
+class FinancialManagerModule(BaseModule):
+    def get_account_settings(self):
+        # Financial manager specific logic
+        pass
+```
 
 ### Security Architecture
 
 #### Data Protection
+- **Multi-Backend Security**: Different security models for local vs cloud
 - **Encryption at Rest**: Optional for sensitive file metadata
 - **Secure Communications**: TLS for all network operations
-- **Access Control**: Role-based permissions for shared access
+- **User Isolation**: Complete data separation between users
 
 #### Privacy by Design
 - **Local Processing**: Content analysis happens locally
-- **Minimal Cloud Data**: Only connection metadata goes to cloud
+- **Backend Choice**: Users choose local NAS vs cloud hosting
+- **Data Sovereignty**: Local backend = user owns all data
 - **User Consent**: Explicit permission for each cloud integration
 
 ### Performance Considerations

@@ -316,6 +316,251 @@ cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/file-org
 cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/financial"
 ```
 
+## 🏗️ **Multi-User Architecture & Database Design** (NEW! 📋)
+
+### **Backend Deployment Scenarios**
+
+#### **Scenario 1: Home Server/NAS Backend** 🏠
+- **User Case**: User has own NAS/home server
+- **Backend Location**: User's local network (e.g., `192.168.1.100:8000`)
+- **Database**: SQLite on user's own hardware
+- **Access**: Direct connection from mobile/desktop apps
+- **Benefits**: Full data control, no cloud dependency, unlimited storage
+- **Setup**: User installs Homie backend on their NAS/server
+
+#### **Scenario 2: Cloud Backend Service** ☁️
+- **User Case**: User wants convenience, no home server
+- **Backend Location**: AWS/Cloud hosting (e.g., `api.homie-app.com`)
+- **Database**: PostgreSQL/RDS with user isolation
+- **Access**: Authenticated API calls with user accounts
+- **Benefits**: No setup required, access from anywhere
+- **Monetization**: Subscription-based service
+
+#### **Scenario 3: Development/Localhost** 🔧
+- **User Case**: Development and testing
+- **Backend Location**: `localhost:8000`
+- **Database**: SQLite for quick iteration
+- **Access**: Direct connection for development
+- **Purpose**: Testing new features before deployment
+
+### **Centralized Authentication System** 🔐
+
+#### **Authentication Outside Module Apps**
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Homie App     │    │  Auth Service    │    │ Backend Server  │
+│  (Flutter)      │───▶│  (Unified Login) │───▶│   (API + DB)    │
+│                 │    │                  │    │                 │
+│ • File Organizer│    │ • User Accounts  │    │ • File Organizer│
+│ • Finance Mgr   │    │ • Server Discovery│    │ • Finance Mgr   │
+│ • Media Mgr     │    │ • Connection Mgmt│    │ • Media Mgr     │
+│ • Future Modules│    │ • Subscription   │    │ • Future Modules│
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+#### **Login Flow Design**
+1. **Server Discovery**: App detects available backends (local NAS, cloud service)
+2. **Authentication**: Single login works across all modules
+3. **Connection Management**: Seamless switching between local/cloud backends
+4. **Module Access**: Each module checks user permissions/subscriptions
+
+### **Database Architecture** 💾
+
+#### **SQLite Database Structure** (Local/Development)
+```sql
+-- Central destination memory and user preferences
+CREATE TABLE destination_mappings (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    file_category TEXT NOT NULL,        -- 'videos', 'documents', 'images'
+    destination_path TEXT NOT NULL,     -- '/drive1/Movies', '/OneDrive/eBooks'
+    drive_info TEXT,                    -- JSON: drive type, mount point
+    confidence_score REAL DEFAULT 0.5,
+    usage_count INTEGER DEFAULT 1,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Series-specific mappings for consistent TV show organization
+CREATE TABLE series_mappings (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    series_name TEXT NOT NULL,
+    destination_path TEXT NOT NULL,     -- '/drive1/Series/Breaking Bad'
+    season_structure TEXT,              -- JSON: season folder patterns
+    usage_count INTEGER DEFAULT 1,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Available drives and mount points
+CREATE TABLE user_drives (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    drive_path TEXT NOT NULL,
+    drive_type TEXT NOT NULL,           -- 'local', 'network', 'cloud', 'usb'
+    drive_name TEXT,
+    filesystem TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User preferences and settings
+CREATE TABLE user_preferences (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    preference_key TEXT NOT NULL,
+    preference_value TEXT,
+    module_name TEXT,                   -- 'file_organizer', 'financial', etc.
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- File action history (migrated from .homie_memory.json)
+CREATE TABLE file_actions (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    action_type TEXT NOT NULL,          -- 'move', 'delete', 're_analyze'
+    file_name TEXT NOT NULL,
+    source_path TEXT,
+    destination_path TEXT,
+    success BOOLEAN,
+    error_message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User accounts and authentication
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,                -- UUID
+    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE,
+    password_hash TEXT,                 -- For cloud backend
+    subscription_tier TEXT DEFAULT 'free',
+    backend_type TEXT DEFAULT 'local', -- 'local', 'cloud'
+    backend_url TEXT,                   -- User's backend endpoint
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+```
+
+#### **Multi-Backend Data Synchronization**
+- **Local Backend**: User's data stays on their hardware
+- **Cloud Backend**: User data isolated by user_id in cloud database
+- **Hybrid Mode**: Local primary + cloud backup (future feature)
+- **Data Migration**: Tools to move from local to cloud backend
+
+### **Module Integration Strategy** 🧩
+
+#### **Unified API Design**
+```python
+# All modules share same authentication and database access
+class BaseModule:
+    def __init__(self, user_id: str, db_connection):
+        self.user_id = user_id
+        self.db = db_connection
+    
+    def get_user_preferences(self, module_name: str):
+        # Shared preferences system
+        pass
+    
+    def log_action(self, action_type: str, details: dict):
+        # Shared action logging
+        pass
+
+class FileOrganizerModule(BaseModule):
+    def get_destination_mappings(self):
+        # File organizer specific logic
+        pass
+
+class FinancialManagerModule(BaseModule):
+    def get_account_settings(self):
+        # Financial manager specific logic
+        pass
+```
+
+#### **Future Module Addition**
+- **Media Manager**: Same login, same database, new tables for media
+- **Document Manager**: Extends file organization for business documents
+- **Home Automation**: IoT device management with same user account
+- **Family Sharing**: Multiple users per household with role-based access
+
+### **AWS Integration Roadmap** 🌐
+
+#### **Phase 1: Development** (Current)
+- Local SQLite backend
+- Single user development
+- Feature development and testing
+
+#### **Phase 2: Cloud Infrastructure**
+- **RDS PostgreSQL**: Multi-user database
+- **Cognito**: User authentication and management
+- **API Gateway + Lambda**: Scalable API endpoints
+- **S3**: File storage and backup
+- **CloudFront**: CDN for media streaming
+
+#### **Phase 3: Commercial Platform**
+- **Multi-tenant SaaS**: Subscription-based service
+- **User Onboarding**: Easy signup and backend connection
+- **Premium Features**: Advanced AI, larger storage, priority support
+- **Enterprise**: Custom deployments, SSO integration
+
+### **Development Priorities & Implementation Roadmap** 📋
+
+#### **🚀 Phase 1: SQLite Database Foundation** (CURRENT - 1-2 weeks)
+**Goal**: Replace scattered `.homie_memory.json` files with centralized SQLite database
+
+**Week 1: Database Foundation**
+1. **SQLite Setup** - Create `backend/data/homie.db` with destination_mappings, series_mappings, user_drives, file_actions tables
+2. **DatabaseService** - Centralized database operations class with user_id isolation
+3. **Migration Script** - Import existing `.homie_memory.json` data into SQLite
+4. **Basic Testing** - Ensure database operations work locally
+
+**Week 2: Destination Memory System**
+1. **Drive Discovery** - Cross-platform drive detection (local, network, cloud, USB)
+2. **Destination Tracking** - AI learns "movies → `/drive1/Movies`" patterns from database
+3. **API Endpoints** - Backend endpoints for destination management and visualization
+4. **AI Enhancement** - Feed destination memory to AI for consistent file organization
+
+**Immediate Value**:
+- ✅ Consistent destination memory ("movies always go to X")
+- ✅ Multi-drive support (local + OneDrive + NAS)
+- ✅ Better AI organization with historical patterns
+- ✅ Foundation for future multi-user system
+
+#### **🔮 Phase 2: Authentication & Multi-Backend** (2-4 weeks later)
+**Goal**: Support both local development and future cloud deployment
+
+**Authentication & User Management**
+1. **User System** - Simple user management (start with single "dev" user)
+2. **Authentication Service** - Login system outside modules, shared across File Organizer, Finance, etc.
+3. **Backend Discovery** - Auto-detect local vs remote backends
+4. **Flutter Integration** - Login screen, server connection management
+
+**Multi-Backend Support**
+1. **Local Backend Mode** - SQLite database on localhost/NAS
+2. **Cloud Backend Mode** - Preparation for PostgreSQL/AWS
+3. **Connection Management** - Seamless switching between backend types
+4. **Data Synchronization** - User data consistency across backends
+
+#### **🌐 Phase 3: AWS & Commercial Platform** (Future - 3+ months)
+**Goal**: Cloud hosting and commercial viability
+
+**AWS Infrastructure**
+1. **RDS PostgreSQL** - Multi-tenant cloud database
+2. **Cognito Authentication** - User authentication and management
+3. **API Gateway + Lambda** - Scalable API endpoints
+4. **S3 + CloudFront** - File storage and CDN
+
+**Commercial Features**
+1. **Multi-tenant SaaS** - Subscription-based service
+2. **User Onboarding** - Easy signup and backend connection
+3. **Premium Features** - Advanced AI, larger storage, priority support
+4. **Mobile App Store** - Production releases on iOS/Android
+
+#### **Current Focus: Phase 1 Implementation**
+- **Next Task**: SQLite database setup with destination_mappings table
+- **Development Environment**: localhost:8000 backend + Flutter web frontend
+- **Target**: Solve immediate destination consistency problem
+- **Foundation**: Prepare architecture for future multi-user commercial platform
+
 ## Key Architecture Principles
 1. **Non-destructive by default** - Always suggest moves, never delete without explicit permission
 2. **User control** - Users can configure automation level and override any decision

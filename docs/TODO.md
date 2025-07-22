@@ -3,9 +3,23 @@
 ## Development Guidelines 📋
 **See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
 
-## 🎯 **Current Status: Module-Specific Launch Scripts Complete ✅**
+## 🎯 **Current Status: SQLite Database Foundation - Phase 1** 🚀
+
+### **Implementation Roadmap Overview**
+
+#### **🚀 Phase 1: SQLite Database Foundation** (CURRENT - 1-2 weeks)
+**Goal**: Replace scattered `.homie_memory.json` files with centralized SQLite database for destination consistency
+
+#### **🔮 Phase 2: Authentication & Multi-Backend** (2-4 weeks later)  
+**Goal**: Support both local development and future cloud deployment with unified login
+
+#### **🌐 Phase 3: AWS & Commercial Platform** (Future - 3+ months)
+**Goal**: Cloud hosting and commercial viability with subscription model
 
 ### Recently Completed ✅ (2025-07-22)
+- [x] **Multi-User Architecture Documentation**: Comprehensive documentation of local NAS vs cloud backend scenarios
+- [x] **SQLite Database Schema**: Designed destination_mappings, series_mappings, user_drives, file_actions tables
+- [x] **Centralized Authentication Design**: Authentication service outside individual modules for unified login
 - [x] **Module-Specific Launch Scripts**: Created 4 standalone startup scripts for focused user experience
 - [x] **File Organizer Scripts**: `start_file_organizer.sh` and `start_file_organizer_web.sh` launch only File Organizer
 - [x] **Financial Manager Scripts**: `start_financial.sh` and `start_financial_web.sh` launch only Financial Manager  
@@ -30,6 +44,32 @@
 - [x] **UI/UX Redesign**: Clean, professional design with minimal approach
 - [x] **API Endpoint Fixes**: Fixed CORS errors by using actual backend endpoints
 - [x] **Theme Optimization**: Removed visual clutter, improved readability and contrast
+
+## 🚀 **Phase 1: SQLite Database Foundation** (CURRENT)
+
+### **Week 1: Database Foundation** 
+- [ ] **SQLite Database Setup**: Create `backend/data/homie.db` with all required tables
+  - [ ] destination_mappings table for file category → folder mappings
+  - [ ] series_mappings table for TV show → folder consistency  
+  - [ ] user_drives table for available storage locations
+  - [ ] file_actions table for action history
+  - [ ] users table for authentication foundation
+- [ ] **DatabaseService Class**: Centralized database operations with user_id isolation
+- [ ] **Migration Script**: Import existing `.homie_memory.json` data into SQLite database
+- [ ] **Basic Testing**: Ensure database operations work correctly
+
+### **Week 2: Destination Memory System**
+- [ ] **Drive Discovery**: Cross-platform detection of local, network, cloud, USB drives
+- [ ] **Destination Tracking**: AI learns patterns like "movies → `/drive1/Movies`" from database
+- [ ] **API Endpoints**: Backend endpoints for destination management and visualization
+- [ ] **AI Enhancement**: Feed destination memory to AI for consistent file organization
+- [ ] **Flutter UI**: Visualization of destination mappings and drive discovery
+
+### **Immediate Benefits After Phase 1**:
+- ✅ **Consistent Destinations**: Movies always go to user's preferred folder
+- ✅ **Multi-Drive Support**: Works across local drives, NAS, OneDrive, Dropbox
+- ✅ **AI Memory**: No more "movies in different folders" - AI remembers patterns
+- ✅ **Foundation Ready**: Database ready for future multi-user and cloud deployment
 
 ## 📱 **Phase 1: File Organizer** ✅ COMPLETE
 
