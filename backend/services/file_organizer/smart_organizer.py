@@ -40,7 +40,6 @@ class SmartOrganizer:
         self.api_key = api_key
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
-    
 
     
     def analyze_downloads_folder(self, downloads_path: str, sorted_path: str) -> Dict:
@@ -286,7 +285,7 @@ Respond with JSON:
 """
             
             try:
-                response = self.genai_model.generate_content(enhanced_prompt)
+                response = self.model.generate_content(enhanced_prompt)
                 response_text = response.text.strip()
                 
                 # Parse JSON response
