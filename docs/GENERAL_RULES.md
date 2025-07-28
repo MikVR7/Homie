@@ -25,6 +25,12 @@ This document contains general rules and guidelines that apply across all projec
 TopicOfJob: Detailed description of what we have done in one sentence
 ```
 
+**IMPORTANT**: 
+- **TopicOfJob**: Use PascalCase (e.g., BackendConnectivity, FileOrganizer, DatabaseMigration)
+- **Start with capital letter**: Always capitalize the first letter
+- **No prefixes**: Do NOT use conventional commit prefixes like "feat:", "fix:", etc.
+- **Be descriptive**: Explain what was accomplished in clear terms
+
 ### Examples
 ```bash
 # Good Examples:
@@ -38,6 +44,8 @@ git commit -m "Fixed stuff"
 git commit -m "Updates"
 git commit -m "WIP"
 git commit -m "Module scripts"
+git commit -m "feat: implement backend connectivity"  # NO conventional commit prefixes
+git commit -m "fix: resolve error handling"          # NO conventional commit prefixes
 ```
 
 ### Topic Guidelines
