@@ -32,5 +32,8 @@ flask>=2.2.0        # For web interface
 flask-cors>=4.0.0   # For CORS support
 google-generativeai>=0.3.0  # For AI-powered file analysis
 
+# Security dependencies
+bcrypt>=4.3.0       # For secure password hashing
+
 # Optional media processing
 # ffmpeg-python>=0.2.0  # For video/audio processing

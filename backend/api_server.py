@@ -467,6 +467,27 @@ def file_organizer_browse_folders():
             'error': str(e)
         }), 500
 
+@app.route('/api/file-organizer/destination-memory', methods=['GET'])
+def file_organizer_destination_memory():
+    """Return the current user's destination memory (folder mappings, usage, confidence, drives)"""
+    try:
+        # For now, use the dev user (future: get from auth/session)
+        api_key = os.getenv('GEMINI_API_KEY', 'test_api_key')
+        organizer = SmartOrganizer(api_key=api_key)
+        memory = organizer.get_destination_memory()
+        drives = organizer.discover_available_drives()
+        
+        response = {
+            'success': True,
+            'data': {
+                'destination_memory': memory,
+                'available_drives': drives
+            }
+        }
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ============================================================================
 # FINANCIAL MANAGER MODULE ENDPOINTS
 # ============================================================================

@@ -29,4 +29,4 @@ fi
 
 # Start the API server
 echo "🌟 Starting API server on http://localhost:8000"
-python api_server.py 
+python3 api_server.py 
