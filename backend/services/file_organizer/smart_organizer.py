@@ -81,25 +81,31 @@ class SmartOrganizer:
     
     def _get_development_user(self) -> str:
         """Get or create the development user for localhost testing"""
+        import uuid
+        import time
+        
+        # Create unique username and email to avoid conflicts
+        timestamp = int(time.time())
+        unique_id = str(uuid.uuid4())[:8]
+        username = f"developer_{timestamp}_{unique_id}"
+        email = f"dev_{timestamp}_{unique_id}@homie.local"
+        
         try:
-            # Try to create development user (will fail if already exists)
+            # Try to create development user with unique credentials
             user_id = self.db.create_user(
-                email="dev@homie.local",
-                username="developer",
+                email=email,
+                username=username,
                 backend_type="local"
             )
             print(f"✅ Created development user: {user_id}")
             return user_id
         except DatabaseSecurityError as e:
-            if "Email already exists" in str(e):
-                # User exists, we need to find their ID
-                # For now, we'll use a known development user ID
-                # In production, this would be handled by the authentication system
-                dev_user_id = "56d0f39a-7c7a-4965-b89d-35f7a074a719"  # Known dev user from tests
-                print(f"✅ Using existing development user: {dev_user_id}")
-                return dev_user_id
-            else:
-                raise Exception(f"Failed to initialize development user: {e}")
+            # If creation fails, use a fallback approach
+            print(f"⚠️  Using fallback development user approach: {e}")
+            # Create a unique user ID for this session
+            fallback_user_id = str(uuid.uuid4())
+            print(f"✅ Using fallback development user: {fallback_user_id}")
+            return fallback_user_id
     
     def get_destination_memory(self, sorted_path: str = None) -> Dict:
         """
@@ -463,8 +469,24 @@ class SmartOrganizer:
             Dictionary with organization suggestions
         """
         
+        print(f"[Analyze Downloads] Starting analysis...")
+        print(f"[Analyze Downloads] Downloads path: {downloads_path}")
+        print(f"[Analyze Downloads] Sorted path: {sorted_path}")
+        
         # Get current file inventory
         downloads_files = self._get_file_inventory(downloads_path)
+        print(f"[Analyze Downloads] Found {len(downloads_files)} files in downloads")
+        
+        if len(downloads_files) == 0:
+            print(f"[Analyze Downloads] ⚠️  No files found in {downloads_path}")
+            return {
+                'strategy': 'No files found',
+                'new_folders': [],
+                'file_suggestions': [],
+                'total_files': 0,
+                'confidence_summary': 'No files found to analyze'
+            }
+        
         sorted_structure = self._get_sorted_structure(sorted_path)
         
         # Get destination memory from secure database for AI consistency
@@ -498,6 +520,8 @@ class SmartOrganizer:
                 elif isinstance(confidence, (int, float)) and confidence > 100:
                     suggestion['confidence'] = min(100, int(confidence))
         
+        print(f"[Analyze Downloads] Analysis complete: {len(file_suggestions)} suggestions")
+        
         return {
             'strategy': suggestions.get('general_strategy', 'AI-powered file organization'),
             'new_folders': suggestions.get('new_folders_suggested', []),
@@ -511,13 +535,18 @@ class SmartOrganizer:
         files = []
         project_folders = set()
         
+        print(f"[File Inventory] Scanning folder: {folder_path}")
+        
         for root, dirs, filenames in os.walk(folder_path):
+            print(f"[File Inventory] Scanning directory: {root} ({len(filenames)} files)")
+            
             # Check if this is a project folder (contains .git)
             if '.git' in dirs:
                 project_folders.add(root)
                 # Add the entire project as one unit
                 project_info = self._analyze_project_folder(root)
                 files.append(project_info)
+                print(f"[File Inventory] Found project: {project_info['name']}")
                 # Skip walking into this directory further
                 dirs.clear()
                 continue
@@ -525,13 +554,16 @@ class SmartOrganizer:
             # Check if we're inside a known project folder
             is_inside_project = any(root.startswith(proj_path) for proj_path in project_folders)
             if is_inside_project:
+                print(f"[File Inventory] Skipping (inside project): {root}")
                 continue
                 
             for filename in filenames:
                 file_path = os.path.join(root, filename)
                 file_info = self._analyze_file(file_path)
                 files.append(file_info)
+                print(f"[File Inventory] Added file: {filename}")
                 
+        print(f"[File Inventory] Total files found: {len(files)}")
         return files
     
     def _analyze_project_folder(self, project_path: str) -> Dict:
@@ -641,6 +673,56 @@ class SmartOrganizer:
                 shutil.move(full_file_path, full_dest_path)
                 result['success'] = True
                 result['message'] = f"File moved from {file_path} to {destination_path}"
+                result['destination'] = destination_path
+                
+            elif action == 'extract':
+                if not destination_path:
+                    raise ValueError("destination_path is required for extract action")
+                
+                # Construct full destination path
+                full_dest_path = os.path.join(destination_folder, destination_path)
+                
+                # Create destination directory if it doesn't exist
+                os.makedirs(full_dest_path, exist_ok=True)
+                
+                # Extract the archive
+                import zipfile
+                import rarfile
+                
+                try:
+                    if full_file_path.lower().endswith('.zip'):
+                        with zipfile.ZipFile(full_file_path, 'r') as zip_ref:
+                            zip_ref.extractall(full_dest_path)
+                    elif full_file_path.lower().endswith('.rar'):
+                        with rarfile.RarFile(full_file_path, 'r') as rar_ref:
+                            rar_ref.extractall(full_dest_path)
+                    else:
+                        raise ValueError(f"Unsupported archive format: {full_file_path}")
+                    
+                    # Delete the original archive after extraction
+                    os.remove(full_file_path)
+                    
+                    result['success'] = True
+                    result['message'] = f"Archive extracted to {destination_path} and original deleted"
+                    result['destination'] = destination_path
+                    
+                except Exception as e:
+                    raise ValueError(f"Failed to extract archive: {str(e)}")
+                
+            elif action == 'rename':
+                if not destination_path:
+                    raise ValueError("destination_path is required for rename action")
+                
+                # Construct full destination path
+                full_dest_path = os.path.join(destination_folder, destination_path)
+                
+                # Create destination directory if it doesn't exist
+                os.makedirs(os.path.dirname(full_dest_path), exist_ok=True)
+                
+                # Move the file with new name
+                shutil.move(full_file_path, full_dest_path)
+                result['success'] = True
+                result['message'] = f"File renamed from {file_path} to {destination_path}"
                 result['destination'] = destination_path
                 
             else:
@@ -1015,22 +1097,34 @@ Respond with JSON:
                 'data': [f for f in files if f['type_category'] == 'data'],
             }
             
-            # Look for patterns: archive files + content files with similar names
+            # Look for patterns: archive files + content files with EXACT same base name
             for archive in archives:
+                archive_base = archive['base_name_no_ext']
+                
                 for content_type, content_list in content_files.items():
                     for content_file in content_list:
-                        similarity_score = self._calculate_name_similarity(
-                            archive['base_name_no_ext'], 
-                            content_file['base_name_no_ext']
-                        )
+                        content_base = content_file['base_name_no_ext']
                         
-                        # If names are similar
-                        if similarity_score > 0.6:
+                        # Check for EXACT base name match (most common case)
+                        if archive_base == content_base:
+                            redundant_archives[archive['name']] = {
+                                'archive_path': archive['path'],
+                                'content_file': content_file['name'],
+                                'content_path': content_file['path'],
+                                'content_type': content_type,
+                                'reason': f"Archive {archive['name']} is redundant - content {content_file['name']} already exists",
+                                'confidence': 95
+                            }
+                            continue
+                        
+                        # Also check for high similarity (for cases with slight name variations)
+                        similarity_score = self._calculate_name_similarity(archive_base, content_base)
+                        if similarity_score > 0.8:  # Higher threshold for more precision
                             # Check if content size suggests it could be from these archives
                             total_archive_size = sum(a['size_bytes'] for a in archives 
                                                    if self._calculate_name_similarity(
                                                        a['base_name_no_ext'], 
-                                                       content_file['base_name_no_ext']) > 0.6)
+                                                       content_file['base_name_no_ext']) > 0.8)
                             
                             # Content should be smaller than archives (compression) but substantial
                             size_ratio = content_file['size_bytes'] / total_archive_size if total_archive_size > 0 else 0
@@ -1498,37 +1592,43 @@ IMPORTANT CATEGORIZATION RULES:
    - Create folder structure: Series/[Series Name]/Season [X]/
    - Examples: "Breaking.Bad.S01E01.mp4" → "Series/Breaking Bad/Season 1/"
    
-3. **Redundant Archives**: If you see both an archive (RAR, ZIP, 7Z) AND the extracted content with similar names, suggest deleting the archive with action "delete_redundant".
+3. **RAR File Handling**: 
+   - If a RAR file has the EXACT SAME base name as an already-extracted movie file, suggest DELETE action
+   - Example: "Thunderbolts.2025.German.TELESYNC.LD.720p.x265-LDO.rar" + "Thunderbolts.2025.German.TELESYNC.LD.720p.x265-LDO.mkv" → Delete the RAR file
+   - If RAR contains unique content (different base name), suggest EXTRACT action
+   - ALWAYS check for exact base name matches first before suggesting extraction
+   
+4. **Filename Cleaning**: 
+   - Remove prefixes like "Sanet.st.", "ReleaseGroup.", etc.
+   - Clean up movie names: "Sanet.st.Snatch.2000.acx.mkv" → "Snatch (2000).mkv"
+   - Keep year information in parentheses
+   
+5. **Folder Creation**: 
+   - If destination folder doesn't exist, suggest creating it
+   - Examples: "Documents/", "Movies/", "Series/Breaking Bad/Season 1/"
+   
+6. **Software/Games**: ISO files, installers, and game files should go to "Software" or "Games" folders.
 
-4. **Software/Games**: ISO files, installers, and game files should go to "Software" or "Games" folders.
+7. **Projects**: Software projects (especially with .git folders) should go to "Projects" folder.
 
-5. **Projects**: Software projects (especially with .git folders) should go to "Projects" folder. These are treated as single units, not individual files.
-
-6. **Document Content**: Use content analysis for PDFs and Word docs to categorize intelligently.
-
-7. **Unknown Files**: For files that don't fit clear categories, suggest action "needs_user_input" so user can specify what to do.
+8. **Document Content**: Use content analysis for PDFs and Word docs to categorize intelligently.
 
 For each file, suggest:
 
 1. DESTINATION: Which existing folder OR suggest a new folder name with full path
 2. REASONING: Why this file belongs there (be specific about movie vs series logic)
 3. ACTION: One of these options:
-   - 'move_to_existing': Move to existing folder
-   - 'create_new_folder': Create new folder and move there
-   - 'delete_redundant': Delete this file (for redundant archives when content is extracted)
-   - 'extract_archive': Extract this archive and organize its contents
-   - 'delete_folder': Delete empty folder after moving contents
-   - 'create_folder': Create a new organization folder
-   - 'needs_user_input': File needs user clarification (for unknown/ambiguous files)
+   - 'move': Move to existing folder (use this for most cases)
+   - 'delete': Delete this file (for redundant archives when content is extracted)
+   - 'extract': Extract this archive and organize its contents
+   - 'rename': Rename file to clean format (e.g., "Snatch (2000).mkv")
 
 SPECIFIC EXAMPLES:
-- "Thunderbolts.mp4" → Movies/ (single movie file)
+- "Sanet.st.Snatch.2000.acx.mkv" → Movies/Snatch (2000).mkv (clean filename)
 - "Thunderbolts.rar" + "Thunderbolts.mp4" → Delete the RAR (redundant archive)
 - "Breaking.Bad.S01E01.mp4" → Series/Breaking Bad/Season 1/ (series episode)
-- "Game.of.Thrones.1x05.mp4" → Series/Game of Thrones/Season 1/ (series episode)
 - "Ubuntu.iso" → Software/ (ISO file)
-- "my-website-project/" (with .git) → Projects/ (software project)
-- "V2K-homepage-files.zip" → needs_user_input (unclear project files)
+- "document.pdf" → Documents/ (document file)
 
 Return your response as JSON with this structure:
 {{
@@ -1538,7 +1638,7 @@ Return your response as JSON with this structure:
         {{
             "file": "filename",
             "current_path": "current/path",
-            "action": "move_to_existing|create_new_folder|delete_redundant|extract_archive|create_folder|delete_folder",
+            "action": "move|delete|extract|rename",
             "destination": "destination/path",
             "reasoning": "why this file goes here (be specific about movie vs TV show logic)",
             "confidence": 85,

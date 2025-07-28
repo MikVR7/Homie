@@ -344,7 +344,7 @@ def execute_file_action():
         })
         
     except Exception as e:
-        logger.error(f"Error executing file action: {str(e)}")
+        print(f"Error executing file action: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -393,7 +393,7 @@ def re_analyze_file():
         })
         
     except Exception as e:
-        logger.error(f"Error re-analyzing file: {str(e)}")
+        print(f"Error re-analyzing file: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
