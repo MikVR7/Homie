@@ -118,8 +118,8 @@ class SmartOrganizer:
             Dictionary with destination patterns and mapping rules from database
         """
         try:
-            # Get destination mappings from secure database
-            mappings = self.db.get_user_destination_mappings(self.user_id)
+            # Get destination mappings from secure database for File Organizer module
+            mappings = self.db.get_user_destination_mappings(self.user_id, module_name='file_organizer')
             
             destination_memory = {
                 'category_mappings': {},
@@ -212,7 +212,7 @@ class SmartOrganizer:
             elif system == "Darwin":  # macOS
                 drives = self._discover_macos_drives()
             
-            # Store discovered drives in database for this user
+            # Store discovered drives in database for this user and File Organizer module
             self._store_discovered_drives(drives)
             
         except Exception as e:
@@ -221,17 +221,33 @@ class SmartOrganizer:
         return drives
     
     def _store_discovered_drives(self, drives: Dict):
-        """Store discovered drives in secure database"""
+        """Store discovered drives in secure database for File Organizer module"""
         try:
             all_drives = []
             for drive_type, drive_list in drives.items():
                 for drive in drive_list:
                     drive['drive_type'] = drive_type.replace('_drives', '')  # Remove '_drives' suffix
                     all_drives.append(drive)
+                    
+                    # Store drive info in module-specific data
+                    drive_info = {
+                        'path': drive.get('path', ''),
+                        'name': drive.get('name', 'Unknown Drive'),
+                        'type': drive['drive_type'],
+                        'device': drive.get('device', ''),
+                        'filesystem': drive.get('filesystem', ''),
+                        'discovered_at': datetime.now().isoformat()
+                    }
+                    
+                    # Store in module data for File Organizer
+                    self.db.store_module_data(
+                        user_id=self.user_id,
+                        module_name='file_organizer',
+                        data_key=f'drive_{drive.get("path", "").replace("/", "_")}',
+                        data_value=drive_info
+                    )
             
-            # Note: In a full implementation, we'd add drive storage methods to DatabaseService
-            # For now, we'll just log the discovery
-            print(f"💾 Discovered {len(all_drives)} drives for user {self.user_id}")
+            print(f"💾 Discovered {len(all_drives)} drives for user {self.user_id} (File Organizer module)")
             
         except Exception as e:
             print(f"⚠️  Warning: Could not store drives in database: {e}")
@@ -414,12 +430,13 @@ class SmartOrganizer:
                 user_id=self.user_id,
                 action_type=action_data.get('action', 'unknown'),
                 file_name=action_data.get('file', ''),
+                module_name='file_organizer',
                 source_path=source_folder,
                 destination_path=action_data.get('destination', ''),
                 success=action_data.get('success', False),
                 error_message=action_data.get('error', None)
             )
-            print(f"📊 Action logged to database: {action_data.get('action', 'unknown')} - {action_data.get('file', '')}")
+            print(f"📊 Action logged to database: {action_data.get('action', 'unknown')} - {action_data.get('file', '')} (File Organizer module)")
             
         except Exception as e:
             print(f"⚠️  Warning: Could not log action to database: {e}")
@@ -435,11 +452,12 @@ class SmartOrganizer:
                 # Extract destination folder (remove filename)
                 dest_folder = os.path.dirname(destination_path) if '/' in destination_path else destination_path
                 
-                # Add or update destination mapping
+                # Add or update destination mapping for File Organizer module
                 mapping_id = self.db.add_destination_mapping(
                     user_id=self.user_id,
                     file_category=file_category,
                     destination_path=dest_folder,
+                    module_name='file_organizer',
                     confidence_score=0.8  # High confidence for user-confirmed moves
                 )
                 

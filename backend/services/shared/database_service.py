@@ -183,11 +183,12 @@ class DatabaseService:
                 )
             """)
             
-            # Create destination mappings table with user isolation
+            # Create destination mappings table with user and module isolation
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS destination_mappings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
+                    module_name TEXT NOT NULL DEFAULT 'file_organizer',
                     file_category TEXT NOT NULL,
                     destination_path TEXT NOT NULL,
                     drive_info TEXT,
@@ -199,11 +200,12 @@ class DatabaseService:
                 )
             """)
             
-            # Create series mappings table
+            # Create series mappings table with module isolation
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS series_mappings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
+                    module_name TEXT NOT NULL DEFAULT 'file_organizer',
                     series_name TEXT NOT NULL,
                     destination_path TEXT NOT NULL,
                     season_structure TEXT,
@@ -214,11 +216,12 @@ class DatabaseService:
                 )
             """)
             
-            # Create user drives table
+            # Create user drives table with module isolation
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS user_drives (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
+                    module_name TEXT NOT NULL DEFAULT 'file_organizer',
                     drive_path TEXT NOT NULL,
                     drive_type TEXT NOT NULL CHECK(drive_type IN ('local', 'network', 'cloud', 'usb')),
                     drive_name TEXT,
@@ -230,7 +233,7 @@ class DatabaseService:
                 )
             """)
             
-            # Create user preferences table
+            # Create user preferences table (already has module_name)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS user_preferences (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -243,11 +246,12 @@ class DatabaseService:
                 )
             """)
             
-            # Create file actions table for audit trail
+            # Create file actions table for audit trail with module isolation
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS file_actions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
+                    module_name TEXT NOT NULL DEFAULT 'file_organizer',
                     action_type TEXT NOT NULL,
                     file_name TEXT NOT NULL,
                     source_path TEXT,
@@ -261,11 +265,28 @@ class DatabaseService:
                 )
             """)
             
+            # Create module-specific data table for flexible module storage
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS module_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    module_name TEXT NOT NULL,
+                    data_key TEXT NOT NULL,
+                    data_value TEXT,
+                    data_type TEXT DEFAULT 'json',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    UNIQUE(user_id, module_name, data_key)
+                )
+            """)
+            
             # Create security audit table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS security_audit (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT,
+                    module_name TEXT,
                     event_type TEXT NOT NULL,
                     event_description TEXT NOT NULL,
                     ip_address TEXT,
@@ -277,10 +298,11 @@ class DatabaseService:
             """)
             
             # Create security indexes for performance
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_destination_mappings_user ON destination_mappings(user_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_series_mappings_user ON series_mappings(user_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_drives_user ON user_drives(user_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_file_actions_user ON file_actions(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_destination_mappings_user_module ON destination_mappings(user_id, module_name)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_series_mappings_user_module ON series_mappings(user_id, module_name)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_drives_user_module ON user_drives(user_id, module_name)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_file_actions_user_module ON file_actions(user_id, module_name)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_module_data_user_module ON module_data(user_id, module_name)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_security_audit_timestamp ON security_audit(timestamp)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
             
@@ -344,9 +366,10 @@ class DatabaseService:
     
     def _log_security_event(self, user_id: Optional[str], event_type: str, 
                            description: str, risk_level: str = "LOW",
-                           ip_address: Optional[str] = None, user_agent: Optional[str] = None):
+                           ip_address: Optional[str] = None, user_agent: Optional[str] = None,
+                           module_name: Optional[str] = None):
         """
-        Log security events for audit trail
+        Log security events for audit trail with module tracking
         
         Args:
             user_id: User ID (optional for system events)
@@ -355,19 +378,21 @@ class DatabaseService:
             risk_level: Risk level (LOW, MEDIUM, HIGH, CRITICAL)
             ip_address: Client IP address
             user_agent: Client user agent
+            module_name: Module name (optional)
         """
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO security_audit 
-                    (user_id, event_type, event_description, risk_level, ip_address, user_agent)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (user_id, event_type, description, risk_level, ip_address, user_agent))
+                    (user_id, module_name, event_type, event_description, risk_level, ip_address, user_agent)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (user_id, module_name, event_type, description, risk_level, ip_address, user_agent))
                 conn.commit()
                 
                 # Also log to file
-                security_logger.info(f"SECURITY_EVENT: {event_type} - {description} - User: {user_id} - Risk: {risk_level}")
+                module_info = f" (Module: {module_name})" if module_name else ""
+                security_logger.info(f"SECURITY_EVENT: {event_type} - {description} - User: {user_id}{module_info} - Risk: {risk_level}")
                 
         except Exception as e:
             security_logger.error(f"Failed to log security event: {e}")
@@ -439,15 +464,16 @@ class DatabaseService:
             security_logger.error(f"User creation failed: {e}")
             raise DatabaseSecurityError("User creation failed")
     
-    def get_user_destination_mappings(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_destination_mappings(self, user_id: str, module_name: str = 'file_organizer') -> List[Dict[str, Any]]:
         """
-        Get destination mappings for a specific user (with complete isolation)
+        Get destination mappings for a specific user and module (with complete isolation)
         
         Args:
             user_id: User ID
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
             
         Returns:
-            List of destination mappings for the user
+            List of destination mappings for the user and module
         """
         validated_user_id = self._validate_user_id(user_id)
         
@@ -458,9 +484,9 @@ class DatabaseService:
                     SELECT id, file_category, destination_path, drive_info, 
                            confidence_score, usage_count, last_used, created_at
                     FROM destination_mappings 
-                    WHERE user_id = ?
+                    WHERE user_id = ? AND module_name = ?
                     ORDER BY usage_count DESC, last_used DESC
-                """, (validated_user_id,))
+                """, (validated_user_id, module_name))
                 
                 results = []
                 for row in cursor.fetchall():
@@ -479,19 +505,21 @@ class DatabaseService:
                 return results
                 
         except Exception as e:
-            security_logger.error(f"Failed to get destination mappings for user {user_id}: {e}")
+            security_logger.error(f"Failed to get destination mappings for user {user_id}, module {module_name}: {e}")
             return []
     
     def add_destination_mapping(self, user_id: str, file_category: str, 
-                              destination_path: str, drive_info: Optional[Dict] = None,
+                              destination_path: str, module_name: str = 'file_organizer',
+                              drive_info: Optional[Dict] = None,
                               confidence_score: float = 0.5) -> int:
         """
-        Add or update destination mapping for a user
+        Add or update destination mapping for a user and module
         
         Args:
             user_id: User ID
             file_category: File category (videos, documents, etc.)
             destination_path: Destination folder path
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
             drive_info: Optional drive information
             confidence_score: Confidence score (0.0-1.0)
             
@@ -514,8 +542,8 @@ class DatabaseService:
                 # Check if mapping already exists
                 cursor.execute("""
                     SELECT id, usage_count FROM destination_mappings 
-                    WHERE user_id = ? AND file_category = ? AND destination_path = ?
-                """, (validated_user_id, file_category, validated_path))
+                    WHERE user_id = ? AND module_name = ? AND file_category = ? AND destination_path = ?
+                """, (validated_user_id, module_name, file_category, validated_path))
                 
                 existing = cursor.fetchone()
                 
@@ -534,9 +562,9 @@ class DatabaseService:
                     # Create new mapping
                     cursor.execute("""
                         INSERT INTO destination_mappings 
-                        (user_id, file_category, destination_path, drive_info, confidence_score)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (validated_user_id, file_category, validated_path, drive_info_json, confidence_score))
+                        (user_id, module_name, file_category, destination_path, drive_info, confidence_score)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (validated_user_id, module_name, file_category, validated_path, drive_info_json, confidence_score))
                     mapping_id = cursor.lastrowid
                 
                 conn.commit()
@@ -544,7 +572,8 @@ class DatabaseService:
                 self._log_security_event(
                     validated_user_id, 
                     "DESTINATION_MAPPING_UPDATED", 
-                    f"Updated mapping: {file_category} -> {validated_path}"
+                    f"Updated mapping: {file_category} -> {validated_path} (module: {module_name})",
+                    module_name=module_name
                 )
                 
                 return mapping_id
@@ -554,16 +583,18 @@ class DatabaseService:
             raise DatabaseSecurityError("Failed to add destination mapping")
     
     def log_file_action(self, user_id: str, action_type: str, file_name: str,
+                       module_name: str = 'file_organizer',
                        source_path: Optional[str] = None, destination_path: Optional[str] = None,
                        success: bool = True, error_message: Optional[str] = None,
                        ip_address: Optional[str] = None, user_agent: Optional[str] = None):
         """
-        Log file action for audit trail
+        Log file action for audit trail with module isolation
         
         Args:
             user_id: User ID
             action_type: Type of action (move, delete, etc.)
             file_name: Name of file
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
             source_path: Source path (optional)
             destination_path: Destination path (optional)
             success: Whether action succeeded
@@ -584,10 +615,10 @@ class DatabaseService:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO file_actions 
-                    (user_id, action_type, file_name, source_path, destination_path, 
+                    (user_id, module_name, action_type, file_name, source_path, destination_path, 
                      success, error_message, ip_address, user_agent)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (validated_user_id, action_type, file_name, source_path, 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (validated_user_id, module_name, action_type, file_name, source_path, 
                       destination_path, success, error_message, ip_address, user_agent))
                 conn.commit()
                 
@@ -597,21 +628,23 @@ class DatabaseService:
                         validated_user_id,
                         "FILE_ACTION_FAILED",
                         f"Failed {action_type}: {file_name} - {error_message}",
-                        "MEDIUM"
+                        "MEDIUM",
+                        module_name=module_name
                     )
                 
         except Exception as e:
             security_logger.error(f"Failed to log file action: {e}")
     
-    def get_user_drives(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_drives(self, user_id: str, module_name: str = 'file_organizer') -> List[Dict[str, Any]]:
         """
-        Get available drives for a user
+        Get available drives for a user and module
         
         Args:
             user_id: User ID
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
             
         Returns:
-            List of user drives
+            List of user drives for the module
         """
         validated_user_id = self._validate_user_id(user_id)
         
@@ -622,9 +655,9 @@ class DatabaseService:
                     SELECT id, drive_path, drive_type, drive_name, filesystem, 
                            is_active, last_seen, created_at
                     FROM user_drives 
-                    WHERE user_id = ? AND is_active = TRUE
+                    WHERE user_id = ? AND module_name = ? AND is_active = TRUE
                     ORDER BY drive_type, drive_name
-                """, (validated_user_id,))
+                """, (validated_user_id, module_name))
                 
                 results = []
                 for row in cursor.fetchall():
@@ -642,8 +675,131 @@ class DatabaseService:
                 return results
                 
         except Exception as e:
-            security_logger.error(f"Failed to get drives for user {user_id}: {e}")
+            security_logger.error(f"Failed to get drives for user {user_id}, module {module_name}: {e}")
             return []
+    
+    def store_module_data(self, user_id: str, module_name: str, data_key: str, 
+                         data_value: Any, data_type: str = 'json') -> bool:
+        """
+        Store module-specific data with user isolation
+        
+        Args:
+            user_id: User ID
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
+            data_key: Data key
+            data_value: Data value (will be JSON serialized)
+            data_type: Data type ('json', 'text', 'number')
+            
+        Returns:
+            Success status
+        """
+        validated_user_id = self._validate_user_id(user_id)
+        
+        # Serialize data value
+        if data_type == 'json':
+            serialized_value = json.dumps(data_value, ensure_ascii=False)
+        else:
+            serialized_value = str(data_value)
+        
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO module_data 
+                    (user_id, module_name, data_key, data_value, data_type, updated_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (validated_user_id, module_name, data_key, serialized_value, data_type))
+                conn.commit()
+                
+                return True
+                
+        except Exception as e:
+            security_logger.error(f"Failed to store module data: {e}")
+            return False
+    
+    def get_module_data(self, user_id: str, module_name: str, data_key: str, 
+                       default_value: Any = None) -> Any:
+        """
+        Get module-specific data with user isolation
+        
+        Args:
+            user_id: User ID
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
+            data_key: Data key
+            default_value: Default value if not found
+            
+        Returns:
+            Deserialized data value or default
+        """
+        validated_user_id = self._validate_user_id(user_id)
+        
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT data_value, data_type FROM module_data 
+                    WHERE user_id = ? AND module_name = ? AND data_key = ?
+                """, (validated_user_id, module_name, data_key))
+                
+                row = cursor.fetchone()
+                if row:
+                    data_value = row['data_value']
+                    data_type = row['data_type']
+                    
+                    # Deserialize based on type
+                    if data_type == 'json':
+                        return json.loads(data_value)
+                    elif data_type == 'number':
+                        return float(data_value) if '.' in data_value else int(data_value)
+                    else:
+                        return data_value
+                else:
+                    return default_value
+                
+        except Exception as e:
+            security_logger.error(f"Failed to get module data: {e}")
+            return default_value
+    
+    def get_all_module_data(self, user_id: str, module_name: str) -> Dict[str, Any]:
+        """
+        Get all module-specific data for a user and module
+        
+        Args:
+            user_id: User ID
+            module_name: Module name (e.g., 'file_organizer', 'financial_manager')
+            
+        Returns:
+            Dictionary of all module data
+        """
+        validated_user_id = self._validate_user_id(user_id)
+        
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT data_key, data_value, data_type FROM module_data 
+                    WHERE user_id = ? AND module_name = ?
+                    ORDER BY data_key
+                """, (validated_user_id, module_name))
+                
+                results = {}
+                for row in cursor.fetchall():
+                    data_value = row['data_value']
+                    data_type = row['data_type']
+                    
+                    # Deserialize based on type
+                    if data_type == 'json':
+                        results[row['data_key']] = json.loads(data_value)
+                    elif data_type == 'number':
+                        results[row['data_key']] = float(data_value) if '.' in data_value else int(data_value)
+                    else:
+                        results[row['data_key']] = data_value
+                
+                return results
+                
+        except Exception as e:
+            security_logger.error(f"Failed to get all module data: {e}")
+            return {}
     
     def close(self):
         """Close database service gracefully"""
