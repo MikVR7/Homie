@@ -24,7 +24,11 @@ import time
 
 # Add shared services to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../shared'))
-from database_service import DatabaseService, DatabaseSecurityError
+from module_database_service import ModuleDatabaseService, ModuleDatabaseError
+
+# Add backend directory to path for USBDriveIdentifier
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
+from usb_drive_identifier import USBDriveIdentifier
 
 # Document processing imports
 try:
@@ -51,24 +55,27 @@ class SmartOrganizer:
     - Enterprise-grade security and audit logging
     """
     
-    def __init__(self, api_key: str, user_id: str = None, db_path: str = None):
+    def __init__(self, api_key: str, user_id: str = None, data_dir: str = None):
         """
-        Initialize the organizer with API key, user context, and secure database
+        Initialize the organizer with API key, user context, and module-specific database
         
         Args:
             api_key: Google Gemini API key
             user_id: User ID for data isolation (defaults to development user)
-            db_path: Database path (defaults to backend/data/homie.db)
+            data_dir: Data directory (defaults to backend/data)
         """
         self.api_key = api_key
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Initialize secure database
-        if not db_path:
-            db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data/homie.db'))
+        # Initialize module-specific database service
+        if not data_dir:
+            data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data'))
         
-        self.db = DatabaseService(db_path)
+        self.db = ModuleDatabaseService(data_dir)
+        
+        # Initialize USB drive identifier
+        self.usb_identifier = USBDriveIdentifier()
         
         # Set user context (use development user if not specified)
         if user_id:
@@ -77,7 +84,7 @@ class SmartOrganizer:
             # Get or create development user
             self.user_id = self._get_development_user()
         
-        print(f"🔗 SmartOrganizer initialized with secure database - User: {self.user_id}")
+        print(f"🔗 SmartOrganizer initialized with module-specific database - User: {self.user_id}")
     
     def _get_development_user(self) -> str:
         """Get or create the development user for localhost testing"""
@@ -99,7 +106,7 @@ class SmartOrganizer:
             )
             print(f"✅ Created development user: {user_id}")
             return user_id
-        except DatabaseSecurityError as e:
+        except ModuleDatabaseError as e:
             # If creation fails, use a fallback approach
             print(f"⚠️  Using fallback development user approach: {e}")
             # Create a unique user ID for this session
@@ -109,7 +116,7 @@ class SmartOrganizer:
     
     def get_destination_memory(self, sorted_path: str = None) -> Dict:
         """
-        Get destination memory from secure database instead of scattered .homie_memory.json files
+        Get destination memory from File Organizer database
         
         Args:
             sorted_path: Legacy parameter (now using database)
@@ -118,8 +125,8 @@ class SmartOrganizer:
             Dictionary with destination patterns and mapping rules from database
         """
         try:
-            # Get destination mappings from secure database for File Organizer module
-            mappings = self.db.get_user_destination_mappings(self.user_id, module_name='file_organizer')
+            # Get destination mappings from File Organizer database
+            mappings = self.db.get_user_destination_mappings(self.user_id)
             
             destination_memory = {
                 'category_mappings': {},
@@ -221,7 +228,7 @@ class SmartOrganizer:
         return drives
     
     def _store_discovered_drives(self, drives: Dict):
-        """Store discovered drives in secure database for File Organizer module"""
+        """Store discovered drives in File Organizer database"""
         try:
             all_drives = []
             for drive_type, drive_list in drives.items():
@@ -229,7 +236,7 @@ class SmartOrganizer:
                     drive['drive_type'] = drive_type.replace('_drives', '')  # Remove '_drives' suffix
                     all_drives.append(drive)
                     
-                    # Store drive info in module-specific data
+                    # Store drive info in File Organizer database
                     drive_info = {
                         'path': drive.get('path', ''),
                         'name': drive.get('name', 'Unknown Drive'),
@@ -239,15 +246,15 @@ class SmartOrganizer:
                         'discovered_at': datetime.now().isoformat()
                     }
                     
-                    # Store in module data for File Organizer
+                    # Store in File Organizer database
                     self.db.store_module_data(
-                        user_id=self.user_id,
                         module_name='file_organizer',
+                        user_id=self.user_id,
                         data_key=f'drive_{drive.get("path", "").replace("/", "_")}',
                         data_value=drive_info
                     )
             
-            print(f"💾 Discovered {len(all_drives)} drives for user {self.user_id} (File Organizer module)")
+            print(f"💾 Discovered {len(all_drives)} drives for user {self.user_id} (File Organizer database)")
             
         except Exception as e:
             print(f"⚠️  Warning: Could not store drives in database: {e}")
@@ -424,25 +431,24 @@ class SmartOrganizer:
         return drives
     
     def _log_action_to_database(self, action_data: Dict, source_folder: str, destination_folder: str):
-        """Log file actions to secure database instead of scattered .homie_memory.json files"""
+        """Log file actions to File Organizer database"""
         try:
             self.db.log_file_action(
                 user_id=self.user_id,
                 action_type=action_data.get('action', 'unknown'),
                 file_name=action_data.get('file', ''),
-                module_name='file_organizer',
                 source_path=source_folder,
                 destination_path=action_data.get('destination', ''),
                 success=action_data.get('success', False),
                 error_message=action_data.get('error', None)
             )
-            print(f"📊 Action logged to database: {action_data.get('action', 'unknown')} - {action_data.get('file', '')} (File Organizer module)")
+            print(f"📊 Action logged to File Organizer database: {action_data.get('action', 'unknown')} - {action_data.get('file', '')}")
             
         except Exception as e:
             print(f"⚠️  Warning: Could not log action to database: {e}")
     
     def _update_destination_memory(self, file_path: str, destination_path: str):
-        """Update destination memory in database when files are moved"""
+        """Update destination memory in File Organizer database when files are moved"""
         try:
             # Determine file category
             file_ext = Path(file_path).suffix.lower()
@@ -452,12 +458,11 @@ class SmartOrganizer:
                 # Extract destination folder (remove filename)
                 dest_folder = os.path.dirname(destination_path) if '/' in destination_path else destination_path
                 
-                # Add or update destination mapping for File Organizer module
+                # Add or update destination mapping in File Organizer database
                 mapping_id = self.db.add_destination_mapping(
                     user_id=self.user_id,
                     file_category=file_category,
                     destination_path=dest_folder,
-                    module_name='file_organizer',
                     confidence_score=0.8  # High confidence for user-confirmed moves
                 )
                 
@@ -660,10 +665,40 @@ class SmartOrganizer:
                            source_folder: str = None, destination_folder: str = None) -> Dict:
         """Execute a file action (move, delete, etc.) and log to memory file"""
         try:
+            # Enhanced path handling and validation
             full_file_path = file_path if os.path.isabs(file_path) else os.path.join(source_folder, file_path)
             
+            print(f"[Execute Action] Action: {action}")
+            print(f"[Execute Action] File path: {file_path}")
+            print(f"[Execute Action] Full file path: {full_file_path}")
+            print(f"[Execute Action] Source folder: {source_folder}")
+            print(f"[Execute Action] Destination folder: {destination_folder}")
+            
+            # Check if file exists
             if not os.path.exists(full_file_path):
-                raise FileNotFoundError(f"File not found: {full_file_path}")
+                error_msg = f"File not found: {full_file_path}"
+                print(f"[Execute Action] ERROR: {error_msg}")
+                raise FileNotFoundError(error_msg)
+            
+            # Check file permissions
+            try:
+                # Test if we can read the file
+                with open(full_file_path, 'rb') as f:
+                    f.read(1)  # Try to read 1 byte
+                print(f"[Execute Action] File is readable")
+            except PermissionError as e:
+                error_msg = f"Permission denied reading file: {full_file_path}"
+                print(f"[Execute Action] ERROR: {error_msg}")
+                raise PermissionError(error_msg)
+            except Exception as e:
+                error_msg = f"Error reading file: {full_file_path} - {str(e)}"
+                print(f"[Execute Action] ERROR: {error_msg}")
+                raise Exception(error_msg)
+            
+            # Get file info for debugging
+            file_stat = os.stat(full_file_path)
+            print(f"[Execute Action] File size: {file_stat.st_size} bytes")
+            print(f"[Execute Action] File permissions: {oct(file_stat.st_mode)}")
             
             result = {
                 'action': action,
@@ -673,9 +708,39 @@ class SmartOrganizer:
             }
             
             if action == 'delete':
-                os.remove(full_file_path)
-                result['success'] = True
-                result['message'] = f"File deleted: {file_path}"
+                print(f"[Execute Action] Attempting to delete: {full_file_path}")
+                
+                # Check if file is in use (on Linux)
+                try:
+                    import psutil
+                    for proc in psutil.process_iter(['pid', 'name', 'open_files']):
+                        try:
+                            for file_info in proc.info['open_files'] or []:
+                                if file_info.path == full_file_path:
+                                    print(f"[Execute Action] WARNING: File is open by process {proc.info['pid']} ({proc.info['name']})")
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+                except ImportError:
+                    print("[Execute Action] psutil not available, skipping file usage check")
+                
+                # Try to delete
+                try:
+                    os.remove(full_file_path)
+                    print(f"[Execute Action] Delete successful")
+                    result['success'] = True
+                    result['message'] = f"File deleted: {file_path}"
+                except PermissionError as e:
+                    error_msg = f"Permission denied deleting file: {full_file_path}"
+                    print(f"[Execute Action] ERROR: {error_msg}")
+                    raise PermissionError(error_msg)
+                except OSError as e:
+                    error_msg = f"OS error deleting file: {full_file_path} - {str(e)}"
+                    print(f"[Execute Action] ERROR: {error_msg}")
+                    raise OSError(error_msg)
+                except Exception as e:
+                    error_msg = f"Unexpected error deleting file: {full_file_path} - {str(e)}"
+                    print(f"[Execute Action] ERROR: {error_msg}")
+                    raise Exception(error_msg)
                 
             elif action == 'move':
                 if not destination_path:
@@ -684,8 +749,14 @@ class SmartOrganizer:
                 # Construct full destination path
                 full_dest_path = os.path.join(destination_folder, destination_path)
                 
+                print(f"[Execute Action] Moving from: {full_file_path}")
+                print(f"[Execute Action] Moving to: {full_dest_path}")
+                
                 # Create destination directory if it doesn't exist
-                os.makedirs(os.path.dirname(full_dest_path), exist_ok=True)
+                dest_dir = os.path.dirname(full_dest_path)
+                if not os.path.exists(dest_dir):
+                    print(f"[Execute Action] Creating destination directory: {dest_dir}")
+                    os.makedirs(dest_dir, exist_ok=True)
                 
                 # Move the file
                 shutil.move(full_file_path, full_dest_path)
@@ -753,9 +824,13 @@ class SmartOrganizer:
             if action == 'move' and result['success']:
                 self._update_destination_memory(file_path, destination_path)
             
+            print(f"[Execute Action] Action completed successfully: {result}")
             return result
             
         except Exception as e:
+            error_msg = f"Error executing {action} on {file_path}: {str(e)}"
+            print(f"[Execute Action] ERROR: {error_msg}")
+            
             result = {
                 'action': action,
                 'file': file_path,
@@ -824,7 +899,7 @@ Respond with JSON:
                 }
                 
                 # Log the re-analysis
-                self._log_to_memory_file({
+                self._log_to_centralized_memory({
                     'action': 're_analyze',
                     'file': file_path,
                     'user_input': user_input,
@@ -880,9 +955,16 @@ Respond with JSON:
             # Get folder containing the file
             folder_path = os.path.dirname(file_path)
             
-            # Log to memory file in the file's directory
-            memory_file = os.path.join(folder_path, '.homie_memory.json')
-            self._append_access_to_memory_file(memory_file, access_data)
+            # Log to centralized database
+            self.db.log_file_action(
+                user_id=self.user_id,
+                action_type=action,
+                file_name=os.path.basename(file_path),
+                source_path=folder_path,
+                destination_path='',
+                success=True,
+                error_message=''
+            )
             
             return {
                 'success': True,
@@ -895,64 +977,52 @@ Respond with JSON:
             print(f"Warning: {error_msg}")
             return {'success': False, 'error': error_msg}
 
-    def get_file_access_analytics(self, folder_path: str, days: int = 30) -> Dict:
-        """Get file access analytics for a folder
+    def get_file_access_analytics(self, folder_path: str = None, days: int = 30) -> Dict:
+        """Get file access analytics from centralized database
         
         Args:
-            folder_path: Path to analyze
+            folder_path: Optional path to analyze (if None, analyzes all)
             days: Number of days to look back (default 30)
             
         Returns:
             Dictionary with access statistics and frequently accessed files
         """
         try:
-            memory_file = os.path.join(folder_path, '.homie_memory.json')
+            # Get file actions from centralized database
+            file_actions = self.db.get_file_actions(
+                user_id=self.user_id,
+                days=days,
+                source_path=folder_path
+            )
             
-            if not os.path.exists(memory_file):
-                return {
-                    'success': True,
-                    'total_accesses': 0,
-                    'frequently_accessed': [],
-                    'recent_accesses': [],
-                    'access_patterns': {}
-                }
-            
-            # Load memory data
-            with open(memory_file, 'r', encoding='utf-8') as f:
-                memory_data = json.load(f)
-            
-            # Get cutoff date
+            # Filter by date range
             cutoff_date = datetime.now() - timedelta(days=days)
-            
-            # Extract file accesses
-            file_accesses = memory_data.get('file_accesses', [])
-            
-            # Filter to recent accesses
             recent_accesses = []
-            for access in file_accesses:
+            
+            for action in file_actions:
                 try:
-                    access_time = datetime.fromisoformat(access['timestamp'])
-                    if access_time >= cutoff_date:
-                        recent_accesses.append(access)
+                    action_time = datetime.fromisoformat(action.get('timestamp', ''))
+                    if action_time >= cutoff_date:
+                        recent_accesses.append(action)
                 except (ValueError, KeyError):
                     continue
             
             # Count access frequency
             access_counts = {}
             for access in recent_accesses:
-                file_name = access.get('file', 'unknown')
+                file_name = access.get('file_path', 'unknown')
                 if file_name not in access_counts:
                     access_counts[file_name] = {
                         'count': 0,
-                        'last_access': access['timestamp'],
+                        'last_access': access.get('timestamp', ''),
                         'actions': [],
-                        'full_path': access.get('full_path', '')
+                        'source_path': access.get('source_path', '')
                     }
                 access_counts[file_name]['count'] += 1
                 access_counts[file_name]['actions'].append(access.get('action', 'open'))
                 # Update last access if this is more recent
-                if access['timestamp'] > access_counts[file_name]['last_access']:
-                    access_counts[file_name]['last_access'] = access['timestamp']
+                if access.get('timestamp', '') > access_counts[file_name]['last_access']:
+                    access_counts[file_name]['last_access'] = access.get('timestamp', '')
             
             # Sort by frequency
             frequently_accessed = sorted(
@@ -970,7 +1040,7 @@ Respond with JSON:
             
             for access in recent_accesses:
                 try:
-                    access_time = datetime.fromisoformat(access['timestamp'])
+                    access_time = datetime.fromisoformat(access.get('timestamp', ''))
                     hour = access_time.hour
                     day = access_time.strftime('%A')
                     action = access.get('action', 'open')
@@ -1002,91 +1072,269 @@ Respond with JSON:
                 'error': f'Error analyzing file access: {str(e)}'
             }
     
-    def _log_to_memory_file(self, action_data: Dict, source_folder: str, destination_folder: str):
-        """Log actions to memory files in both source and destination folders"""
+    def _log_to_centralized_memory(self, action_data: Dict, source_folder: str, destination_folder: str):
+        """Log actions to centralized memory system"""
         try:
             # Create memory entry
             memory_entry = {
                 'timestamp': datetime.now().isoformat(),
                 'action': action_data,
                 'source_folder': source_folder,
-                'destination_folder': destination_folder
+                'destination_folder': destination_folder,
+                'user_id': self.user_id
             }
             
-            # Log to source folder
-            source_memory_file = os.path.join(source_folder, '.homie_memory.json')
-            self._append_to_memory_file(source_memory_file, memory_entry)
+            # Store in centralized database
+            self.db.log_file_action(
+                user_id=self.user_id,
+                action_type=action_data.get('action', 'unknown'),
+                file_name=action_data.get('file', ''),
+                source_path=source_folder,
+                destination_path=destination_folder,
+                success=action_data.get('success', False),
+                error_message=action_data.get('error', '')
+            )
             
-            # Log to destination folder
-            dest_memory_file = os.path.join(destination_folder, '.homie_memory.json')
-            self._append_to_memory_file(dest_memory_file, memory_entry)
+            print(f"📊 Action logged to centralized database: {action_data.get('action', 'unknown')} - {action_data.get('file', '')}")
             
         except Exception as e:
-            print(f"Warning: Could not log to memory file: {e}")
+            print(f"Warning: Could not log to centralized memory: {e}")
     
-    def _append_to_memory_file(self, memory_file_path: str, entry: Dict):
-        """Append an entry to a memory file"""
+    def get_usb_drives_memory(self) -> Dict:
+        """Get memory of USB drives and their purposes with identification info"""
         try:
-            # Load existing memory or create new
-            if os.path.exists(memory_file_path):
-                with open(memory_file_path, 'r', encoding='utf-8') as f:
-                    memory_data = json.load(f)
-            else:
-                memory_data = {
-                    'created': datetime.now().isoformat(),
-                    'version': '1.0',
-                    'actions': [],
-                    'file_accesses': []  # Add file access tracking array
-                }
+            drives = self.db.get_user_drives(self.user_id)
+            usb_drives = {}
             
-            # Ensure file_accesses array exists (for backward compatibility)
-            if 'file_accesses' not in memory_data:
-                memory_data['file_accesses'] = []
+            for drive in drives:
+                if drive.get('type') == 'usb':
+                    drive_info = {
+                        'id': drive.get('id'),
+                        'path': drive.get('path', ''),
+                        'label': drive.get('label', ''),
+                        'last_used': drive.get('last_used', ''),
+                        'usb_serial_number': drive.get('usb_serial_number', ''),
+                        'partition_uuid': drive.get('partition_uuid', ''),
+                        'identifier_type': drive.get('identifier_type', ''),
+                        'primary_identifier': drive.get('primary_identifier', ''),
+                        'is_connected': drive.get('is_connected', False)
+                    }
+                    
+                    # Try to detect current connection status
+                    if not drive_info['is_connected']:
+                        # Check if this drive might be connected at a different mount point
+                        connected_status = self._detect_drive_connection(drive)
+                        if connected_status['connected']:
+                            drive_info['is_connected'] = True
+                            drive_info['current_path'] = connected_status['path']
+                    
+                    # Use primary identifier as key for better consistency
+                    key = drive.get('primary_identifier', drive.get('path', ''))
+                    usb_drives[key] = drive_info
             
-            # Add new entry
-            memory_data['actions'].append(entry)
-            memory_data['last_updated'] = datetime.now().isoformat()
+            return {
+                'success': True,
+                'usb_drives': usb_drives,
+                'connected_drives': [d for d in usb_drives.values() if d['is_connected']],
+                'disconnected_drives': [d for d in usb_drives.values() if not d['is_connected']]
+            }
             
-            # Save back to file
-            with open(memory_file_path, 'w', encoding='utf-8') as f:
-                json.dump(memory_data, f, indent=2, ensure_ascii=False)
-                
         except Exception as e:
-            print(f"Warning: Could not append to memory file {memory_file_path}: {e}")
+            return {
+                'success': False,
+                'error': f'Error getting USB drives memory: {str(e)}'
+            }
+    
+    def _is_drive_connected(self, drive_path: str) -> bool:
+        """Check if a USB drive is currently connected"""
+        try:
+            return os.path.exists(drive_path) and os.path.ismount(drive_path)
+        except:
+            return False
 
-    def _append_access_to_memory_file(self, memory_file_path: str, access_data: Dict):
-        """Append a file access entry to a memory file"""
+    def _detect_drive_connection(self, drive_info: Dict) -> Dict:
+        """Detect if a drive is currently connected using its identifiers"""
         try:
-            # Load existing memory or create new
-            if os.path.exists(memory_file_path):
-                with open(memory_file_path, 'r', encoding='utf-8') as f:
-                    memory_data = json.load(f)
-            else:
-                memory_data = {
-                    'created': datetime.now().isoformat(),
-                    'version': '1.0',
-                    'actions': [],
-                    'file_accesses': []
+            # Try common mount points
+            mount_points = ['/media', '/mnt', '/Volumes']  # Linux and macOS
+            
+            usb_serial = drive_info.get('usb_serial_number', '')
+            partition_uuid = drive_info.get('partition_uuid', '')
+            
+            for mount_base in mount_points:
+                if not os.path.exists(mount_base):
+                    continue
+                
+                for item in os.listdir(mount_base):
+                    mount_path = os.path.join(mount_base, item)
+                    if os.path.ismount(mount_path):
+                        # Try to identify this mounted drive
+                        current_identifier = self.usb_identifier.get_drive_identifier(mount_path)
+                        if current_identifier:
+                            # Check if this matches our stored drive
+                            if (usb_serial and current_identifier.get('id') == usb_serial) or \
+                               (partition_uuid and current_identifier.get('id') == partition_uuid):
+                                return {
+                                    'connected': True,
+                                    'path': mount_path
+                                }
+            
+            return {'connected': False, 'path': ''}
+            
+        except Exception as e:
+            print(f"Warning: Error detecting drive connection: {e}")
+            return {'connected': False, 'path': ''}
+    
+    def register_usb_drive(self, drive_path: str) -> Dict:
+        """Register a USB drive with dual identification system"""
+        try:
+            if not os.path.exists(drive_path):
+                return {
+                    'success': False,
+                    'error': f'Drive path does not exist: {drive_path}'
                 }
             
-            # Ensure file_accesses array exists (for backward compatibility)
-            if 'file_accesses' not in memory_data:
-                memory_data['file_accesses'] = []
+            # Get drive identifiers using the new system
+            identifier_info = self.usb_identifier.get_drive_identifier(drive_path)
+            if not identifier_info:
+                return {
+                    'success': False,
+                    'error': f'Could not get reliable identifier for drive: {drive_path}'
+                }
             
-            # Add new access entry
-            memory_data['file_accesses'].append(access_data)
-            memory_data['last_updated'] = datetime.now().isoformat()
+            # Check if drive already exists
+            existing_drive = None
+            if identifier_info['type'] == 'usb_serial':
+                existing_drive = self.db.find_drive_by_identifier(
+                    user_id=self.user_id,
+                    usb_serial=identifier_info['id']
+                )
+            elif identifier_info['type'] == 'partition_uuid':
+                existing_drive = self.db.find_drive_by_identifier(
+                    user_id=self.user_id,
+                    partition_uuid=identifier_info['id']
+                )
             
-            # Optional: Limit file access history to prevent huge files (keep last 1000 entries)
-            if len(memory_data['file_accesses']) > 1000:
-                memory_data['file_accesses'] = memory_data['file_accesses'][-1000:]
+            if existing_drive:
+                # Update existing drive
+                self.db.update_drive_connection_status(
+                    user_id=self.user_id,
+                    primary_identifier=existing_drive['primary_identifier'],
+                    is_connected=True,
+                    current_path=drive_path
+                )
+                return {
+                    'success': True,
+                    'drive_id': existing_drive['id'],
+                    'message': f'USB drive reconnected: {existing_drive["label"]} ({drive_path}) - {identifier_info["description"]}'
+                }
             
-            # Save back to file
-            with open(memory_file_path, 'w', encoding='utf-8') as f:
-                json.dump(memory_data, f, indent=2, ensure_ascii=False)
+            # Get drive label
+            drive_label = self._get_drive_label(drive_path)
+            
+            # Store new drive with identifiers
+            usb_serial = identifier_info['id'] if identifier_info['type'] == 'usb_serial' else ''
+            partition_uuid = identifier_info['id'] if identifier_info['type'] == 'partition_uuid' else ''
+            
+            # Try to get both identifiers for maximum compatibility
+            if identifier_info['type'] == 'usb_serial':
+                # Also try to get partition UUID as secondary
+                alt_uuid = self.usb_identifier._get_partition_uuid(drive_path)
+                if alt_uuid:
+                    partition_uuid = alt_uuid
+            elif identifier_info['type'] == 'partition_uuid':
+                # Also try to get USB serial as primary
+                alt_serial = self.usb_identifier._get_usb_serial_number(drive_path)
+                if alt_serial:
+                    usb_serial = alt_serial
+                    identifier_info = {
+                        'type': 'usb_serial',
+                        'id': alt_serial,
+                        'confidence': 'high',
+                        'description': 'Hardware USB serial number'
+                    }
+            
+            drive_id = self.db.add_user_drive(
+                user_id=self.user_id,
+                drive_path=drive_path,
+                drive_type='usb',
+                drive_label=drive_label,
+                usb_serial_number=usb_serial,
+                partition_uuid=partition_uuid,
+                identifier_type=identifier_info['type'],
+                primary_identifier=identifier_info['id'],
+                is_connected=True
+            )
+            
+            return {
+                'success': True,
+                'drive_id': drive_id,
+                'identifier_type': identifier_info['type'],
+                'confidence': identifier_info['confidence'],
+                'message': f'USB drive registered: {drive_label} ({drive_path}) - {identifier_info["description"]}'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Error registering USB drive: {str(e)}'
+            }
+    
+    def _get_drive_label(self, drive_path: str) -> str:
+        """Get the label of a drive"""
+        try:
+            # Try to get label from various sources
+            if os.path.exists(os.path.join(drive_path, '.volume_label')):
+                with open(os.path.join(drive_path, '.volume_label'), 'r') as f:
+                    return f.read().strip()
+            
+            # Use basename as fallback
+            return os.path.basename(drive_path)
+            
+        except:
+            return os.path.basename(drive_path)
+    
+    def suggest_destination_for_file(self, file_path: str, file_type: str) -> Dict:
+        """Suggest destination based on USB drive memory"""
+        try:
+            usb_memory = self.get_usb_drives_memory()
+            
+            if not usb_memory['success']:
+                return {
+                    'success': False,
+                    'error': 'Could not retrieve USB drive memory'
+                }
+            
+            connected_drives = usb_memory.get('connected_drives', [])
+            suggestions = []
+            
+            for drive in connected_drives:
+                if file_type in drive.get('file_types', []):
+                    suggestions.append({
+                        'drive_path': drive['path'],
+                        'drive_label': drive['label'],
+                        'purpose': drive['purpose'],
+                        'confidence': 'high' if file_type in drive.get('file_types', []) else 'medium'
+                    })
+            
+            if suggestions:
+                return {
+                    'success': True,
+                    'suggestions': suggestions,
+                    'message': f'Found {len(suggestions)} USB drive(s) suitable for {file_type} files'
+                }
+            else:
+                return {
+                    'success': True,
+                    'suggestions': [],
+                    'message': 'No USB drives found for this file type. Would you like to register a new drive?'
+                }
                 
         except Exception as e:
-            print(f"Warning: Could not append access to memory file {memory_file_path}: {e}")
+            return {
+                'success': False,
+                'error': f'Error suggesting destination: {str(e)}'
+            }
     
     def _detect_redundant_archives(self, downloads_files: List[Dict]) -> Dict[str, Dict]:
         """Detect archive files that likely contain already-extracted content"""

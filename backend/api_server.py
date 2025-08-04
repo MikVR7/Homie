@@ -310,10 +310,19 @@ def execute_file_action():
         source_folder = data.get('source_folder')
         destination_folder = data.get('destination_folder')
         
+        print(f"[API] Execute action request:")
+        print(f"[API]   Action: {action}")
+        print(f"[API]   File path: {file_path}")
+        print(f"[API]   Source folder: {source_folder}")
+        print(f"[API]   Destination folder: {destination_folder}")
+        print(f"[API]   Destination path: {destination_path}")
+        
         if not action or not file_path or not source_folder or not destination_folder:
+            error_msg = 'Missing required parameters'
+            print(f"[API] ERROR: {error_msg}")
             return jsonify({
                 'success': False,
-                'error': 'Missing required parameters'
+                'error': error_msg
             }), 400
         
         # Use environment API key
@@ -321,9 +330,11 @@ def execute_file_action():
         load_dotenv()
         api_key = os.getenv('GEMINI_API_KEY')
         if not api_key:
+            error_msg = 'GEMINI_API_KEY environment variable not set'
+            print(f"[API] ERROR: {error_msg}")
             return jsonify({
                 'success': False,
-                'error': 'GEMINI_API_KEY environment variable not set'
+                'error': error_msg
             }), 400
         
         # Initialize the organizer
@@ -338,16 +349,44 @@ def execute_file_action():
             destination_folder=destination_folder
         )
         
+        print(f"[API] Action completed successfully: {result}")
         return jsonify({
             'success': True,
             'data': result
         })
         
-    except Exception as e:
-        print(f"Error executing file action: {str(e)}")
+    except FileNotFoundError as e:
+        error_msg = f"File not found: {str(e)}"
+        print(f"[API] ERROR: {error_msg}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': error_msg
+        }), 404
+        
+    except PermissionError as e:
+        error_msg = f"Permission denied: {str(e)}"
+        print(f"[API] ERROR: {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        }), 403
+        
+    except OSError as e:
+        error_msg = f"System error: {str(e)}"
+        print(f"[API] ERROR: {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        }), 500
+        
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        print(f"[API] ERROR: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': error_msg
         }), 500
 
 @app.route('/api/file-organizer/re-analyze', methods=['POST'])
@@ -1485,6 +1524,114 @@ def get_file_access_analytics():
             'error': str(e)
         }), 500
 
+@app.route('/api/file-organizer/usb-drives', methods=['GET'])
+def get_usb_drives():
+    """Get USB drives memory"""
+    try:
+        # Use environment API key
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'GEMINI_API_KEY environment variable not set'
+            }), 400
+        
+        # Initialize the organizer
+        organizer = SmartOrganizer(api_key)
+        
+        # Get USB drives memory
+        result = organizer.get_usb_drives_memory()
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error getting USB drives: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/file-organizer/register-usb-drive', methods=['POST'])
+def register_usb_drive():
+    """Register a USB drive with its purpose"""
+    try:
+        data = request.get_json()
+        drive_path = data.get('drive_path')
+        purpose = data.get('purpose', '')
+        file_types = data.get('file_types', [])
+        
+        if not drive_path:
+            return jsonify({
+                'success': False,
+                'error': 'drive_path is required'
+            }), 400
+        
+        # Use environment API key
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'GEMINI_API_KEY environment variable not set'
+            }), 400
+        
+        # Initialize the organizer
+        organizer = SmartOrganizer(api_key)
+        
+        # Register USB drive
+        result = organizer.register_usb_drive(drive_path, purpose, file_types)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error registering USB drive: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/file-organizer/suggest-destination', methods=['POST'])
+def suggest_destination():
+    """Suggest destination based on USB drive memory"""
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path')
+        file_type = data.get('file_type')
+        
+        if not file_path or not file_type:
+            return jsonify({
+                'success': False,
+                'error': 'file_path and file_type are required'
+            }), 400
+        
+        # Use environment API key
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'GEMINI_API_KEY environment variable not set'
+            }), 400
+        
+        # Initialize the organizer
+        organizer = SmartOrganizer(api_key)
+        
+        # Suggest destination
+        result = organizer.suggest_destination_for_file(file_path, file_type)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error suggesting destination: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # ============================================================================
 # FUTURE MODULE ENDPOINTS
 # ============================================================================
@@ -1505,6 +1652,9 @@ if __name__ == '__main__':
     print("    POST /api/file-organizer/browse-folders")
     print("    POST /api/file-organizer/log-access")
     print("    GET  /api/file-organizer/access-analytics")
+    print("    GET  /api/file-organizer/usb-drives")
+    print("    POST /api/file-organizer/register-usb-drive")
+    print("    POST /api/file-organizer/suggest-destination")
     print("  💰 Financial Manager:")
     print("    GET  /api/financial/summary")
     print("    GET/POST /api/financial/income")

@@ -1,363 +1,265 @@
-# TODO & Future Plans - Homie Ecosystem
+# Homie Development TODO
 
-## Development Guidelines 📋
-**See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
+## Phase 1: SQLite Database Foundation ✅ COMPLETE (2025-07-28)
 
-## 🎯 **Current Status: SQLite Database Foundation - Phase 1** 🚀
+### Week 1: Database Foundation ✅ COMPLETE
+- [x] **SQLite Database Setup**: Centralized database for all module data
+- [x] **User Management**: User accounts, authentication, and isolation
+- [x] **Security Features**: SQL injection prevention, audit logging, path validation
+- [x] **Database Schema**: Tables for users, destination_mappings, series_mappings, user_drives, user_preferences, file_actions, security_audit
 
-### **Implementation Roadmap Overview**
+### Week 2: Destination Memory System ✅ COMPLETE
+- [x] **Module Isolation**: Complete data separation between modules
+- [x] **Memory Persistence**: Learned patterns stored in database
+- [x] **Security Audit**: All operations logged with timestamps
+- [x] **User Isolation**: Complete data separation between users
+- [x] **Centralized Memory**: Replaced folder-based memory files with centralized database
+- [x] **USB Drive Memory**: System remembers USB drives and their purposes
+- [x] **Smart Suggestions**: Destination suggestions based on file types and drive purposes
 
-#### **🚀 Phase 1: SQLite Database Foundation** (CURRENT - 1-2 weeks)
-**Goal**: Replace scattered `.homie_memory.json` files with centralized SQLite database for destination consistency
+### Week 3: Module-Specific Database Architecture ✅ COMPLETE (2025-07-28)
+- [x] **Separate Database Files**: Each module gets its own database file
+- [x] **Module Database Service**: `ModuleDatabaseService` for module-specific operations
+- [x] **Database Structure**:
+  - `homie_users.db`: User management and authentication
+  - `modules/homie_file_organizer.db`: File organization and destination memory
+  - `modules/homie_financial_manager.db`: Financial data and transactions
+  - `modules/homie_media_manager.db`: Media library and watch history
+  - `modules/homie_document_manager.db`: Document management and OCR
+- [x] **Complete Isolation**: Each module has its own database with no shared tables
+- [x] **Migration from Single Database**: Updated SmartOrganizer to use module-specific database
+- [x] **Testing**: Comprehensive tests for module isolation and user isolation
+- [x] **Documentation**: Updated architecture documentation
 
-#### **🔮 Phase 2: Authentication & Multi-Backend** (2-4 weeks later)  
-**Goal**: Support both local development and future cloud deployment with unified login
+### Week 4: SIMPLE USB Drive Recognition ✅ COMPLETE (2025-08-04)
+- [x] **Eliminated Folder Memory Files**: Removed `.homie_memory.json` files from folders
+- [x] **Centralized Database Storage**: All memory now stored in SQLite databases
+- [x] **USB Drive Recognition**: System recognizes USB drives by hardware serial number
+- [x] **Multi-Level Identification**: USB Serial → Partition UUID → Label+Size fallback
+- [x] **Cross-Platform Support**: Works on Linux, macOS, Windows
+- [x] **Simple API**: Just register drive path, no purpose/file_types nonsense
+- [x] **Persistent Memory**: Drive memory persists across app restarts and reconnections
+- [x] **Connection Tracking**: Tracks when drives are connected/disconnected
+- [x] **Testing**: Comprehensive tests for USB drive recognition
+- [x] **Documentation**: Complete documentation of SIMPLE recognition system
 
-#### **🌐 Phase 3: AWS & Commercial Platform** (Future - 3+ months)
-**Goal**: Cloud hosting and commercial viability with subscription model
+## Phase 2: Authentication & Multi-Backend Support (Planned)
 
-### Recently Completed ✅ (2025-07-28)
-- [x] **Backend Connectivity & Error Handling**: Robust backend detection with clear error messages for different connectivity issues
-- [x] **Timeout Handling**: 30-second timeout for API calls with proper error handling
-- [x] **Network Error Handling**: Proper handling of `SocketException` and `ClientException` with `dart:io` import
-- [x] **User-Friendly Feedback**: 5-second error message display with appropriate colors and specific messages
-- [x] **SQLite Database Integration**: Centralized destination memory storage with enterprise-grade security
-- [x] **Destination Memory System**: AI learns and remembers preferred folder locations for consistent organization
-- [x] **Multi-User Support**: Database supports multiple users with data isolation
-- [x] **Audit Logging**: All file operations logged with timestamps and user tracking
-- [x] **Redundant Archive Detection**: Automatically detects when RAR files contain already-extracted content
-- [x] **Filename Cleaning**: Removes prefixes like "Sanet.st." and standardizes movie names
-- [x] **Enhanced AI Prompts**: AI prompts include specific rules for RAR handling and filename cleaning
-- [x] **Security Implementation**: Path validation, SQL injection prevention, password hashing, user data isolation
-- [x] **Debug Infrastructure**: Added debug prints to trace file detection and processing issues
+### Week 1: Authentication System
+- [ ] **User Registration**: Email/password registration with validation
+- [ ] **Login System**: Secure authentication with session management
+- [ ] **Password Reset**: Email-based password reset functionality
+- [ ] **Multi-Factor Authentication**: Optional 2FA for enhanced security
 
-### Previously Completed ✅ (2025-07-22)
-- [x] **Multi-User Architecture Documentation**: Comprehensive documentation of local NAS vs cloud backend scenarios
-- [x] **SQLite Database Schema**: Designed destination_mappings, series_mappings, user_drives, file_actions tables
-- [x] **Centralized Authentication Design**: Authentication service outside individual modules for unified login
-- [x] **Module-Specific Launch Scripts**: Created 4 standalone startup scripts for focused user experience
-- [x] **File Organizer Scripts**: `start_file_organizer.sh` and `start_file_organizer_web.sh` launch only File Organizer
-- [x] **Financial Manager Scripts**: `start_financial.sh` and `start_financial_web.sh` launch only Financial Manager  
-- [x] **Command Line Route Arguments**: Flutter app accepts `--route=/module` arguments via `main(List<String> args)`
-- [x] **Conditional Back Button**: Back buttons hidden in standalone launches using `isStandaloneLaunch` parameter
-- [x] **Architecture Decision**: Maintained single codebase; no module exclusion from builds (Flutter tree-shaking handles optimization)
-- [x] **Focused User Experience**: Standalone scripts provide single-purpose application experience without navigation distractions
+### Week 2: Backend Discovery & Connection
+- [ ] **Backend Discovery**: Automatic detection of available backends
+- [ ] **Connection Management**: Seamless switching between local/cloud backends
+- [ ] **Health Checks**: Backend status monitoring and reporting
+- [ ] **Failover**: Automatic fallback to alternative backends
 
-### Previously Completed ✅
-- [x] **Flutter Project Setup**: Complete Flutter app structure with dependencies
-- [x] **Cross-Platform Support**: Android, iOS, Web, Desktop compatibility
-- [x] **Dark Theme Implementation**: Material 3 dark theme with modern design
-- [x] **State Management**: Provider pattern for reactive state updates
-- [x] **API Integration**: Complete API service layer for backend communication
-- [x] **Data Models**: JSON serialization for all data structures
-- [x] **Dashboard Implementation**: Main dashboard with module cards
-- [x] **File Organizer Module**: Complete implementation with stats, files, and rules
-- [x] **Financial Manager Module**: Austrian tax-compliant financial tracking
-- [x] **Navigation System**: Go Router for declarative routing
-- [x] **Responsive Design**: Mobile-first design optimized for all screen sizes
-- [x] **Documentation Updates**: Updated all docs to reflect Flutter implementation
-- [x] **UI/UX Redesign**: Clean, professional design with minimal approach
-- [x] **API Endpoint Fixes**: Fixed CORS errors by using actual backend endpoints
-- [x] **Theme Optimization**: Removed visual clutter, improved readability and contrast
+### Week 3: Multi-User Support
+- [ ] **User Profiles**: Individual user settings and preferences
+- [ ] **Permission System**: Role-based access control
+- [ ] **Data Isolation**: Complete separation between users
+- [ ] **Shared Resources**: Controlled sharing between users
 
-## 🚀 **Phase 1: SQLite Database Foundation** (CURRENT)
+## Phase 3: Enhanced File Organizer Features (Planned)
 
-### **Week 1: Database Foundation** ✅ COMPLETE
-- [x] **SQLite Database Setup**: Created `backend/data/homie.db` with all required tables
-  - [x] destination_mappings table for file category → folder mappings
-  - [x] series_mappings table for TV show → folder consistency  
-  - [x] user_drives table for available storage locations
-  - [x] file_actions table for action history
-  - [x] users table for authentication foundation
-- [x] **DatabaseService Class**: Centralized database operations with user_id isolation
-- [x] **Basic Testing**: Database operations working correctly with security validation
-- [ ] **Migration Script**: Import existing `.homie_memory.json` data into SQLite database (PENDING)
+### Week 1: Advanced AI Features
+- [ ] **Content Analysis**: Deep file content understanding
+- [ ] **Duplicate Detection**: Intelligent duplicate file identification
+- [ ] **Series Recognition**: Enhanced TV series episode detection
+- [ ] **Project Detection**: Better project folder recognition
 
-### **Week 2: Destination Memory System** 🔄 IN PROGRESS
-- [x] **Drive Discovery**: Cross-platform detection of local, network, cloud, USB drives
-- [x] **Destination Tracking**: AI learns patterns like "movies → `/drive1/Movies`" from database
-- [x] **API Endpoints**: Backend endpoints for destination management and visualization (`/api/file-organizer/destination-memory`)
-- [x] **AI Enhancement**: Feed destination memory to AI for consistent file organization
-- [ ] **Flutter UI**: Visualization of destination mappings and drive discovery (CURRENT FOCUS)
+### Week 2: User Experience Improvements
+- [ ] **Real-time Updates**: Live file system monitoring
+- [ ] **Progress Tracking**: Detailed operation progress reporting
+- [ ] **Undo System**: Comprehensive operation rollback
+- [ ] **Batch Operations**: Multi-file operation support
 
-### **Immediate Benefits After Phase 1**:
-- ✅ **Consistent Destinations**: Movies always go to user's preferred folder
-- ✅ **Multi-Drive Support**: Works across local drives, NAS, OneDrive, Dropbox
-- ✅ **AI Memory**: No more "movies in different folders" - AI remembers patterns
-- ✅ **Foundation Ready**: Database ready for future multi-user and cloud deployment
+### Week 3: Performance Optimization
+- [ ] **Incremental Scanning**: Only process changed files
+- [ ] **Caching System**: Intelligent caching for repeated operations
+- [ ] **Parallel Processing**: Multi-threaded file operations
+- [ ] **Memory Management**: Optimized memory usage for large file sets
 
-### **Current Issues & Debugging** 🔍
-- 🔄 **File Detection Issue**: Investigating "no files found" error with debug prints added to `_get_file_inventory` and `analyze_downloads_folder`
-- 🔄 **Frontend-Backend Communication**: Ensuring proper error handling and user feedback
-- 🔄 **Debug Infrastructure**: Added comprehensive debug prints to trace file detection and processing
+## Phase 4: Financial Manager Enhancement (Planned)
 
-## 📱 **Phase 1: File Organizer** ✅ COMPLETE
+### Week 1: Advanced Financial Features
+- [ ] **Bank Integration**: Direct bank API connections
+- [ ] **Transaction Categorization**: AI-powered transaction classification
+- [ ] **Budget Tracking**: Real-time budget monitoring
+- [ ] **Tax Preparation**: Automated tax report generation
 
-### Recently Completed ✅
-- [x] **Real File Operations**: Implemented actual move and delete operations with user confirmation
-- [x] **User Control System**: Accept, Specify, and Delete buttons for each file with individual control
-- [x] **Completed Actions Tracking**: Files move to "Completed Actions" section with timestamps and status icons
-- [x] **Memory/Log System**: .homie_memory.json files created in both source and destination folders
-- [x] **Project Detection**: .git folder recognition with no deep scanning of project directories
-- [x] **Content Reading**: PDF, DOC, and TXT file content analysis for better AI categorization
-- [x] **AI Re-analysis**: Re-analyze files with user input when "Specify" is used
-- [x] **Compact UI Design**: Right-aligned action buttons with professional, minimal design
-- [x] **Smart Archive Detection**: Enhanced AI to detect and suggest deletion of redundant archive files when extracted content exists
-- [x] **Document Content Analysis**: Implemented OCR and document content analysis for PDFs, DOCs, and scanned files to determine proper categorization
-- [x] **Quota Error Handling**: Comprehensive 429 error handling with user-friendly messages and actionable suggestions
-- [x] **Enhanced Error Management**: Rich error types (quota, auth, API, generic) with detailed frontend display
-- [x] **Archive Analysis Extension**: Extended redundant archive detection to books, documents, software and all content types
-- [x] **AI Integration**: Connected AI organize endpoint to frontend interface with confidence scoring
-- [x] **Flutter UI Implementation**: Complete Flutter interface with Material 3 design
+### Week 2: Construction Management
+- [ ] **Project Tracking**: Construction project cost management
+- [ ] **Supplier Management**: Vendor and invoice tracking
+- [ ] **Payment Scheduling**: Automated payment reminders
+- [ ] **Cost Analysis**: Detailed cost breakdown and reporting
 
-### Previously Completed ✅
-- [x] **Technology Stack Decision**: Python 3.8+ backend + Flutter frontend
-- [x] **Project Structure**: Basic backend structure with src/, config/, tests/
-- [x] **AI-Powered Organization**: Google Gemini integration for smart file categorization
-- [x] **File Metadata Analysis**: Extract file type, size, content hints
-- [x] **Environment Configuration**: .env setup for API keys and secrets
-- [x] **Folder Discovery System**: Recursive directory scanning and mapping
-- [x] **Smart Organization Logic**: AI-driven file-to-folder matching with confidence scores
-- [x] **API Integration**: Connect frontend to Python backend via REST API
-- [x] **Folder Selection**: Browse button and quick access paths for common directories
-- [x] **Modern Dark Theme**: Material 3 design with mobile-optimized styling
-- [x] **Folder Browser API**: Created backend API endpoint for browsing file system folders
+### Week 3: Investment Portfolio
+- [ ] **Securities Tracking**: Stock and bond portfolio management
+- [ ] **Performance Analysis**: Investment performance metrics
+- [ ] **Dividend Tracking**: Dividend income management
+- [ ] **Tax Optimization**: Investment tax strategy support
 
-### Next Enhancements for File Organizer
-- [ ] **File Access Tracking**: Add file open/access timestamps to memory files (TODO: Track when files are opened)
-- [ ] **Batch Operations**: Implement bulk file operations with progress tracking
-- [ ] **Rollback System**: Implement file operation rollback and undo functionality using memory files
-- [ ] **Auto-Archive Extraction**: Implement automatic archive extraction with password support when no content exists
-- [ ] **Folder Cleanup**: Delete empty folders after successful extraction and organization
-- [ ] **Extraction API**: Create backend API endpoints for archive extraction with password handling
-- [ ] **Document Categorization**: Create smart document categories (contracts, receipts, personal docs, etc.) based on content analysis
-- [ ] **OCR Integration**: Add OCR support for scanned PDFs and image files to extract text content
-- [ ] **Memory File Analytics**: Analyze usage patterns from memory files for better AI suggestions
+## Phase 5: Media Manager Development (Planned)
 
-## 🏠 **Phase 2: Home Server/NAS** (Future)
+### Week 1: Media Library Foundation
+- [ ] **File Scanning**: Comprehensive media file discovery
+- [ ] **Metadata Extraction**: Movie/TV show information extraction
+- [ ] **Library Management**: Media catalog organization
+- [ ] **Search & Filter**: Advanced media search capabilities
 
-### Core NAS Features
-- [ ] **Multi-Device Access**: Support Windows, Linux, iOS, Android connections
-- [ ] **File Sync Engine**: Upload, download, sync capabilities across devices
-- [ ] **User Management**: Multi-user access and permissions
-- [ ] **Remote Access**: Secure remote connection to home server
-- [ ] **Storage Management**: Disk usage monitoring and optimization
-- [ ] **Backup Systems**: Automated backup and versioning
+### Week 2: Watch History & Recommendations
+- [ ] **Viewing History**: Track watched content and progress
+- [ ] **Recommendation Engine**: AI-powered content suggestions
+- [ ] **Series Tracking**: TV series episode management
+- [ ] **Family Profiles**: Multi-user viewing histories
 
-## 🎬 **Phase 3: Media Manager** (Future)
+### Week 3: Streaming & Access
+- [ ] **Local Streaming**: Media server capabilities
+- [ ] **Remote Access**: Secure external media access
+- [ ] **Mobile App**: Mobile media viewing interface
+- [ ] **Offline Support**: Download for offline viewing
 
-### Netflix-Style Interface
-- [ ] **Media Library Scanning**: Automatic movie/TV show detection
-- [ ] **IMDB Integration**: Fetch ratings, descriptions, posters, cast information
-- [ ] **Watch History Tracking**: Record viewing progress and completion
-- [ ] **Recommendation Engine**: "What to watch next" based on viewing patterns
-- [ ] **Progress Tracking**: Resume watching, series episode management
-- [ ] **Family Profiles**: Multiple user profiles with separate watch histories
-- [ ] **Search and Filter**: Advanced filtering by genre, rating, year, etc.
-- [ ] **Flutter Integration**: Native mobile interface for media browsing
+## Phase 6: Document Management System (Planned)
 
-## 📄 **Phase 4: Document Management** (Future)
+### Week 1: Document Processing
+- [ ] **OCR Integration**: Text extraction from scanned documents
+- [ ] **Document Categorization**: AI-powered document classification
+- [ ] **Metadata Extraction**: Document information extraction
+- [ ] **Search Engine**: Full-text document search
 
-### Austrian Business Focus
-- [ ] **Document Categories Setup**:
-  - [ ] Zeiterfassung (time tracking) management
-  - [ ] Lohnzettel (pay slips) organization
-  - [ ] Rechnungen (invoices) incoming/outgoing tracking
-  - [ ] Verträge (contracts) storage and reminders
-  - [ ] Behörden (government) document management
-- [ ] **Smart Categorization**: AI-powered document classification (building on current content analysis)
-- [ ] **Search Functionality**: Full-text search across all documents
-- [ ] **Tax Preparation**: Austrian tax reporting automation
-- [ ] **Document Workflows**: Approval processes and notifications
-- [ ] **Flutter Document Viewer**: Native mobile document viewing and management
+### Week 2: Austrian Business Focus
+- [ ] **Zeiterfassung**: Time tracking and timesheet management
+- [ ] **Lohnzettel**: Pay slip and salary documentation
+- [ ] **Rechnungen**: Invoice management (incoming/outgoing)
+- [ ] **Verträge**: Contract and agreement management
 
-## 💰 **Phase 5: Financial Management** ✅ IMPLEMENTED
+### Week 3: Tax & Compliance
+- [ ] **Tax Preparation**: Automated Austrian tax reporting
+- [ ] **Compliance Tracking**: Regulatory requirement monitoring
+- [ ] **Audit Trail**: Complete document operation history
+- [ ] **Export Formats**: Standard accounting format exports
 
-### Austrian Tax Compliance ✅
-- [x] **Dual Employment Tracking**: Employee + Self-employed income management
-- [x] **Financial Overview**: Summary dashboard with key metrics
-- [x] **Income Management**: Track employment and self-employment income
-- [x] **Expense Tracking**: Business and personal expense categorization
-- [x] **Construction Budget**: House construction cost tracking and budget management
-- [x] **Tax Reporting**: Austrian tax-compliant reporting structure
-- [x] **Flutter UI**: Complete mobile interface for financial management
+## Phase 7: Mobile App Enhancement (Planned)
 
-### Account Management System ✅ COMPLETED
-- [x] **User Account Creation**: Create custom accounts with different types (checking, savings, investment, cash)
-- [x] **Account Deletion**: Delete user-created accounts with validation
-- [x] **Legacy Account Management**: Enhanced controls for system accounts (Main, Sparkonto, etc.)
-- [x] **Manual Balance Setting**: Set account balances with date tracking for historical accuracy
-- [x] **Inter-Account Transfers**: Transfer money between accounts with validation
-- [x] **Securities Portfolio**: Track investments with real-time gain/loss calculations
-- [x] **Enhanced UI**: Comprehensive account management dialog with clean, professional design
+### Week 1: Native Mobile Features
+- [ ] **Camera Integration**: Document scanning via camera
+- [ ] **File Picker**: Native file selection interface
+- [ ] **Push Notifications**: Real-time operation updates
+- [ ] **Offline Mode**: Core functionality without internet
 
-### CSV Import Enhancement ✅ COMPLETED
-- [x] **Date-Based Filtering**: Only import transactions after manual balance date
-- [x] **Duplicate Prevention**: Prevent double-counting when manual balances are set
-- [x] **Transaction Skipping**: Automatically skip older transactions based on manual_balance_date
-- [x] **Import Statistics**: Show count of processed vs skipped transactions
-- [x] **Backend Integration**: Enhanced FinancialManager with date filtering logic
+### Week 2: Cross-Platform Optimization
+- [ ] **Platform-Specific UI**: Native look and feel per platform
+- [ ] **Performance Optimization**: Platform-specific performance tuning
+- [ ] **Accessibility**: Screen reader and accessibility support
+- [ ] **Internationalization**: Multi-language support
 
-### Recently Completed ✅
-- [x] **AccountBalance Enhancement**: Added manual_balance_date field for tracking when balances were manually set
-- [x] **UserAccount Dataclass**: New dataclass for user-created accounts with comprehensive metadata
-- [x] **Security Dataclass**: Investment tracking with symbol, quantity, prices, and gain/loss calculations
-- [x] **Enhanced API Endpoints**: Account creation, deletion, balance setting with date tracking
-- [x] **Frontend Account Management**: Comprehensive AccountManagementDialog with all features
-- [x] **CSV Import Date Logic**: Core filtering logic to process only newer transactions
-- [x] **UI/UX Improvements**: Removed clutter, added "Manage Accounts" button, redesigned interface
+### Week 3: Advanced Mobile Features
+- [ ] **Widgets**: Home screen widgets for quick access
+- [ ] **Shortcuts**: App shortcuts for common actions
+- [ ] **Background Sync**: Automatic data synchronization
+- [ ] **Battery Optimization**: Efficient power usage
 
-### Future Financial Enhancements
-- [ ] **Invoice Management**:
-  - [ ] Incoming invoice tracking for business expenses
-  - [ ] Outgoing invoice management for self-employment income
-  - [ ] VAT/USt calculation and tracking
-  - [ ] Automated tax reporting
-- [ ] **Enhanced Construction Tracking**:
-  - [ ] Real-time cost tracking against budget
-  - [ ] Supplier invoice management and payment scheduling
-  - [ ] Cost category analysis (materials, labor, permits)
-  - [ ] Budget variance reporting
-- [ ] **Credit/Loan Management**:
-  - [ ] Monthly payment tracking and reminders
-  - [ ] Interest calculation and projections
-  - [ ] Early payment scenario planning
-- [ ] **Financial Forecasting**:
-  - [ ] Cash flow predictions based on income/expenses
-  - [ ] House construction affordability timeline
-  - [ ] Major purchase planning and savings goals
-  - [ ] Emergency fund tracking and recommendations
-- [ ] **Advanced Account Features**:
-  - [ ] Account categories and tagging
-  - [ ] Recurring transaction templates
-  - [ ] Budget allocation per account
-  - [ ] Transaction history export
-  - [ ] Account performance analytics
+## Phase 8: Cloud Integration & Sync (Planned)
 
-## 🌍 **Phase 6: DACH Market Expansion** (Future Commercial Opportunity)
+### Week 1: Cloud Storage Integration
+- [ ] **OneDrive Integration**: Microsoft OneDrive support
+- [ ] **Google Drive**: Google Drive file synchronization
+- [ ] **Dropbox**: Dropbox cloud storage integration
+- [ ] **Generic WebDAV**: Standard WebDAV protocol support
 
-### **Market Research Findings ✅ COMPLETED (2025-01-XX)**
-Based on comprehensive research of Austrian, German, and Swiss invoice requirements and VAT regulations, **expansion to Germany and Switzerland is highly viable and strategically valuable**.
+### Week 2: Sync Engine
+- [ ] **Conflict Resolution**: Smart file conflict handling
+- [ ] **Incremental Sync**: Efficient synchronization of changes
+- [ ] **Bandwidth Management**: Network usage optimization
+- [ ] **Offline Queue**: Operations queued for when online
 
-### **Key Market Insights:**
-- **Unified DACH Strategy**: All three countries share EU VAT framework basics and similar business compliance requirements
-- **Germany Market Size**: 9x larger than Austria (3.5M vs 400K businesses) = massive revenue potential
-- **Switzerland Premium Market**: Highest business income in Europe, willingness to pay premium for compliance tools
-- **Technical Compatibility**: 80% of current Austrian solution can be reused for Germany/Switzerland
-- **Perfect Timing**: Germany introducing mandatory B2B e-invoicing 2025-2028 creates urgent market need
+### Week 3: Multi-Device Sync
+- [ ] **Cross-Device Consistency**: Synchronized data across devices
+- [ ] **Real-time Updates**: Live synchronization between devices
+- [ ] **Version Control**: File version history and rollback
+- [ ] **Collaboration**: Multi-user document collaboration
 
-### **Revenue Potential Analysis:**
-- **Austria**: €10-20M total addressable market
-- **Germany**: €70-140M total addressable market  
-- **Switzerland**: €15-30M total addressable market
-- **Combined DACH**: €95-190M total market opportunity
+## Phase 9: Advanced AI & Machine Learning (Planned)
 
-### **Recommended Implementation Priority:**
-1. **Germany First** (Next 6 months): Urgent need due to 2025 e-invoicing mandate
-2. **Switzerland Next** (6-12 months): Premium market with high-value customers
+### Week 1: Enhanced AI Capabilities
+- [ ] **Content Understanding**: Deep file content analysis
+- [ ] **Pattern Recognition**: Learning from user behavior
+- [ ] **Predictive Organization**: Anticipating user needs
+- [ ] **Natural Language Processing**: Conversational AI interface
 
-### **AI Invoice Processor DACH Expansion Features:**
-- [ ] **German Market Entry**:
-  - [ ] German CEN 16931 format support for mandatory e-invoicing
-  - [ ] DATEV export format integration (German accounting standard)
-  - [ ] German tax rate validation (19% standard, 7% reduced)
-  - [ ] German business number patterns and validation
-  - [ ] Partnership with German tax advisors and accounting firms
-- [ ] **Swiss Market Entry**:
-  - [ ] CHE business number validation system
-  - [ ] Swiss accounting software integrations (Abacus, etc.)
-  - [ ] Multi-currency support with CHF focus
-  - [ ] Swiss VAT rate handling (7.7% standard)
-  - [ ] Premium positioning for high-value Swiss businesses
-- [ ] **Unified DACH Platform**:
-  - [ ] Single AI core handling all three countries
-  - [ ] Country-specific validation modules
-  - [ ] Multi-language support (German with Austrian/Swiss variants)
-  - [ ] Unified pricing and billing system
-  - [ ] DACH-wide customer support
+### Week 2: Machine Learning Integration
+- [ ] **Custom Models**: Module-specific ML models
+- [ ] **Training Data**: User behavior data collection
+- [ ] **Model Optimization**: Performance and accuracy improvements
+- [ ] **A/B Testing**: Feature testing and optimization
 
-### **Business Model Expansion:**
-- [ ] **Pricing Strategy by Market**:
-  - [ ] Germany: €19-39/month (competitive, volume-based)
-  - [ ] Austria: €29-49/month (specialized compliance premium)
-  - [ ] Switzerland: €39-79/month (premium market positioning)
-- [ ] **Revenue Projections**:
-  - [ ] Year 1: €442K (focus on Germany + existing Austria)
-  - [ ] Year 2: €1.42M (add Switzerland, scale Germany)
-  - [ ] Year 3-4: €5M+ potential with market penetration
-- [ ] **Marketing Channels**:
-  - [ ] German tax advisor partnerships for e-invoicing mandate
-  - [ ] Austrian business association relationships
-  - [ ] Swiss multinational corporate direct sales
+### Week 3: AI-Powered Features
+- [ ] **Smart Suggestions**: Context-aware recommendations
+- [ ] **Automated Workflows**: AI-driven task automation
+- [ ] **Intelligent Search**: Semantic search capabilities
+- [ ] **Predictive Analytics**: Future trend predictions
 
-### **Technical Implementation Requirements:**
-- [ ] **Core AI Engine Enhancement** (20% new development):
-  - [ ] Country-specific VAT number format validation
-  - [ ] Local accounting software export formats
-  - [ ] Multi-country invoice template recognition
-  - [ ] Currency and tax rate handling per country
-- [ ] **Regulatory Compliance**:
-  - [ ] German CEN 16931 European standard compliance
-  - [ ] Austrian e-Rechnung.gv.at format compatibility
-  - [ ] Swiss CHE business registry integration
-  - [ ] GDPR compliance across all DACH countries
+## Phase 10: Enterprise & Commercial Features (Planned)
 
-### **Success Metrics:**
-- [ ] **Year 1 Targets**:
-  - [ ] Germany: 1,000+ customers (€348K ARR)
-  - [ ] Austria: 200+ customers (€94K ARR)
-- [ ] **Year 2 Targets**:
-  - [ ] Germany: 3,000+ customers (€1.04M ARR)
-  - [ ] Switzerland: 200+ customers (€142K ARR)
-  - [ ] Total DACH: €1.4M+ annual recurring revenue
+### Week 1: Multi-Tenant Architecture
+- [ ] **Tenant Isolation**: Complete data separation between organizations
+- [ ] **User Management**: Enterprise user administration
+- [ ] **Role-Based Access**: Granular permission system
+- [ ] **Audit Logging**: Comprehensive activity tracking
 
-**Note**: This DACH expansion represents a **€5M+ business opportunity** within 3-4 years, leveraging existing Austrian expertise across the German-speaking business compliance market.
+### Week 2: API & Integration
+- [ ] **REST API**: Comprehensive API for third-party integration
+- [ ] **Webhook Support**: Real-time event notifications
+- [ ] **Plugin System**: Extensible plugin architecture
+- [ ] **Third-Party Integrations**: Popular service integrations
 
-## 🔧 **Technical Infrastructure** (Ongoing)
+### Week 3: Commercial Features
+- [ ] **Subscription Management**: Billing and subscription handling
+- [ ] **Usage Analytics**: Detailed usage reporting
+- [ ] **Support System**: Customer support integration
+- [ ] **Documentation**: Comprehensive user and developer documentation
 
-### Core System Improvements
-- [x] **Flutter Architecture**: Complete cross-platform app architecture
-- [x] **API Framework**: RESTful API design for all module interactions
-- [x] **State Management**: Provider pattern for reactive state updates
-- [x] **Mobile-First Design**: Responsive design optimized for mobile devices
-- [ ] **Database Architecture**: Design unified schema for all modules
-- [ ] **Authentication System**: User management and security
-- [ ] **Offline Capabilities**: Core functions working without internet
-- [ ] **Data Backup**: Comprehensive backup and restore system
-- [ ] **Performance Optimization**: Handle large datasets efficiently
+## Current Status
 
-### Security & Privacy
-- [ ] **Data Encryption**: Encrypt sensitive financial and personal data
-- [ ] **Access Control**: Role-based permissions for family members
-- [ ] **Audit Logging**: Track all financial and document changes
-- [ ] **GDPR Compliance**: European privacy regulation compliance
+### ✅ Completed Features
+- **Module-Specific Database Architecture**: Complete isolation between modules
+- **File Organizer**: AI-powered file organization with destination memory
+- **Financial Manager**: Basic financial tracking and reporting
+- **Security System**: Comprehensive security with audit logging
+- **User Isolation**: Complete data separation between users
+- **Module Isolation**: Complete data separation between modules
 
-## 📱 **Mobile-First Design Principles** ✅ IMPLEMENTED
+### 🔄 In Progress
+- **API Server**: Flask-based REST API for frontend communication
+- **Frontend Development**: Flutter-based mobile and web interface
+- **Testing**: Comprehensive test suite for all modules
 
-### Design Guidelines ✅
-- [x] **Touch-First**: All interactions optimized for touchscreen
-- [x] **Thumb-Friendly**: Important actions within thumb reach
-- [x] **Responsive Layout**: Perfect on all screen sizes
-- [x] **Material 3 Design**: Modern dark theme with consistent styling
-- [x] **Cross-Platform**: Single codebase for mobile, web, and desktop
-- [ ] **Gesture Support**: Swipe, pinch, and touch gestures
-- [ ] **Fast Loading**: Optimized for mobile network speeds
-- [ ] **Offline Support**: Critical functions work without internet
+### 📋 Next Priorities
+1. **Real-world Testing**: Test File Organizer with actual files
+2. **Frontend Integration**: Connect Flutter app with new module database
+3. **Financial Manager Enhancement**: Apply module database to Financial Manager
+4. **Documentation**: Update all documentation for new architecture
 
-## 🎯 **Success Metrics**
+## Development Guidelines
 
-### User Experience Goals
-- [x] **Cross-Platform Compatibility**: Single app works on all platforms
-- [x] **Modern UI**: Material 3 dark theme with intuitive navigation
-- [x] **Module Integration**: Seamless navigation between modules
-- [ ] **One-Touch Access**: Most common tasks achievable in 1-2 taps
-- [ ] **Mobile Performance**: < 3 second load times on mobile
-- [ ] **Adoption Rate**: Daily usage of at least 3 modules
-- [ ] **Error Reduction**: 90% reduction in financial/document errors
-- [ ] **Time Savings**: 50% reduction in administrative task time
+### Code Quality
+- **Python**: Use type hints, docstrings, and comprehensive error handling
+- **Flutter**: Follow Material Design 3 guidelines and maintain clean architecture
+- **Testing**: Maintain high test coverage for all critical functionality
+- **Documentation**: Keep documentation updated with code changes
 
-## 🚫 **Removed/Cancelled Items**
-- ~~Svelte Frontend~~ - Replaced with Flutter for cross-platform support
-- ~~Web-Only Interface~~ - Replaced with mobile-first Flutter app
-- ~~API Usage Monitoring~~ - Google's Gemini API provides no real quota checking functionality
-- ~~Usage Display Frontend~~ - Not feasible without real quota data from Google
+### Security
+- **Input Validation**: Validate and sanitize all user inputs
+- **SQL Injection Prevention**: Use parameterized queries exclusively
+- **Path Validation**: Prevent directory traversal attacks
+- **Audit Logging**: Log all security-relevant operations
+
+### Performance
+- **Database Optimization**: Use appropriate indexes and query optimization
+- **Memory Management**: Efficient memory usage for large file operations
+- **Caching**: Implement intelligent caching for repeated operations
+- **Async Operations**: Use asynchronous processing for long-running tasks
