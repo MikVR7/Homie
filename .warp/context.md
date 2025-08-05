@@ -4,21 +4,22 @@
 Homie is your comprehensive intelligent home management ecosystem that evolves from a smart file organizer into a complete personal management suite. It includes multiple integrated modules:
 
 ### 🗂️ **File Organizer** (Phase 1 - Complete ✅)
+- **TERMINAL COMMAND ARCHITECTURE**: AI generates actual shell commands (mv, rm, mkdir) for reliable file operations
 - **AI-Powered File Organization**: Google Gemini integration for intelligent file categorization
 - **Centralized Memory System**: SQLite database tracks all file operations and destination mappings
 - **Simple USB Drive Recognition**: Hardware-based identification (USB Serial → Partition UUID → Label+Size)
 - **Multi-Drive Support**: Detects and handles local, network (NAS), cloud (OneDrive, Dropbox), and USB drives
-- **File Operations**: Move, delete, extract, and rename with user confirmation
-- **Redundant Archive Detection**: Automatically detects and suggests deletion of RAR files when content is already extracted
-- **Filename Cleaning**: Removes prefixes (e.g., "Sanet.st.") and standardizes movie names (e.g., "Snatch (2000).mkv")
+- **Terminal Command Execution**: AI returns commands like ["mkdir -p '/Movies'", "mv '/src' '/dest'"] executed via subprocess
+- **Redundant Archive Detection**: AI generates rm commands for RAR files when content is already extracted
+- **Filename Cleaning**: AI generates mv commands with clean names (e.g., "Snatch (2000).mkv")
 - **Project Detection**: .git folder recognition for project organization
 - **PDF/DOC/TXT Content Reading**: Enhanced AI categorization based on file content
-- **User-Controlled Actions**: "Accept", "Specify", and "Delete" options with preview mode
-- **Completed Actions Tracking**: Timestamps and status icons for all operations
+- **User-Controlled Actions**: Preview AI-generated commands before execution
+- **Completed Actions Tracking**: All terminal commands logged with success/failure status
 - **No Folder Memory Files**: Eliminated `.homie_memory.json` clutter - all centralized in database
 - **Cross-Platform USB Recognition**: Works on Linux, macOS, Windows with reliable hardware identification
 - **Module Isolation**: Separate database files for complete data isolation between modules
-- **Security-First Design**: Enterprise-grade security with input validation, SQL injection prevention, and user isolation
+- **Security-First Design**: Command timeouts, proper escaping, comprehensive audit logging
 
 ### 🏠 **Home Server/NAS** (Phase 2)
 - OneDrive-like personal cloud storage replacement
@@ -61,6 +62,52 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
 - **Perfect Timing**: Germany mandatory B2B e-invoicing 2025-2028 creates urgent market opportunity
 - **Technical Compatibility**: All three countries share EU VAT framework and similar compliance requirements
 - **Premium Positioning**: Switzerland offers highest-value customers willing to pay premium for compliance tools
+
+## 🎯 **CRITICAL: Terminal Command Architecture**
+
+### **Core Principle: AI Generates Abstract Operations**
+The File Organizer uses an **abstract operation architecture** where the AI generates platform-agnostic operations that work on any OS (Windows, Linux, macOS, Android, iOS). This is **much more reliable** and **truly cross-platform**.
+
+### **How It Works:**
+1. **AI Analysis**: Analyzes files and folder structure with destination memory  
+2. **Abstract Operations**: AI returns JSON with universal operations:
+   ```json
+   {
+     "operations": [
+       {"type": "mkdir", "path": "/Movies", "parents": true},
+       {"type": "move", "src": "/source/file.mkv", "dest": "/Movies/Clean Name.mkv"},
+       {"type": "delete", "path": "/source/redundant.rar"}
+     ],
+     "explanations": ["Create directory", "Move and rename file", "Delete archive"],
+     "fallback_operations": [
+       {"type": "copy", "src": "/locked.txt", "dest": "/backup/", "reason": "File locked"}
+     ]
+   }
+   ```
+3. **Platform Translation**: System translates to OS-specific commands (mv/move, rm/del, etc.)
+4. **Cross-Platform Execution**: Same operations work on any platform
+
+### **Why This Is Superior:**
+- ✅ **Truly cross-platform** - same operations work on Windows, Linux, macOS, Android, iOS
+- ✅ **Permission-aware** - AI can check access and suggest fallbacks for locked files
+- ✅ **Much more reliable** - no complex Python file operations
+- ✅ **AI has full intelligence** - can list directories, check permissions, handle archives
+- ✅ **Smart fallbacks** - automatic alternatives when operations fail
+- ✅ **Easy to debug** - operations translate to readable commands
+- ✅ **Comprehensive logging** - all operations and results tracked
+
+### **Complete Operation Set:**
+- **File ops**: move, copy, delete, rename
+- **Directory ops**: mkdir, list_dir  
+- **Archive ops**: extract, compress, list_archive
+- **Information**: get_info, get_size, check_exists, get_permissions
+- **Security**: check_access, set_permissions, request_admin
+
+### **API Endpoints:**
+- `POST /api/file-organizer/organize` - AI analyzes and returns operations
+- `POST /api/file-organizer/execute-operations` - Executes the generated operations
+
+**IMPORTANT**: Never implement Python file operations. Always use the abstract operation approach!
 
 ## 🚨 **CRITICAL: Flutter Linux Desktop Issues**
 

@@ -28,7 +28,7 @@ from module_database_service import ModuleDatabaseService, ModuleDatabaseError
 
 # Add backend directory to path for USBDriveIdentifier
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
-from usb_drive_identifier import USBDriveIdentifier
+from .usb_drive_identifier import USBDriveIdentifier
 
 # Document processing imports
 try:
@@ -83,6 +83,10 @@ class SmartOrganizer:
         else:
             # Get or create development user
             self.user_id = self._get_development_user()
+        
+        # Initialize drive monitor for real-time detection
+        self.drive_monitor = None
+        self.drive_events = []  # Store recent drive events
         
         print(f"🔗 SmartOrganizer initialized with module-specific database - User: {self.user_id}")
     
@@ -471,9 +475,80 @@ class SmartOrganizer:
         except Exception as e:
             print(f"⚠️  Warning: Could not update destination memory: {e}")
     
+    def start_drive_monitoring(self):
+        """Start real-time drive monitoring"""
+        try:
+            if self.drive_monitor is None:
+                from .drive_monitor import DriveMonitor
+                self.drive_monitor = DriveMonitor(
+                    smart_organizer=self,
+                    callback=self._handle_drive_event
+                )
+            
+            self.drive_monitor.start_monitoring()
+            print("🖥️  Real-time drive monitoring started")
+            
+        except Exception as e:
+            print(f"⚠️  Warning: Could not start drive monitoring: {e}")
+    
+    def stop_drive_monitoring(self):
+        """Stop real-time drive monitoring"""
+        try:
+            if self.drive_monitor:
+                self.drive_monitor.stop_monitoring()
+                print("🖥️  Real-time drive monitoring stopped")
+                
+        except Exception as e:
+            print(f"⚠️  Warning: Error stopping drive monitoring: {e}")
+    
+    def _handle_drive_event(self, event_data: Dict):
+        """Handle drive connection/disconnection events"""
+        try:
+            # Store recent events (keep last 50)
+            self.drive_events.append(event_data)
+            if len(self.drive_events) > 50:
+                self.drive_events.pop(0)
+            
+            print(f"🖥️  Drive {event_data['event_type']}: {event_data['drive_path']}")
+            
+            # Could extend this to trigger WebSocket notifications to frontend
+            
+        except Exception as e:
+            print(f"⚠️  Warning: Error handling drive event: {e}")
+    
+    def get_drive_events(self) -> List[Dict]:
+        """Get recent drive connection/disconnection events"""
+        return self.drive_events.copy()
+    
+    def get_real_time_drive_status(self) -> Dict:
+        """Get real-time drive status from monitor"""
+        try:
+            if self.drive_monitor:
+                return {
+                    'success': True,
+                    'monitoring_active': self.drive_monitor.is_monitoring,
+                    'connected_drives': self.drive_monitor.get_connected_drives(),
+                    'drive_history': self.drive_monitor.get_drive_history(),
+                    'recent_events': self.get_drive_events()
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Drive monitoring not initialized'
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Error getting drive status: {str(e)}'
+            }
+    
     def close(self):
         """Close database connection gracefully"""
         try:
+            # Stop drive monitoring
+            self.stop_drive_monitoring()
+            
             if hasattr(self, 'db'):
                 self.db.close()
                 print("🔗 SmartOrganizer database connection closed")
@@ -530,8 +605,47 @@ class SmartOrganizer:
         # Get AI suggestions enhanced with destination memory
         suggestions = self._get_ai_suggestions(context, redundant_archives, archives_to_extract, destination_memory)
         
-        # Transform to frontend-expected format
-        file_suggestions = suggestions.get('file_suggestions', [])
+        # Transform new operations format to frontend-expected file_suggestions format
+        operations = suggestions.get('operations', [])
+        explanations = suggestions.get('explanations', [])
+        
+        file_suggestions = []
+        for i, operation in enumerate(operations):
+            # Convert abstract operations back to file suggestions for frontend compatibility
+            if operation.get('type') == 'move':
+                file_suggestions.append({
+                    'file': os.path.basename(operation.get('src', '')),
+                    'current_path': operation.get('src', ''),
+                    'action': 'move',
+                    'destination': operation.get('dest', ''),
+                    'reasoning': explanations[i] if i < len(explanations) else 'AI suggested move',
+                    'confidence': 85,  # Default confidence
+                    'document_type': 'unknown'
+                })
+            elif operation.get('type') == 'delete':
+                file_suggestions.append({
+                    'file': os.path.basename(operation.get('path', '')),
+                    'current_path': operation.get('path', ''),
+                    'action': 'delete', 
+                    'destination': '',
+                    'reasoning': explanations[i] if i < len(explanations) else 'AI suggested deletion',
+                    'confidence': 85,
+                    'document_type': 'unknown'
+                })
+            elif operation.get('type') == 'extract':
+                file_suggestions.append({
+                    'file': os.path.basename(operation.get('archive', '')),
+                    'current_path': operation.get('archive', ''),
+                    'action': 'extract',
+                    'destination': operation.get('dest', ''),
+                    'reasoning': explanations[i] if i < len(explanations) else 'AI suggested extraction', 
+                    'confidence': 85,
+                    'document_type': 'archive'
+                })
+        
+        # Fallback to old format if no operations found
+        if not file_suggestions:
+            file_suggestions = suggestions.get('file_suggestions', [])
         
         # Convert confidence to percentage (0-100) format if needed
         for suggestion in file_suggestions:
@@ -543,14 +657,17 @@ class SmartOrganizer:
                 elif isinstance(confidence, (int, float)) and confidence > 100:
                     suggestion['confidence'] = min(100, int(confidence))
         
-        print(f"[Analyze Downloads] Analysis complete: {len(file_suggestions)} suggestions")
+        print(f"[Analyze Downloads] Analysis complete: {len(file_suggestions)} suggestions from {len(operations)} operations")
         
         return {
-            'strategy': suggestions.get('general_strategy', 'AI-powered file organization'),
-            'new_folders': suggestions.get('new_folders_suggested', []),
+            'strategy': suggestions.get('strategy', suggestions.get('general_strategy', 'AI-powered file organization')),
+            'new_folders': suggestions.get('new_folders', suggestions.get('new_folders_suggested', [])),
             'file_suggestions': file_suggestions,
             'total_files': len(downloads_files),
-            'confidence_summary': suggestions.get('summary', f'{len(downloads_files)} files analyzed')
+            'confidence_summary': suggestions.get('summary', f'{len(downloads_files)} files analyzed'),
+            'operations': operations,  # Include operations for new frontend
+            'explanations': explanations,
+            'fallback_operations': suggestions.get('fallback_operations', [])
         }
     
     def _get_file_inventory(self, folder_path: str) -> List[Dict]:
@@ -661,185 +778,252 @@ class SmartOrganizer:
         
         return 'software_project'
     
-    def execute_file_action(self, action: str, file_path: str, destination_path: str = None, 
-                           source_folder: str = None, destination_folder: str = None) -> Dict:
-        """Execute a file action (move, delete, etc.) and log to memory file"""
-        try:
-            # Enhanced path handling and validation
-            full_file_path = file_path if os.path.isabs(file_path) else os.path.join(source_folder, file_path)
+    # OLD BROKEN execute_file_action METHOD REMOVED! 
+    # NOW USING execute_operations() WITH ABSTRACT OPERATIONS ONLY!
+    
+    def execute_operations(self, operations: list, explanations: list = None, fallback_operations: list = None) -> Dict:
+        """Execute abstract operations - Cross-platform file operations!"""
+        import subprocess
+        import platform
+        
+        results = []
+        successful_operations = 0
+        failed_operations = 0
+        
+        print(f"[Execute Operations] Starting execution of {len(operations)} operations on {platform.system()}")
+        
+        for i, operation in enumerate(operations):
+            explanation = explanations[i] if explanations and i < len(explanations) else f"Operation {i+1}"
             
-            print(f"[Execute Action] Action: {action}")
-            print(f"[Execute Action] File path: {file_path}")
-            print(f"[Execute Action] Full file path: {full_file_path}")
-            print(f"[Execute Action] Source folder: {source_folder}")
-            print(f"[Execute Action] Destination folder: {destination_folder}")
-            
-            # Check if file exists
-            if not os.path.exists(full_file_path):
-                error_msg = f"File not found: {full_file_path}"
-                print(f"[Execute Action] ERROR: {error_msg}")
-                raise FileNotFoundError(error_msg)
-            
-            # Check file permissions
             try:
-                # Test if we can read the file
-                with open(full_file_path, 'rb') as f:
-                    f.read(1)  # Try to read 1 byte
-                print(f"[Execute Action] File is readable")
-            except PermissionError as e:
-                error_msg = f"Permission denied reading file: {full_file_path}"
-                print(f"[Execute Action] ERROR: {error_msg}")
-                raise PermissionError(error_msg)
+                print(f"[Execute Operations] {explanation}: {operation}")
+                
+                # Translate abstract operation to platform-specific command
+                command = self._translate_operation_to_command(operation)
+                
+                if command is None:
+                    # Skip unsupported operations
+                    results.append({
+                        'operation': operation,
+                        'explanation': explanation,
+                        'success': False,
+                        'error': 'Unsupported operation type',
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    failed_operations += 1
+                    continue
+                
+                print(f"[Execute Operations] Translated to: {command}")
+                
+                # Execute the platform-specific command
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if result.returncode == 0:
+                    print(f"[Execute Operations] ✅ SUCCESS: {explanation}")
+                    if result.stdout:
+                        print(f"[Execute Operations] Output: {result.stdout.strip()}")
+                    
+                    results.append({
+                        'operation': operation,
+                        'explanation': explanation,
+                        'success': True,
+                        'output': result.stdout.strip(),
+                        'command_used': command,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    successful_operations += 1
+                    
+                else:
+                    print(f"[Execute Operations] ❌ FAILED: {explanation}")
+                    print(f"[Execute Operations] Error: {result.stderr.strip()}")
+                    
+                    # Try fallback operations if available
+                    fallback_tried = self._try_fallback_operations(operation, fallback_operations or [])
+                    
+                    results.append({
+                        'operation': operation,
+                        'explanation': explanation,
+                        'success': False,
+                        'error': result.stderr.strip(),
+                        'return_code': result.returncode,
+                        'command_used': command,
+                        'fallback_attempted': fallback_tried,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    failed_operations += 1
+                    
+            except subprocess.TimeoutExpired:
+                error_msg = f"Operation timed out after 30 seconds: {operation}"
+                print(f"[Execute Operations] ⏱️ TIMEOUT: {error_msg}")
+                
+                results.append({
+                    'operation': operation,
+                    'explanation': explanation,
+                    'success': False,
+                    'error': error_msg,
+                    'timestamp': datetime.now().isoformat()
+                })
+                failed_operations += 1
+                
             except Exception as e:
-                error_msg = f"Error reading file: {full_file_path} - {str(e)}"
-                print(f"[Execute Action] ERROR: {error_msg}")
-                raise Exception(error_msg)
-            
-            # Get file info for debugging
-            file_stat = os.stat(full_file_path)
-            print(f"[Execute Action] File size: {file_stat.st_size} bytes")
-            print(f"[Execute Action] File permissions: {oct(file_stat.st_mode)}")
-            
-            result = {
-                'action': action,
-                'file': file_path,
-                'timestamp': datetime.now().isoformat(),
-                'success': False
-            }
-            
-            if action == 'delete':
-                print(f"[Execute Action] Attempting to delete: {full_file_path}")
+                error_msg = f"Unexpected error executing operation: {str(e)}"
+                print(f"[Execute Operations] 💥 ERROR: {error_msg}")
                 
-                # Check if file is in use (on Linux)
-                try:
-                    import psutil
-                    for proc in psutil.process_iter(['pid', 'name', 'open_files']):
-                        try:
-                            for file_info in proc.info['open_files'] or []:
-                                if file_info.path == full_file_path:
-                                    print(f"[Execute Action] WARNING: File is open by process {proc.info['pid']} ({proc.info['name']})")
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            pass
-                except ImportError:
-                    print("[Execute Action] psutil not available, skipping file usage check")
-                
-                # Try to delete
-                try:
-                    os.remove(full_file_path)
-                    print(f"[Execute Action] Delete successful")
-                    result['success'] = True
-                    result['message'] = f"File deleted: {file_path}"
-                except PermissionError as e:
-                    error_msg = f"Permission denied deleting file: {full_file_path}"
-                    print(f"[Execute Action] ERROR: {error_msg}")
-                    raise PermissionError(error_msg)
-                except OSError as e:
-                    error_msg = f"OS error deleting file: {full_file_path} - {str(e)}"
-                    print(f"[Execute Action] ERROR: {error_msg}")
-                    raise OSError(error_msg)
-                except Exception as e:
-                    error_msg = f"Unexpected error deleting file: {full_file_path} - {str(e)}"
-                    print(f"[Execute Action] ERROR: {error_msg}")
-                    raise Exception(error_msg)
-                
-            elif action == 'move':
-                if not destination_path:
-                    raise ValueError("destination_path is required for move action")
-                
-                # Construct full destination path
-                full_dest_path = os.path.join(destination_folder, destination_path)
-                
-                print(f"[Execute Action] Moving from: {full_file_path}")
-                print(f"[Execute Action] Moving to: {full_dest_path}")
-                
-                # Create destination directory if it doesn't exist
-                dest_dir = os.path.dirname(full_dest_path)
-                if not os.path.exists(dest_dir):
-                    print(f"[Execute Action] Creating destination directory: {dest_dir}")
-                    os.makedirs(dest_dir, exist_ok=True)
-                
-                # Move the file
-                shutil.move(full_file_path, full_dest_path)
-                result['success'] = True
-                result['message'] = f"File moved from {file_path} to {destination_path}"
-                result['destination'] = destination_path
-                
-            elif action == 'extract':
-                if not destination_path:
-                    raise ValueError("destination_path is required for extract action")
-                
-                # Construct full destination path
-                full_dest_path = os.path.join(destination_folder, destination_path)
-                
-                # Create destination directory if it doesn't exist
-                os.makedirs(full_dest_path, exist_ok=True)
-                
-                # Extract the archive
-                import zipfile
-                import rarfile
-                
-                try:
-                    if full_file_path.lower().endswith('.zip'):
-                        with zipfile.ZipFile(full_file_path, 'r') as zip_ref:
-                            zip_ref.extractall(full_dest_path)
-                    elif full_file_path.lower().endswith('.rar'):
-                        with rarfile.RarFile(full_file_path, 'r') as rar_ref:
-                            rar_ref.extractall(full_dest_path)
+                results.append({
+                    'operation': operation,
+                    'explanation': explanation,
+                    'success': False,
+                    'error': error_msg,
+                    'timestamp': datetime.now().isoformat()
+                })
+                failed_operations += 1
+        
+        # Log results to database for audit trail
+        try:
+            for result in results:
+                self.db.log_file_action(
+                    user_id=self.user_id,
+                    action_type=result['operation'].get('type', 'unknown'),
+                    file_name=result['explanation'],
+                    source_path=str(result['operation'])[:100],
+                    destination_path='',
+                    success=result['success'],
+                    error_message=result.get('error', '')
+                )
+        except Exception as log_error:
+            print(f"Debug: Operation logging failed: {log_error}")
+        
+        summary = {
+            'total_operations': len(operations),
+            'successful': successful_operations,
+            'failed': failed_operations,
+            'results': results,
+            'overall_success': failed_operations == 0,
+            'platform': platform.system(),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        print(f"[Execute Operations] SUMMARY: {successful_operations}/{len(operations)} operations successful on {platform.system()}")
+        return summary
+    
+    def _translate_operation_to_command(self, operation: dict) -> str:
+        """Translate abstract operation to platform-specific command"""
+        import platform
+        
+        op_type = operation.get('type')
+        system = platform.system()
+        
+        try:
+            if op_type == 'mkdir':
+                path = operation['path']
+                if system == 'Windows':
+                    return f'mkdir "{path}" 2>nul || echo Directory exists'
+                else:
+                    parents = operation.get('parents', True)
+                    flag = '-p' if parents else ''
+                    return f'mkdir {flag} "{path}"'
+                    
+            elif op_type == 'move':
+                src = operation['src']
+                dest = operation['dest']
+                if system == 'Windows':
+                    return f'move "{src}" "{dest}"'
+                else:
+                    return f'mv "{src}" "{dest}"'
+                    
+            elif op_type == 'copy':
+                src = operation['src']
+                dest = operation['dest']
+                if system == 'Windows':
+                    return f'copy "{src}" "{dest}"'
+                else:
+                    return f'cp "{src}" "{dest}"'
+                    
+            elif op_type == 'delete':
+                path = operation['path']
+                if system == 'Windows':
+                    return f'del "{path}"'
+                else:
+                    return f'rm "{path}"'
+                    
+            elif op_type == 'list_dir':
+                path = operation['path']
+                show_hidden = operation.get('show_hidden', False)
+                if system == 'Windows':
+                    flag = '/A' if show_hidden else ''
+                    return f'dir "{path}" {flag}'
+                else:
+                    flag = '-la' if show_hidden else '-l'
+                    return f'ls {flag} "{path}"'
+                    
+            elif op_type == 'check_access':
+                path = operation['path']
+                permission = operation.get('permission', 'read')
+                if system == 'Windows':
+                    return f'icacls "{path}" | findstr "({permission})"'
+                else:
+                    if permission == 'read':
+                        return f'test -r "{path}" && echo "readable" || echo "not readable"'
+                    elif permission == 'write':
+                        return f'test -w "{path}" && echo "writable" || echo "not writable"'
                     else:
-                        raise ValueError(f"Unsupported archive format: {full_file_path}")
+                        return f'test -x "{path}" && echo "executable" || echo "not executable"'
+                        
+            elif op_type == 'extract':
+                archive = operation['archive']
+                dest = operation['dest']
+                if archive.lower().endswith('.zip'):
+                    if system == 'Windows':
+                        return f'powershell -command "Expand-Archive -Path \'{archive}\' -DestinationPath \'{dest}\'"'
+                    else:
+                        return f'unzip "{archive}" -d "{dest}"'
+                elif archive.lower().endswith('.rar'):
+                    return f'unrar x "{archive}" "{dest}"'
+                elif archive.lower().endswith(('.tar.gz', '.tgz')):
+                    return f'tar -xzf "{archive}" -C "{dest}"'
+                else:
+                    return None  # Unsupported archive type
                     
-                    # Delete the original archive after extraction
-                    os.remove(full_file_path)
-                    
-                    result['success'] = True
-                    result['message'] = f"Archive extracted to {destination_path} and original deleted"
-                    result['destination'] = destination_path
-                    
-                except Exception as e:
-                    raise ValueError(f"Failed to extract archive: {str(e)}")
-                
-            elif action == 'rename':
-                if not destination_path:
-                    raise ValueError("destination_path is required for rename action")
-                
-                # Construct full destination path
-                full_dest_path = os.path.join(destination_folder, destination_path)
-                
-                # Create destination directory if it doesn't exist
-                os.makedirs(os.path.dirname(full_dest_path), exist_ok=True)
-                
-                # Move the file with new name
-                shutil.move(full_file_path, full_dest_path)
-                result['success'] = True
-                result['message'] = f"File renamed from {file_path} to {destination_path}"
-                result['destination'] = destination_path
-                
             else:
-                raise ValueError(f"Unknown action: {action}")
-            
-            # Log to secure database for audit trail
-            self._log_action_to_database(result, source_folder, destination_folder)
-            
-            # Update destination memory if this was a successful move
-            if action == 'move' and result['success']:
-                self._update_destination_memory(file_path, destination_path)
-            
-            print(f"[Execute Action] Action completed successfully: {result}")
-            return result
-            
-        except Exception as e:
-            error_msg = f"Error executing {action} on {file_path}: {str(e)}"
-            print(f"[Execute Action] ERROR: {error_msg}")
-            
-            result = {
-                'action': action,
-                'file': file_path,
-                'timestamp': datetime.now().isoformat(),
-                'success': False,
-                'error': str(e)
-            }
-            self._log_action_to_database(result, source_folder, destination_folder)
-            raise
+                print(f"[Translate] Unsupported operation type: {op_type}")
+                return None
+                
+        except KeyError as e:
+            print(f"[Translate] Missing required parameter for {op_type}: {e}")
+            return None
+    
+    def _try_fallback_operations(self, failed_operation: dict, fallback_operations: list) -> bool:
+        """Try fallback operations when primary operation fails"""
+        # Find relevant fallback operations for this failed operation
+        relevant_fallbacks = []
+        
+        for fallback in fallback_operations:
+            # Check if fallback is relevant to the failed operation
+            if (failed_operation.get('src') and fallback.get('src') == failed_operation.get('src')) or \
+               (failed_operation.get('path') and fallback.get('path') == failed_operation.get('path')):
+                relevant_fallbacks.append(fallback)
+        
+        if relevant_fallbacks:
+            print(f"[Fallback] Trying {len(relevant_fallbacks)} fallback operations")
+            for fallback in relevant_fallbacks:
+                try:
+                    command = self._translate_operation_to_command(fallback)
+                    if command:
+                        import subprocess
+                        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=15)
+                        if result.returncode == 0:
+                            print(f"[Fallback] ✅ SUCCESS: {fallback}")
+                            return True
+                except:
+                    continue
+                    
+        return False
     
     def re_analyze_file(self, file_path: str, user_input: str, source_folder: str, 
                        destination_folder: str) -> Dict:
@@ -956,15 +1140,19 @@ Respond with JSON:
             folder_path = os.path.dirname(file_path)
             
             # Log to centralized database
-            self.db.log_file_action(
-                user_id=self.user_id,
-                action_type=action,
-                file_name=os.path.basename(file_path),
-                source_path=folder_path,
-                destination_path='',
-                success=True,
-                error_message=''
-            )
+            try:
+                self.db.log_file_action(
+                    user_id=self.user_id,
+                    action_type=action,
+                    file_name=os.path.basename(file_path),
+                    source_path=folder_path,
+                    destination_path='',
+                    success=True,
+                    error_message=''
+                )
+            except Exception as log_error:
+                # Don't fail the main operation if logging fails
+                print(f"Debug: File access logging failed: {log_error}")
             
             return {
                 'success': True,
@@ -1879,40 +2067,51 @@ IMPORTANT CATEGORIZATION RULES:
 
 8. **Document Content**: Use content analysis for PDFs and Word docs to categorize intelligently.
 
-For each file, suggest:
+Generate ABSTRACT OPERATIONS to organize these files. Return platform-agnostic operations that work on any OS (Windows, Linux, macOS, Android, iOS).
 
-1. DESTINATION: Which existing folder OR suggest a new folder name with full path
-2. REASONING: Why this file belongs there (be specific about movie vs series logic)
-3. ACTION: One of these options:
-   - 'move': Move to existing folder (use this for most cases)
-   - 'delete': Delete this file (for redundant archives when content is extracted)
-   - 'extract': Extract this archive and organize its contents
-   - 'rename': Rename file to clean format (e.g., "Snatch (2000).mkv")
+OPERATION EXAMPLES:
+- Check folder contents: {{"type": "list_dir", "path": "/source", "show_hidden": false}}
+- Create directories: {{"type": "mkdir", "path": "/Movies", "parents": true}}
+- Move files: {{"type": "move", "src": "/source/movie.mkv", "dest": "/Movies/Clean Name.mkv"}}
+- Delete files: {{"type": "delete", "path": "/source/redundant.rar"}}
+- Extract archives: {{"type": "extract", "archive": "/source/archive.rar", "dest": "/extracted/", "delete_after": true}}
+- Check permissions: {{"type": "check_access", "path": "/protected/file.txt", "permission": "write"}}
 
 SPECIFIC EXAMPLES:
-- "Sanet.st.Snatch.2000.acx.mkv" → Movies/Snatch (2000).mkv (clean filename)
-- "Thunderbolts.rar" + "Thunderbolts.mp4" → Delete the RAR (redundant archive)
-- "Breaking.Bad.S01E01.mp4" → Series/Breaking Bad/Season 1/ (series episode)
-- "Ubuntu.iso" → Software/ (ISO file)
-- "document.pdf" → Documents/ (document file)
+- "Sanet.st.Snatch.2000.acx.mkv" → {{"type": "move", "src": "/source/Sanet.st.Snatch.2000.acx.mkv", "dest": "/Movies/Snatch (2000).mkv"}}
+- "Thunderbolts.rar" + "Thunderbolts.mp4" → {{"type": "delete", "path": "/source/Thunderbolts.rar"}}
+- "Breaking.Bad.S01E01.mp4" → {{"type": "mkdir", "path": "/Series/Breaking Bad/Season 1", "parents": true}} then {{"type": "move", "src": "/source/Breaking.Bad.S01E01.mp4", "dest": "/Series/Breaking Bad/Season 1/"}}
+
+PERMISSION HANDLING:
+- Always check access before operations: {{"type": "check_access", "path": "/file", "permission": "write"}}
+- For locked files, suggest fallbacks: {{"type": "copy", "src": "/locked.txt", "dest": "/backup/"}} instead of move
+- For system files, request admin: {{"type": "request_admin", "reason": "System file modification"}}
+
+AVAILABLE OPERATION TYPES:
+- File operations: "move", "copy", "delete", "rename"  
+- Directory operations: "mkdir", "list_dir"
+- Archive operations: "extract", "compress", "list_archive"
+- Information: "get_info", "get_size", "check_exists", "get_permissions"
+- Security: "check_access", "set_permissions", "request_admin"
 
 Return your response as JSON with this structure:
-{{
+{{{{
     "strategy": "Overall organization strategy",
-    "new_folders": ["List of new folders to create"],
-    "file_suggestions": [
-        {{
-            "file": "filename",
-            "current_path": "current/path",
-            "action": "move|delete|extract|rename",
-            "destination": "destination/path",
-            "reasoning": "why this file goes here (be specific about movie vs TV show logic)",
-            "confidence": 85,
-            "document_type": "contract|receipt|invoice|personal|etc" // for documents only
-        }}
+    "operations": [
+        {{{{"type": "mkdir", "path": "/Movies", "parents": true}}}},
+        {{{{"type": "move", "src": "/source/file.mkv", "dest": "/Movies/Clean Name.mkv"}}}},
+        {{{{"type": "delete", "path": "/source/redundant.rar"}}}}
+    ],
+    "explanations": [
+        "Creating Movies directory",
+        "Moving and renaming movie file with clean filename",
+        "Deleting redundant archive file"
+    ],
+    "fallback_operations": [
+        {{{{"type": "copy", "src": "/source/locked.txt", "dest": "/backup/locked.txt", "reason": "File appears to be locked"}}}}
     ],
     "total_files": "number of files processed"
-}}
+}}}}
 """
 
         try:

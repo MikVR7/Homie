@@ -30,4 +30,4 @@ echo "🌐 Starting File Organizer module in Chrome"
 echo "💡 Tip: Use 'r' for hot reload, 'R' for hot restart, 'q' to quit"
 echo "🔗 App will open at: http://localhost:33317"
 echo "📁 Direct route: File Organizer module only"
-flutter run -d chrome --web-hostname localhost --web-port 33317 --dart-entrypoint-args="--route=/file-organizer" 
+flutter run -d chrome --web-hostname localhost --web-port 33317 --dart-define=ROUTE=file-organizer 
