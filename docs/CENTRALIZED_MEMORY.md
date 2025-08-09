@@ -47,6 +47,10 @@ backend/data/
 - **Connection Status**: Tracks which drives are currently connected
 - **Persistent Memory**: Remembers drives even when disconnected
 
+### **Ownership & Structure**
+- `DrivesManager` is an internal dependency of `PathMemoryManager` (composition). Paths live on drives, so drive discovery/monitoring is encapsulated inside the path memory domain.
+- External components do not call `DrivesManager` directly; they interact with `FileOrganizerApp`/`PathMemoryManager` APIs or listen to events on `EventBus` (`drive_added`, `drive_removed`, `drive_status`).
+
 ### **How It Works**
 
 #### **1. Drive Registration**

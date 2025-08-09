@@ -98,9 +98,9 @@ This starts both backend and frontend services automatically!
 
 ### Manual Startup Commands
 
-**Backend (Python API):**
+**Backend (Python Orchestrator):**
 ```bash
-cd backend && source venv/bin/activate && python api_server.py
+cd backend && source venv/bin/activate && python main.py
 ```
 
 **Frontend (Flutter App):**
@@ -115,7 +115,7 @@ cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/financia
 
 ### Access Points
 - **🌐 Flutter Web App**: http://localhost:3000
-- **🔗 Backend API**: http://localhost:8000
+- **🔗 Backend API**: http://localhost:8000 (configured in `backend/core/web_server.py`)
 - **📱 Mobile**: Run `flutter run` for device deployment
 
 ### For Developers

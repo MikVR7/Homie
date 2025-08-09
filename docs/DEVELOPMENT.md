@@ -38,11 +38,10 @@ pip install -r requirements.txt
 
 ### Running the Backend
 ```bash
-# Start the API server
-python api_server.py
+# Start the orchestrator (starts core services and web server)
+python main.py
 
-# The server will be available at:
-# http://localhost:8000
+# The server will be available at http://localhost:8000 (configured in `core/web_server.py`)
 ```
 
 ### Testing
@@ -104,14 +103,9 @@ flutter run -d ios
 ## API Endpoints
 
 ### File Organizer
-- `POST /api/file-organizer/discover` - Discover files and folders
-- `POST /api/file-organizer/organize` - AI-powered file organization
-- `POST /api/file-organizer/execute-action` - Execute file operations
-- `POST /api/file-organizer/re-analyze` - Re-analyze files with user input
-- `POST /api/file-organizer/browse-folders` - Browse file system
-- `GET /api/file-organizer/destination-memory` - Get learned patterns
-- `GET /api/file-organizer/usb-drives` - Get USB drives memory
-- `POST /api/file-organizer/register-usb-drive` - Register USB drive for recognition
+- `POST /api/file-organizer/organize` - AI analyzes and returns abstract operations
+- `POST /api/file-organizer/execute-operations` - Execute abstract operations (pure Python)
+- Additional module endpoints may be exposed via `core/web_server.py`
 
 ### Financial Manager
 - `GET /api/financial/summary` - Financial summary
@@ -197,7 +191,7 @@ python test_centralized_memory.py
 ### Local Development
 ```bash
 # Backend
-cd backend && python api_server.py
+cd backend && python main.py
 
 # Frontend
 cd mobile_app && flutter run -d chrome

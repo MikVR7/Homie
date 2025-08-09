@@ -3,23 +3,23 @@
 ## Project Purpose
 Homie is your comprehensive intelligent home management ecosystem that evolves from a smart file organizer into a complete personal management suite. It includes multiple integrated modules:
 
-### 🗂️ **File Organizer** (Phase 1 - Complete ✅)
-- **TERMINAL COMMAND ARCHITECTURE**: AI generates actual shell commands (mv, rm, mkdir) for reliable file operations
+### 🗂️ **File Organizer** (Phase 1 - Rebuilt ✅)
+- **ABSTRACT OPERATIONS ARCHITECTURE**: AI generates platform-agnostic operations
+- **Pure Python Execution**: Operations run via `pathlib`/`shutil` (no shell)
 - **AI-Powered File Organization**: Google Gemini integration for intelligent file categorization
 - **Centralized Memory System**: SQLite database tracks all file operations and destination mappings
 - **Simple USB Drive Recognition**: Hardware-based identification (USB Serial → Partition UUID → Label+Size)
-- **Multi-Drive Support**: Detects and handles local, network (NAS), cloud (OneDrive, Dropbox), and USB drives
-- **Terminal Command Execution**: AI returns commands like ["mkdir -p '/Movies'", "mv '/src' '/dest'"] executed via subprocess
-- **Redundant Archive Detection**: AI generates rm commands for RAR files when content is already extracted
-- **Filename Cleaning**: AI generates mv commands with clean names (e.g., "Snatch (2000).mkv")
+- **Multi-Drive Support**: Detects and handles local, network (NAS), cloud, and USB drives
+- **Redundant Archive Detection**: AI suggests deletion when content already extracted
+- **Filename Cleaning**: Consistent rename operations (e.g., "Snatch (2000).mkv")
 - **Project Detection**: .git folder recognition for project organization
 - **PDF/DOC/TXT Content Reading**: Enhanced AI categorization based on file content
-- **User-Controlled Actions**: Preview AI-generated commands before execution
-- **Completed Actions Tracking**: All terminal commands logged with success/failure status
+- **User-Controlled Actions**: Preview AI-generated operations before execution
+- **Completed Actions Tracking**: All operations logged with success/failure status
 - **No Folder Memory Files**: Eliminated `.homie_memory.json` clutter - all centralized in database
-- **Cross-Platform USB Recognition**: Works on Linux, macOS, Windows with reliable hardware identification
+- **Cross-Platform USB Recognition**: Works on Linux, macOS, Windows
 - **Module Isolation**: Separate database files for complete data isolation between modules
-- **Security-First Design**: Command timeouts, proper escaping, comprehensive audit logging
+- **Security-First Design**: Validation, timeouts, comprehensive audit logging
 
 ### 🏠 **Home Server/NAS** (Phase 2)
 - OneDrive-like personal cloud storage replacement
@@ -63,10 +63,10 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
 - **Technical Compatibility**: All three countries share EU VAT framework and similar compliance requirements
 - **Premium Positioning**: Switzerland offers highest-value customers willing to pay premium for compliance tools
 
-## 🎯 **CRITICAL: Terminal Command Architecture**
+## 🎯 **CRITICAL: Abstract Operations Architecture**
 
-### **Core Principle: AI Generates Abstract Operations**
-The File Organizer uses an **abstract operation architecture** where the AI generates platform-agnostic operations that work on any OS (Windows, Linux, macOS, Android, iOS). This is **much more reliable** and **truly cross-platform**.
+### **Core Principle: AI Generates Abstract Operations; Backend Executes with Pure Python**
+The File Organizer uses an **abstract operation architecture** where the AI generates platform-agnostic operations that work on any OS (Windows, Linux, macOS, Android, iOS). The backend executes these operations using pure Python (`pathlib`, `shutil`, `zipfile`, etc.) for reliability and cross-platform consistency.
 
 ### **How It Works:**
 1. **AI Analysis**: Analyzes files and folder structure with destination memory  
@@ -84,16 +84,16 @@ The File Organizer uses an **abstract operation architecture** where the AI gene
      ]
    }
    ```
-3. **Platform Translation**: System translates to OS-specific commands (mv/move, rm/del, etc.)
-4. **Cross-Platform Execution**: Same operations work on any platform
+3. **Python Execution**: Backend maps each abstract operation to a pure Python implementation
+4. **Cross-Platform Execution**: Same operations work on any platform without shell commands
 
 ### **Why This Is Superior:**
 - ✅ **Truly cross-platform** - same operations work on Windows, Linux, macOS, Android, iOS
-- ✅ **Permission-aware** - AI can check access and suggest fallbacks for locked files
-- ✅ **Much more reliable** - no complex Python file operations
+- ✅ **Permission-aware** - AI can check access and suggest fallbacks
+- ✅ **Reliable** - pure Python file operations with structured error handling
 - ✅ **AI has full intelligence** - can list directories, check permissions, handle archives
 - ✅ **Smart fallbacks** - automatic alternatives when operations fail
-- ✅ **Easy to debug** - operations translate to readable commands
+- ✅ **Easy to debug** - operations are explicit and logged
 - ✅ **Comprehensive logging** - all operations and results tracked
 
 ### **Complete Operation Set:**
@@ -105,9 +105,9 @@ The File Organizer uses an **abstract operation architecture** where the AI gene
 
 ### **API Endpoints:**
 - `POST /api/file-organizer/organize` - AI analyzes and returns operations
-- `POST /api/file-organizer/execute-operations` - Executes the generated operations
+- `POST /api/file-organizer/execute-operations` - Executes the generated operations with pure Python
 
-**IMPORTANT**: Never implement Python file operations. Always use the abstract operation approach!
+**IMPORTANT**: Always use the abstract operation approach, and execute them via pure Python (no shell commands).
 
 ## 🚨 **CRITICAL: Flutter Linux Desktop Issues**
 
@@ -837,3 +837,15 @@ This represents a **€5M+ business opportunity** within 3-4 years, leveraging e
 - **IMPORTANT: Work in small, incremental steps** - Always explain what you're doing and wait for user confirmation before proceeding to the next step
 - Use feature branches for development
 - Write comprehensive tests for file operations
+
+## Backend Rebuild Notes (2025-08-09)
+- `main.py` is orchestrator-only; knows nothing about specific apps. It initializes `AppManager`, which registers modules without starting them.
+- `WebServer` (`core/web_server.py`) owns host/port and provides HTTP/WebSocket endpoints.
+- `AppManager` handles `start_module`/`stop_module` on demand.
+- File Organizer structure:
+  - `file_organizer_app.py`: coordinates; subscribes to events
+  - `path_memory_manager.py`: central memory; OWNS `drives_manager.py`
+  - `drives_manager.py`: drive discovery/monitoring (internal only)
+  - `ai_command_generator.py`: builds prompts; returns abstract operations
+  - `file_operation_manager.py`: executes operations with pure Python
+- A test GUI app will visualize connections, events, and test pass/fail (to be built later).

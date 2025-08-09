@@ -4,17 +4,18 @@
 
 Homie is a mobile-first intelligent home management platform that provides AI-powered file organization, financial management, media management, and document management through a unified ecosystem.
 
-## Core Modules
+## Core Modules (Rebuilt 2025-08-09)
 
-### Phase 1: File Organizer ✅ COMPLETE
-- **Status**: Complete with module-specific database
-- **Features**: AI-powered file categorization, destination memory, drive discovery
+### Phase 1: File Organizer ✅ Rebuilt
+- **Status**: Rebuilt with abstract operations and pure Python execution
+- **Features**: AI-powered file categorization, destination memory, drive discovery/monitoring
 - **Database**: `homie_file_organizer.db` (separate module database)
 - **Key Components**:
-  - `SmartOrganizer`: AI-powered file analysis and organization
-  - `ModuleDatabaseService`: Module-specific database operations
-  - Destination memory learning and persistence
-  - Drive discovery and mapping
+  - `file_organizer_app.py`: High-level coordinator; subscribes to `EventBus`
+  - `path_memory_manager.py`: Central memory; OWNS `drives_manager.py`
+  - `drives_manager.py`: Drive discovery + monitoring (internal dependency of PathMemoryManager)
+  - `ai_command_generator.py`: Builds AI prompts; returns abstract operations
+  - `file_operation_manager.py`: Executes operations via pure Python (`pathlib`/`shutil`)
 
 ### Phase 2: Home Server/NAS (Planned)
 - **Status**: Planned
@@ -40,7 +41,9 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
 
 ### Backend
 - **Language**: Python 3.11+
-- **Framework**: Flask (API server)
+- **Framework**: Flask + Socket.IO (via `core/web_server.py`)
+- **Orchestrator**: `backend/main.py` (starts core only, not apps)
+- **App Lifecycle**: `core/app_manager.py` (register, start/stop on demand)
 - **Database**: SQLite with module-specific databases
 - **AI**: Google Gemini API
 - **Security**: bcrypt, SQL injection prevention, audit logging
@@ -145,21 +148,25 @@ backend/data/
 - **Backup**: Individual module databases can be backed up separately
 - **Testing**: Each module has isolated test databases
 
-### Code Organization
+### Code Organization (Current)
 ```
 backend/
-├── api_server.py              # Main Flask API server
-├── services/
-│   ├── shared/
-│   │   └── module_database_service.py  # Module database service
-│   ├── file_organizer/
-│   │   ├── smart_organizer.py          # AI file organization
-│   │   └── discover.py                 # Drive discovery
-│   └── financial_manager/
-│       └── financial_manager.py        # Financial operations
+├── main.py                         # Orchestrator (starts core services only)
+├── core/
+│   ├── web_server.py              # Flask + Socket.IO, owns host/port
+│   ├── event_bus.py               # Internal pub/sub + socket broadcasting
+│   ├── client_manager.py          # WebSocket sessions and module switching
+│   ├── shared_services.py         # AI keys, env, utilities
+│   └── app_manager.py             # Module registration and lifecycle
+├── file_organizer/
+│   ├── file_organizer_app.py      # Module coordinator
+│   ├── path_memory_manager.py     # Central memory; owns DrivesManager
+│   ├── drives_manager.py          # Drive discovery/monitoring (internal)
+│   ├── ai_command_generator.py    # AI prompts → abstract operations
+│   └── file_operation_manager.py  # Execute operations via pure Python
 └── data/
-    ├── homie_users.db                 # User management
-    └── modules/                       # Module databases
+    ├── homie_users.db
+    └── modules/
         ├── homie_file_organizer.db
         ├── homie_financial_manager.db
         ├── homie_media_manager.db

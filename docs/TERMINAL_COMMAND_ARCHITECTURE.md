@@ -1,6 +1,8 @@
-# Terminal Command Architecture
+# Terminal Command Architecture (Deprecated)
 
-## 🎯 **Core Principle: AI Generates Terminal Commands**
+> Deprecated as of 2025-08-09. Replaced by the Abstract Operations Architecture with pure Python execution. See `docs/ABSTRACT_COMMAND_SYSTEM.md` for the current design.
+
+## 🎯 **Core Principle (Historical): AI Generates Terminal Commands**
 
 The Homie File Organizer uses a **terminal command-based architecture** where the AI generates actual shell commands that are executed directly. This is **simple, reliable, and leverages proven Unix tools**.
 
@@ -167,13 +169,13 @@ for command in commands:
     subprocess.run(command, shell=True, timeout=30)
 ```
 
-## 📝 **Summary**
+## 📝 **Summary (Historical)**
 
-This architecture makes the File Organizer:
+This historical architecture made the File Organizer:
 - **More reliable** - uses proven Unix tools
 - **Simpler** - less custom code to maintain  
 - **More powerful** - AI has full control over operations
 - **Easier to debug** - commands are visible and testable
 - **More secure** - proper logging and timeouts
 
-The AI is smart enough to generate correct commands, and Unix tools are reliable enough to execute them safely.
+Note: This approach has been superseded. We now use an abstract operation set executed with pure Python for cross-platform consistency and better safety.

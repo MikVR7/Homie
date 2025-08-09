@@ -1,8 +1,8 @@
 # Abstract Command System
 
-## 🎯 **Universal Operations for Cross-Platform File Management**
+## 🎯 **Universal Operations for Cross-Platform File Management (Pure Python Execution)**
 
-The AI generates **abstract operations** that work on any platform - Windows, Linux, macOS, Android, iOS.
+The AI generates **abstract operations** that work on any platform - Windows, Linux, macOS, Android, iOS. The backend executes these with pure Python (`pathlib`, `shutil`, `zipfile`, `os`, `stat`).
 
 ## 📋 **Complete Command Set**
 
@@ -101,40 +101,28 @@ PERMISSION_LEVELS = {
 }
 ```
 
-## 🖥️ **Platform Translation Examples**
+## 🖥️ **Python Execution Examples**
 
 ### **Directory Listing**
 ```json
 {"type": "list_dir", "path": "/source", "show_hidden": false}
 ```
 
-**Translates to:**
-- **Linux/Mac**: `ls -la "/source"`
-- **Windows**: `dir "C:\source" /A`
-- **Python**: `os.listdir("/source")`
-- **Mobile**: `Directory.listSync()`
+Executes as Python: `os.listdir("/source")` (with filtering for hidden if requested)
 
 ### **File Operations**
 ```json
 {"type": "move", "src": "/file.txt", "dest": "/new/file.txt"}
 ```
 
-**Translates to:**
-- **Linux/Mac**: `mv "/file.txt" "/new/file.txt"`
-- **Windows**: `move "C:\file.txt" "C:\new\file.txt"`
-- **Python**: `shutil.move("/file.txt", "/new/file.txt")`
-- **Mobile**: `File.copy() + File.delete()`
+Executes as Python: `shutil.move("/file.txt", "/new/file.txt")`
 
 ### **Permission Checking**
 ```json
 {"type": "check_access", "path": "/protected", "permission": "write"}
 ```
 
-**Translates to:**
-- **Linux/Mac**: `test -w "/protected" && echo "writable"`
-- **Windows**: `icacls "C:\protected" | findstr "Write"`
-- **Python**: `os.access("/protected", os.W_OK)`
-- **Mobile**: `File.stat().mode & permissions`
+Executes as Python: `os.access("/protected", os.W_OK)`
 
 ## 🧠 **AI Intelligence Benefits**
 
@@ -165,9 +153,9 @@ The AI can generate intelligent command sequences:
 
 ## 🔧 **Implementation Architecture**
 
-### **Backend Command Translator**
+### **Backend Operation Executor**
 ```python
-class AbstractCommandExecutor:
+class AbstractOperationExecutor:
     def execute_operations(self, operations: List[Dict]) -> Dict:
         results = []
         for op in operations:
