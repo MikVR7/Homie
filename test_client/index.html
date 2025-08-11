@@ -291,6 +291,25 @@
                 <div class="button-group">
                     <button onclick="sendCustomEvent()" class="secondary" disabled id="custom-event-btn">Send Custom Event</button>
                     <button onclick="testAI()" class="secondary" disabled id="test-ai-btn">Test AI Connection</button>
+                    <button onclick="client.requestDriveStatus()" class="secondary" disabled id="drive-status-btn">Drive Status</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-panel">
+                <h3>📂 Folder Memory</h3>
+                <div class="input-group">
+                    <label for="folder-path">Folder Path:</label>
+                    <input type="text" id="folder-path" placeholder="/home/user/Downloads" />
+                </div>
+                <div class="input-group">
+                    <label for="history-limit">History Limit:</label>
+                    <input type="number" id="history-limit" value="50" />
+                </div>
+                <div class="button-group">
+                    <button onclick="client.requestFolderHistory()" class="secondary" disabled id="history-btn">Get History</button>
+                    <button onclick="client.requestFolderSummary()" class="secondary" disabled id="summary-btn">Get Summary</button>
                 </div>
             </div>
         </div>
@@ -303,7 +322,22 @@
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <!-- Prefer local vendor Socket.IO client, fallback to CDN if missing -->
+    <script>
+      (function() {
+        var s = document.createElement('script');
+        s.src = 'vendor/socket.io.min.js';
+        s.onload = function(){ console.log('Socket.IO (local) loaded'); };
+        s.onerror = function(){
+          console.warn('Local Socket.IO not found, falling back to CDN');
+          var cdn = document.createElement('script');
+          cdn.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+          cdn.onload = function(){ console.log('Socket.IO (CDN) loaded'); };
+          document.body.appendChild(cdn);
+        };
+        document.body.appendChild(s);
+      })();
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

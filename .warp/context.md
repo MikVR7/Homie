@@ -812,8 +812,12 @@ This represents a **€5M+ business opportunity** within 3-4 years, leveraging e
 
 ## Technology Stack (FINALIZED)
 
-### Backend: Python 3.8+
-- **Framework**: Flask with CORS support
+### Backend: Python 3.12+ (New Clean Architecture)
+- **Framework**: Flask + Socket.IO with **gevent** async engine for WebSocket communication
+- **Async Engine**: Gevent chosen for Python 3.12 compatibility and clean signal handling (Ctrl+C works properly)
+  - **Why not eventlet**: Incompatible with Python 3.12 (missing `distutils`, broken `ssl.wrap_socket`)
+  - **Why not threading**: Poor signal handling, hangs on shutdown, inferior WebSocket performance
+- **Architecture**: Modular event-driven design with orchestrator pattern (`main.py` → core services → app modules)
 - **AI Integration**: Google Gemini 1.5 Flash for file organization and transaction categorization
 - **Document Processing**: PyPDF2, python-docx, pytesseract, pillow
 - **Banking Integration**: Salt Edge API v6 with PSD2 compliance

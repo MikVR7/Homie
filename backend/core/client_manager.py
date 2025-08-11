@@ -46,10 +46,15 @@ class ClientManager:
     
     def __init__(self, event_bus):
         self.event_bus = event_bus
+        self.app_manager = None
         self.sessions: Dict[str, UserSession] = {}  # socket_id -> UserSession
         self.user_sessions: Dict[str, Set[str]] = {}  # user_id -> set of socket_ids
         
         logger.info("🔌 Client Manager initialized")
+    
+    def set_app_manager(self, app_manager):
+        """Inject AppManager after initialization to avoid construction order issues."""
+        self.app_manager = app_manager
     
     async def handle_connect(self, socket_id: str, auth_data: Optional[Dict] = None):
         """Handle new WebSocket connection"""
@@ -179,6 +184,15 @@ class ClientManager:
             except ValueError:
                 return {'success': False, 'error': f'Invalid module: {new_module}'}
             
+            # Request module start via EventBus (decoupled lifecycle)
+            if new_module_enum != AppModule.MAIN_MENU:
+                await self.event_bus.emit('module_start_requested', {
+                    'module': new_module,
+                    'requested_by': session.user_id,
+                    'socket_id': socket_id,
+                    'session_id': session.session_id
+                })
+
             # Clean up old module
             await self._cleanup_user_module(session)
             

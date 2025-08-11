@@ -81,6 +81,11 @@ class DrivesManager:
                 "drive_removed",
                 {"drive_path": path, "timestamp": datetime.now().isoformat()},
             )
+            # Backward/compat: generic naming used by test client
+            await self.event_bus.emit(
+                "drive_disconnected",
+                {"drive_path": path, "timestamp": datetime.now().isoformat()},
+            )
 
         # Detect additions
         added = set(snapshot.keys()) - set(self._last_snapshot.keys())
@@ -95,12 +100,22 @@ class DrivesManager:
                     "filesystem": info.filesystem,
                 },
             )
+            # Backward/compat: generic naming used by test client
+            await self.event_bus.emit(
+                "drive_connected",
+                {
+                    "drive_path": path,
+                    "label": info.label,
+                    "type": info.type,
+                    "filesystem": info.filesystem,
+                },
+            )
 
         # Emit full status (throttled by interval)
-        await self.event_bus.emit(
-            "drive_status",
-            {"drives": [drive.__dict__ for drive in snapshot.values()]},
-        )
+        payload = {"drives": [drive.__dict__ for drive in snapshot.values()]}
+        await self.event_bus.emit("drive_status", payload)
+        # Backward/compat broadcast name
+        await self.event_bus.emit("drive_discovered", payload)
 
         self._last_snapshot = snapshot
 

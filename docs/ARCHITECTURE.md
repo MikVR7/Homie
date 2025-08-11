@@ -41,12 +41,18 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
 
 ### Backend
 - **Language**: Python 3.11+
-- **Framework**: Flask + Socket.IO (via `core/web_server.py`)
+- **Framework**: Flask + Socket.IO with **gevent** async engine (via `core/web_server.py`)
 - **Orchestrator**: `backend/main.py` (starts core only, not apps)
 - **App Lifecycle**: `core/app_manager.py` (register, start/stop on demand)
 - **Database**: SQLite with module-specific databases
 - **AI**: Google Gemini API
 - **Security**: bcrypt, SQL injection prevention, audit logging
+
+#### Async Engine Choice: Gevent
+- **Why gevent**: Excellent Python 3.12 compatibility, proper signal handling (clean Ctrl+C shutdown)
+- **vs threading**: Better performance for WebSocket-heavy applications
+- **vs eventlet**: eventlet has compatibility issues with Python 3.12 (removed `distutils`, `ssl.wrap_socket`)
+- **Production ready**: Used by many Flask-SocketIO applications in production
 
 ### Frontend
 - **Framework**: Flutter (Dart)
@@ -153,7 +159,7 @@ backend/data/
 backend/
 ├── main.py                         # Orchestrator (starts core services only)
 ├── core/
-│   ├── web_server.py              # Flask + Socket.IO, owns host/port
+│   ├── web_server.py              # Flask + Socket.IO + gevent, owns host/port
 │   ├── event_bus.py               # Internal pub/sub + socket broadcasting
 │   ├── client_manager.py          # WebSocket sessions and module switching
 │   ├── shared_services.py         # AI keys, env, utilities

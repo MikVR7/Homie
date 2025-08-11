@@ -100,6 +100,10 @@ class HomieOrchestrator:
         )
         self.components['app_manager'] = app_manager
         
+        # Inject AppManager into ClientManager for on-demand module start
+        if 'client_manager' in self.components:
+            self.components['client_manager'].set_app_manager(app_manager)
+        
         # Register (construct) all enabled modules without starting
         await app_manager.register_all_modules()
         
@@ -155,7 +159,10 @@ class HomieOrchestrator:
     def handle_signal(self, signum, frame):
         """Handle shutdown signals"""
         logger.info(f"📡 Received signal {signum}, initiating shutdown...")
-        asyncio.create_task(self.shutdown())
+        self.running = False
+        # Signal gevent to exit gracefully
+        import sys
+        sys.exit(0)
 
 
 async def main():

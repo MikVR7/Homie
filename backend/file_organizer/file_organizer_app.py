@@ -141,6 +141,38 @@ class FileOrganizerApp:
             operations, dry_run=dry_run
         )
 
+    async def get_drives(self) -> Dict[str, Any]:
+        if not self._started or not self.path_memory_manager:
+            return {"drives": []}
+        return await self.path_memory_manager.get_drive_status()
+
+    async def get_folder_history(self, folder_path: str, limit: int = 50) -> Dict[str, Any]:
+        if not self._started or not self.path_memory_manager:
+            return {"success": False, "error": "module_not_started"}
+        history = self.path_memory_manager.get_folder_history(folder_path, limit)
+        return {
+            "success": True,
+            "folder_path": folder_path,
+            "history": [
+                {
+                    "action_type": r.action_type,
+                    "file_name": r.file_name,
+                    "destination_path": r.destination_path,
+                    "success": r.success,
+                    "error_message": r.error_message,
+                    "timestamp": r.timestamp.isoformat(),
+                }
+                for r in history
+            ],
+        }
+
+    async def get_folder_summary(self, folder_path: str) -> Dict[str, Any]:
+        if not self._started or not self.path_memory_manager:
+            return {"success": False, "error": "module_not_started"}
+        summary = self.path_memory_manager.get_folder_summary(folder_path)
+        summary["success"] = True
+        return summary
+
     async def health_check(self) -> Dict[str, Any]:
         return {
             "status": "healthy" if self._started else "stopped",

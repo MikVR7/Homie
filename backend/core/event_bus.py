@@ -133,22 +133,20 @@ class EventBus:
                 logger.error(f"❌ Error in subscriber {subscription.component_name}: {e}")
     
     async def _emit_websocket(self, event_type: str, data: Dict[str, Any]):
-        """Emit to WebSocket clients"""
+        """Emit to WebSocket clients (thread-safe for any async_mode)."""
         if not self.socketio_instance:
             return
-        
         try:
-            # Emit to all connected clients
-            await self.socketio_instance.emit(event_type, data)
+            import asyncio as _asyncio
+            await _asyncio.to_thread(self.socketio_instance.emit, event_type, data)
             logger.debug(f"🔌 Emitted '{event_type}' to WebSocket clients")
         except Exception as e:
             logger.error(f"❌ Error emitting to WebSocket: {e}")
     
     async def emit_to_socket(self, socket_id: str, event_type: str, data: Dict[str, Any]):
-        """Emit event to specific WebSocket client"""
+        """Emit event to specific WebSocket client (thread-safe)."""
         if not self.socketio_instance:
             return
-        
         try:
             enriched_data = {
                 **data,
@@ -156,17 +154,16 @@ class EventBus:
                 'timestamp': datetime.now().isoformat(),
                 'source': 'backend'
             }
-            
-            await self.socketio_instance.emit(event_type, enriched_data, room=socket_id)
+            import asyncio as _asyncio
+            await _asyncio.to_thread(self.socketio_instance.emit, event_type, enriched_data, room=socket_id)
             logger.debug(f"🎯 Emitted '{event_type}' to socket {socket_id[:8]}")
         except Exception as e:
             logger.error(f"❌ Error emitting to socket {socket_id}: {e}")
     
     async def emit_to_room(self, room: str, event_type: str, data: Dict[str, Any]):
-        """Emit event to WebSocket room"""
+        """Emit event to WebSocket room (thread-safe)."""
         if not self.socketio_instance:
             return
-        
         try:
             enriched_data = {
                 **data,
@@ -174,8 +171,8 @@ class EventBus:
                 'timestamp': datetime.now().isoformat(),
                 'source': 'backend'
             }
-            
-            await self.socketio_instance.emit(event_type, enriched_data, room=room)
+            import asyncio as _asyncio
+            await _asyncio.to_thread(self.socketio_instance.emit, event_type, enriched_data, room=room)
             logger.debug(f"🏠 Emitted '{event_type}' to room '{room}'")
         except Exception as e:
             logger.error(f"❌ Error emitting to room {room}: {e}")

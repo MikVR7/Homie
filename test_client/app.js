@@ -128,6 +128,25 @@ class HomieTestClient {
             this.updateStats();
         });
         
+        // Specific responses
+        this.socket.on('file_organizer_drive_status', (data) => {
+            this.log('event', 'Drive Status', data);
+            this.stats.eventsReceived++;
+            this.updateStats();
+        });
+
+        this.socket.on('folder_history_response', (data) => {
+            this.log('event', 'Folder History', data);
+            this.stats.eventsReceived++;
+            this.updateStats();
+        });
+
+        this.socket.on('folder_summary_response', (data) => {
+            this.log('event', 'Folder Summary', data);
+            this.stats.eventsReceived++;
+            this.updateStats();
+        });
+
         // Backend events
         const backendEvents = [
             'client_connected',
@@ -247,6 +266,50 @@ class HomieTestClient {
         this.stats.messagesSent++;
         this.updateStats();
     }
+
+    requestDriveStatus() {
+        if (!this.connected || !this.socket) {
+            this.log('error', 'Not connected');
+            return;
+        }
+        this.log('info', 'Requesting drive status');
+        this.socket.emit('request_drive_status', {});
+        this.stats.messagesSent++;
+        this.updateStats();
+    }
+
+    requestFolderHistory() {
+        if (!this.connected || !this.socket) {
+            this.log('error', 'Not connected');
+            return;
+        }
+        const folderPath = document.getElementById('folder-path').value.trim();
+        const limit = parseInt(document.getElementById('history-limit').value || '50', 10);
+        if (!folderPath) {
+            this.log('error', 'Please enter a folder path');
+            return;
+        }
+        this.log('info', `Requesting folder history: ${folderPath}`);
+        this.socket.emit('request_folder_history', { folder_path: folderPath, limit });
+        this.stats.messagesSent++;
+        this.updateStats();
+    }
+
+    requestFolderSummary() {
+        if (!this.connected || !this.socket) {
+            this.log('error', 'Not connected');
+            return;
+        }
+        const folderPath = document.getElementById('folder-path').value.trim();
+        if (!folderPath) {
+            this.log('error', 'Please enter a folder path');
+            return;
+        }
+        this.log('info', `Requesting folder summary: ${folderPath}`);
+        this.socket.emit('request_folder_summary', { folder_path: folderPath });
+        this.stats.messagesSent++;
+        this.updateStats();
+    }
     
     testConnection() {
         const serverUrl = document.getElementById('server-url').value;
@@ -279,6 +342,9 @@ class HomieTestClient {
         const sessionInfoBtn = document.getElementById('session-info-btn');
         const customEventBtn = document.getElementById('custom-event-btn');
         const testAiBtn = document.getElementById('test-ai-btn');
+        const driveStatusBtn = document.getElementById('drive-status-btn');
+        const historyBtn = document.getElementById('history-btn');
+        const summaryBtn = document.getElementById('summary-btn');
         
         // Connection buttons
         connectBtn.disabled = this.connected;
@@ -293,6 +359,9 @@ class HomieTestClient {
         sessionInfoBtn.disabled = !this.connected;
         customEventBtn.disabled = !this.connected;
         testAiBtn.disabled = !this.connected;
+        driveStatusBtn.disabled = !this.connected;
+        historyBtn.disabled = !authRequired;
+        summaryBtn.disabled = !authRequired;
     }
     
     updateStats() {
@@ -351,42 +420,56 @@ class HomieTestClient {
 let client;
 
 function connect() {
+    if (!client) { console.error('Client not initialized'); return; }
     client.connect();
 }
 
 function disconnect() {
+    if (!client) { return; }
     client.disconnect();
 }
 
 function authenticate() {
+    if (!client) { return; }
     client.authenticate();
 }
 
 function switchModule() {
+    if (!client) { return; }
     client.switchModule();
 }
 
 function getSessionInfo() {
+    if (!client) { return; }
     client.getSessionInfo();
 }
 
 function sendCustomEvent() {
+    if (!client) { return; }
     client.sendCustomEvent();
 }
 
 function testAI() {
+    if (!client) { return; }
     client.testAI();
 }
 
 function testConnection() {
+    if (!client) { return; }
     client.testConnection();
 }
 
 function clearLogs() {
+    if (!client) { return; }
     client.clearLogs();
 }
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    client = new HomieTestClient();
+    try {
+        client = new HomieTestClient();
+        console.log('HomieTestClient initialized');
+    } catch (e) {
+        console.error('Failed to initialize test client', e);
+    }
 });

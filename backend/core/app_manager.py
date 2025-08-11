@@ -68,6 +68,36 @@ class AppManager:
         
         logger.info("📦 AppManager initialized - Module registry loaded")
         self._log_available_modules()
+        self._subscriptions = []
+        self._subscribe_to_events()
+
+    def _subscribe_to_events(self):
+        """Listen for module lifecycle requests via EventBus."""
+        try:
+            self._subscriptions.append(
+                self.event_bus.subscribe(
+                    "module_start_requested", self._on_module_start_requested, "AppManager"
+                )
+            )
+            self._subscriptions.append(
+                self.event_bus.subscribe(
+                    "module_stop_requested", self._on_module_stop_requested, "AppManager"
+                )
+            )
+        except Exception as e:
+            logger.warning(f"AppManager event subscription warning: {e}")
+
+    async def _on_module_start_requested(self, data: Dict[str, Any]):
+        module = data.get("module")
+        if not module:
+            return
+        await self.start_module(module)
+
+    async def _on_module_stop_requested(self, data: Dict[str, Any]):
+        module = data.get("module")
+        if not module:
+            return
+        await self.stop_module(module)
     
     def _log_available_modules(self):
         """Log available modules for debugging"""

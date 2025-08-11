@@ -20,7 +20,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 
 logger = logging.getLogger("PathMemoryManager")
@@ -47,6 +47,7 @@ class PathMemoryManager:
         self._db_path: Optional[Path] = None
         self._drives_manager = None  # Lazy import to avoid circulars
         self._started = False
+        self._subscriptions: List[str] = []
 
     async def start(self) -> None:
         if self._started:
@@ -60,6 +61,21 @@ class PathMemoryManager:
         self._drives_manager = DrivesManager(event_bus=self.event_bus)
         await self._drives_manager.start()
 
+        # Subscribe to operation results to persist history
+        try:
+            self._subscriptions.append(
+                self.event_bus.subscribe(
+                    "operation_done", self._on_operation_done, "PathMemoryManager"
+                )
+            )
+            self._subscriptions.append(
+                self.event_bus.subscribe(
+                    "operation_failed", self._on_operation_failed, "PathMemoryManager"
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Subscription warning: {e}")
+
         self._started = True
         logger.info("✅ PathMemoryManager started")
 
@@ -71,6 +87,12 @@ class PathMemoryManager:
 
         if self._drives_manager:
             await self._drives_manager.shutdown()
+
+        # Unsubscribe
+        try:
+            self.event_bus.unsubscribe_component("PathMemoryManager")
+        except Exception:
+            pass
 
         if self._db_connection:
             try:
@@ -124,6 +146,69 @@ class PathMemoryManager:
             )
         self._db_connection = conn
         logger.info(f"📦 PathMemoryManager DB ready at {self._db_path}")
+
+    async def _on_operation_done(self, data: Dict[str, Any]):
+        """Persist results from executed operations."""
+        try:
+            results = (data or {}).get("results", [])
+            for item in results:
+                op = item.get("operation", {})
+                success = bool(item.get("success", False))
+                error_message = item.get("error")
+                op_type = op.get("type", "unknown")
+
+                # Derive paths
+                source_path = None
+                destination_path = None
+                file_name = None
+
+                if op_type in ("move", "copy", "rename"):
+                    src = op.get("src")
+                    dest = op.get("dest")
+                    source_path = src
+                    destination_path = dest
+                    try:
+                        file_name = Path(src).name if src else None
+                    except Exception:
+                        file_name = src
+                elif op_type == "delete":
+                    path = op.get("path")
+                    source_path = path
+                    try:
+                        file_name = Path(path).name if path else None
+                    except Exception:
+                        file_name = path
+                elif op_type in ("mkdir", "check_exists", "list_dir"):
+                    path = op.get("path")
+                    source_path = path
+                    try:
+                        file_name = Path(path).name if path else None
+                    except Exception:
+                        file_name = path
+
+                # Record
+                try:
+                    self.record_folder_usage(
+                        folder_path=source_path or "",
+                        action_type=op_type,
+                        file_name=file_name,
+                        destination_path=destination_path,
+                        success=success,
+                        error_message=error_message,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to record operation history: {e}")
+        except Exception as e:
+            logger.warning(f"operation_done handler error: {e}")
+
+    async def _on_operation_failed(self, data: Dict[str, Any]):
+        try:
+            op = (data or {}).get("operation", {})
+            await self._on_operation_done({
+                "results": [{"operation": op, "success": False, "error": (data or {}).get("error")}] 
+            })
+        except Exception:
+            pass
 
     def record_folder_usage(
         self,
@@ -187,6 +272,70 @@ class PathMemoryManager:
                 )
             )
         return history
+
+    def get_folder_summary(self, folder_path: str) -> Dict[str, Any]:
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        summary: Dict[str, Any] = {
+            "folder_path": folder_path,
+            "total_actions": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "last_activity": None,
+            "actions_by_type": {},
+            "top_destinations": [],
+        }
+
+        # Totals and last activity
+        row = self._db_connection.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) AS success_count,
+                   SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS failure_count,
+                   MAX(timestamp) AS last_ts
+            FROM file_actions
+            WHERE source_path = ?
+            """,
+            (folder_path,),
+        ).fetchone()
+
+        if row:
+            summary["total_actions"] = int(row["total"] or 0)
+            summary["success_count"] = int(row["success_count"] or 0)
+            summary["failure_count"] = int(row["failure_count"] or 0)
+            summary["last_activity"] = row["last_ts"]
+
+        # Actions by type
+        cur = self._db_connection.execute(
+            """
+            SELECT action_type, COUNT(*) AS cnt
+            FROM file_actions
+            WHERE source_path = ?
+            GROUP BY action_type
+            ORDER BY cnt DESC
+            """,
+            (folder_path,),
+        )
+        summary["actions_by_type"] = {r["action_type"]: int(r["cnt"]) for r in cur.fetchall()}
+
+        # Top destinations
+        cur = self._db_connection.execute(
+            """
+            SELECT destination_path, COUNT(*) AS cnt
+            FROM file_actions
+            WHERE source_path = ? AND destination_path IS NOT NULL AND destination_path <> ''
+            GROUP BY destination_path
+            ORDER BY cnt DESC
+            LIMIT 10
+            """,
+            (folder_path,),
+        )
+        summary["top_destinations"] = [
+            {"destination_path": r["destination_path"], "count": int(r["cnt"])} for r in cur.fetchall()
+        ]
+
+        return summary
 
     async def get_drive_status(self) -> Dict:
         if not self._drives_manager:
