@@ -170,13 +170,17 @@ backend/
 │   ├── drives_manager.py          # Drive discovery/monitoring (internal)
 │   ├── ai_command_generator.py    # AI prompts → abstract operations
 │   └── file_operation_manager.py  # Execute operations via pure Python
-└── data/
-    ├── homie_users.db
-    └── modules/
-        ├── homie_file_organizer.db
-        ├── homie_financial_manager.db
-        ├── homie_media_manager.db
-        └── homie_document_manager.db
+├── data/
+│   ├── homie_users.db
+│   └── modules/
+│       ├── homie_file_organizer.db
+│       ├── homie_financial_manager.db
+│       ├── homie_media_manager.db
+│       └── homie_document_manager.db
+└── test_client/                    # ✅ Backend test client (2025-08-13)
+    ├── index.html                  # Multi-user test interface
+    ├── app.js                      # WebSocket + HTTP API testing
+    └── server.py                   # Development test server
 ```
 
 ## Deployment Architecture

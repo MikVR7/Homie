@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import zipfile
+import tarfile
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -48,6 +50,12 @@ class FileOperationManager:
                     result = self._op_check_exists(op)
                 elif op_type == "list_dir":
                     result = self._op_list_dir(op)
+                elif op_type == "extract":
+                    result = self._op_extract(op)
+                elif op_type == "get_info":
+                    result = self._op_get_info(op)
+                elif op_type == "get_size":
+                    result = self._op_get_size(op)
                 else:
                     raise ValueError(f"Unsupported operation type: {op_type}")
 
@@ -121,5 +129,71 @@ class FileOperationManager:
                 "size": entry.stat().st_size if entry.is_file() else None,
             })
         return {"entries": entries}
+
+    def _op_extract(self, op: Dict[str, Any]):
+        """Extract archive file"""
+        archive_path = Path(op["archive"]).expanduser()
+        dest_path = Path(op["dest"]).expanduser()
+        delete_after = op.get("delete_after", False)
+        
+        if not archive_path.exists():
+            raise FileNotFoundError(f"Archive not found: {archive_path}")
+        
+        # Create destination directory
+        dest_path.mkdir(parents=True, exist_ok=True)
+        
+        # Extract based on file type
+        ext = archive_path.suffix.lower()
+        
+        if ext == ".zip":
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(dest_path)
+        elif ext in [".tar", ".tar.gz", ".tgz", ".tar.bz2"]:
+            with tarfile.open(archive_path, 'r') as tar_ref:
+                tar_ref.extractall(dest_path)
+        else:
+            raise ValueError(f"Unsupported archive format: {ext}")
+        
+        result = {"archive": str(archive_path), "dest": str(dest_path)}
+        
+        # Delete archive if requested
+        if delete_after:
+            archive_path.unlink()
+            result["deleted"] = True
+        
+        return result
+
+    def _op_get_info(self, op: Dict[str, Any]):
+        """Get file/directory information"""
+        path = Path(op["path"]).expanduser()
+        
+        if not path.exists():
+            return {"path": str(path), "exists": False}
+        
+        stat = path.stat()
+        return {
+            "path": str(path),
+            "exists": True,
+            "is_file": path.is_file(),
+            "is_dir": path.is_dir(),
+            "size": stat.st_size,
+            "modified": stat.st_mtime,
+            "permissions": oct(stat.st_mode)[-3:]
+        }
+
+    def _op_get_size(self, op: Dict[str, Any]):
+        """Get file/directory size"""
+        path = Path(op["path"]).expanduser()
+        
+        if not path.exists():
+            raise FileNotFoundError(f"Path not found: {path}")
+        
+        if path.is_file():
+            size = path.stat().st_size
+        else:
+            # Calculate directory size recursively
+            size = sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
+        
+        return {"path": str(path), "size": size}
 
 

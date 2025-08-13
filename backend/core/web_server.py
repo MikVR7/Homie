@@ -153,7 +153,7 @@ class WebServer:
                 app_manager = self.components.get('app_manager')
                 if not app_manager:
                     return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
-                await app_manager.start_module('file_organizer')
+                run_async(app_manager.start_module('file_organizer'))
 
                 file_organizer = app_manager.get_active_module('file_organizer')
                 if not file_organizer:
@@ -175,7 +175,7 @@ class WebServer:
                 app_manager = self.components.get('app_manager')
                 if not app_manager:
                     return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
-                await app_manager.start_module('file_organizer')
+                run_async(app_manager.start_module('file_organizer'))
 
                 file_organizer = app_manager.get_active_module('file_organizer')
                 if not file_organizer:
@@ -186,7 +186,8 @@ class WebServer:
             except Exception as e:
                 logger.error(f"/execute-operations error: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
-        
+
+
         @self.app.route('/api/test-ai', methods=['POST'])
         async def test_ai():
             """Test AI connection"""
@@ -204,15 +205,70 @@ class WebServer:
     def _setup_websocket_handlers(self):
         """Setup WebSocket event handlers"""
         
+        def run_async(coro):
+            """Helper to run async functions in gevent context"""
+            import asyncio
+            import inspect
+            
+            # If it's already a coroutine, we need to run it
+            if inspect.iscoroutine(coro):
+                try:
+                    # Try to get existing event loop
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # If loop is running, create a task
+                        import concurrent.futures
+                        import threading
+                        
+                        # Run in a separate thread with its own event loop
+                        def run_in_thread():
+                            new_loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(new_loop)
+                            try:
+                                return new_loop.run_until_complete(coro)
+                            finally:
+                                new_loop.close()
+                        
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(run_in_thread)
+                            return future.result(timeout=30)  # 30 second timeout
+                    else:
+                        return loop.run_until_complete(coro)
+                except RuntimeError:
+                    # No event loop in current thread, create one
+                    return asyncio.run(coro)
+            else:
+                # Not a coroutine, just return the result
+                return coro
+        
+        # HTTP routes that use run_async (must be after run_async definition)
+        @self.app.route('/api/file_organizer/drives', methods=['GET'])
+        def fo_get_drives():
+            try:
+                app_manager = self.components.get('app_manager')
+                if not app_manager:
+                    return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
+                run_async(app_manager.start_module('file_organizer'))
+
+                file_organizer = app_manager.get_active_module('file_organizer')
+                if not file_organizer:
+                    return jsonify({'success': False, 'error': 'module_not_running'}), 500
+
+                result = run_async(file_organizer.get_drives())
+                return jsonify({'success': True, **result})
+            except Exception as e:
+                logger.error(f"/drives error: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+        
         @self.socketio.on('connect')
-        async def handle_connect(auth):
+        def handle_connect(auth):
             """Handle WebSocket connection - delegate to client manager"""
             try:
                 logger.info(f"🔌 WebSocket connection: {request.sid}")
                 
                 if 'client_manager' in self.components:
                     client_manager = self.components['client_manager']
-                    result = await client_manager.handle_connect(request.sid, auth)
+                    result = run_async(client_manager.handle_connect(request.sid, auth))
                     emit('connection_response', result)
                 else:
                     emit('connection_response', {
@@ -225,25 +281,25 @@ class WebServer:
                 emit('connection_response', {'success': False, 'error': str(e)})
         
         @self.socketio.on('disconnect')
-        async def handle_disconnect():
+        def handle_disconnect():
             """Handle WebSocket disconnection - delegate to client manager"""
             try:
                 logger.info(f"🔌 WebSocket disconnect: {request.sid}")
                 
                 if 'client_manager' in self.components:
                     client_manager = self.components['client_manager']
-                    await client_manager.handle_disconnect(request.sid)
+                    run_async(client_manager.handle_disconnect(request.sid))
                     
             except Exception as e:
                 logger.error(f"❌ Disconnect error: {e}")
         
         @self.socketio.on('authenticate')
-        async def handle_authenticate(credentials):
+        def handle_authenticate(credentials):
             """Handle authentication - delegate to client manager"""
             try:
                 if 'client_manager' in self.components:
                     client_manager = self.components['client_manager']
-                    result = await client_manager.authenticate_user(request.sid, credentials)
+                    result = run_async(client_manager.authenticate_user(request.sid, credentials))
                     emit('auth_response', result)
                 else:
                     emit('auth_response', {
@@ -256,12 +312,12 @@ class WebServer:
                 emit('auth_response', {'success': False, 'error': str(e)})
         
         @self.socketio.on('switch_module')
-        async def handle_module_switch(data):
+        def handle_module_switch(data):
             """Handle module switching - delegate to client manager"""
             try:
                 if 'client_manager' in self.components:
                     client_manager = self.components['client_manager']
-                    result = await client_manager.switch_module(request.sid, data.get('module'))
+                    result = run_async(client_manager.switch_module(request.sid, data.get('module')))
                     emit('module_switch_response', result)
                 else:
                     emit('module_switch_response', {
@@ -274,7 +330,7 @@ class WebServer:
                 emit('module_switch_response', {'success': False, 'error': str(e)})
         
         @self.socketio.on('request_folder_history')
-        async def handle_request_folder_history(data):
+        def handle_request_folder_history(data):
             try:
                 folder_path = (data or {}).get('folder_path')
                 limit = int((data or {}).get('limit', 50))
@@ -286,21 +342,21 @@ class WebServer:
                 if not app_manager:
                     emit('folder_history_response', {'success': False, 'error': 'app_manager_unavailable'})
                     return
-                await app_manager.start_module('file_organizer')
+                run_async(app_manager.start_module('file_organizer'))
 
                 file_organizer = app_manager.get_active_module('file_organizer')
                 if not file_organizer:
                     emit('folder_history_response', {'success': False, 'error': 'module_not_running'})
                     return
 
-                result = await file_organizer.get_folder_history(folder_path, limit=limit)
+                result = run_async(file_organizer.get_folder_history(folder_path, limit=limit))
                 emit('folder_history_response', result)
             except Exception as e:
                 logger.error(f"❌ request_folder_history error: {e}")
                 emit('folder_history_response', {'success': False, 'error': str(e)})
 
         @self.socketio.on('request_folder_summary')
-        async def handle_request_folder_summary(data):
+        def handle_request_folder_summary(data):
             try:
                 folder_path = (data or {}).get('folder_path')
                 if not folder_path:
@@ -311,20 +367,20 @@ class WebServer:
                 if not app_manager:
                     emit('folder_summary_response', {'success': False, 'error': 'app_manager_unavailable'})
                     return
-                await app_manager.start_module('file_organizer')
+                run_async(app_manager.start_module('file_organizer'))
 
                 file_organizer = app_manager.get_active_module('file_organizer')
                 if not file_organizer:
                     emit('folder_summary_response', {'success': False, 'error': 'module_not_running'})
                     return
 
-                result = await file_organizer.get_folder_summary(folder_path)
+                result = run_async(file_organizer.get_folder_summary(folder_path))
                 emit('folder_summary_response', result)
             except Exception as e:
                 logger.error(f"❌ request_folder_summary error: {e}")
                 emit('folder_summary_response', {'success': False, 'error': str(e)})
         @self.socketio.on('test_event')
-        async def handle_test_event(data):
+        def handle_test_event(data):
             """Handle test event"""
             try:
                 logger.info(f"🧪 Test event received: {request.sid}")
@@ -339,31 +395,31 @@ class WebServer:
                 
                 # Broadcast to event bus
                 if 'event_bus' in self.components:
-                    await self.components['event_bus'].emit('test_event_received', {
+                    run_async(self.components['event_bus'].emit('test_event_received', {
                         'socket_id': request.sid,
                         'data': data
-                    })
+                    }))
                     
             except Exception as e:
                 logger.error(f"❌ Test event error: {e}")
                 emit('test_event_response', {'success': False, 'error': str(e)})
 
         @self.socketio.on('request_drive_status')
-        async def handle_request_drive_status(data):
+        def handle_request_drive_status(data):
             """Return current drive snapshot to the requesting socket."""
             try:
                 app_manager = self.components.get('app_manager')
                 if not app_manager:
                     emit('file_organizer_drive_status', {'success': False, 'error': 'app_manager_unavailable'})
                     return
-                await app_manager.start_module('file_organizer')
+                run_async(app_manager.start_module('file_organizer'))
 
                 file_organizer = app_manager.get_active_module('file_organizer')
                 if not file_organizer:
                     emit('file_organizer_drive_status', {'success': False, 'error': 'module_not_running'})
                     return
 
-                result = await file_organizer.get_drives()
+                result = run_async(file_organizer.get_drives())
                 emit('file_organizer_drive_status', {'success': True, **result})
             except Exception as e:
                 logger.error(f"❌ request_drive_status error: {e}")
