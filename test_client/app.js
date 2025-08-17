@@ -161,6 +161,12 @@ class HomieTestClient {
             this.log('event', 'Drive Status', data);
             this.stats.eventsReceived++;
             this.updateStats();
+            
+            // Update drives display if this is the current user and File Organizer is active
+            if (typeof getCurrentUser === 'function' && this === getCurrentUser() && 
+                this.currentModule === 'file_organizer') {
+                this.updateDrivesDisplay(data);
+            }
         });
 
         this.socket.on('folder_history_response', (data) => {
@@ -197,6 +203,12 @@ class HomieTestClient {
                 this.log('event', `Backend Event: ${eventType}`, data);
                 this.stats.eventsReceived++;
                 this.updateStats();
+                
+                // Handle drive events for real-time updates
+                if (eventType === 'drive_connected' || eventType === 'drive_disconnected' || 
+                    eventType === 'drive_discovered' || eventType === 'drive_status') {
+                    this.handleDriveEvent(eventType, data);
+                }
             });
         });
         
@@ -424,7 +436,7 @@ class HomieTestClient {
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 30px;">
                     <!-- Main Controls -->
                     <div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 25px;">
                             <div style="padding: 20px; background: #3a3a3a; border-radius: 8px; border: 1px solid #555;">
                                 <h4 style="margin-top: 0; color: #e9ecef;">📂 Source Folder</h4>
                                 <input type="text" id="fo-source-path" value="/home/mikele/Downloads" 
@@ -432,10 +444,30 @@ class HomieTestClient {
                                 <small style="color: #adb5bd; display: block; margin-top: 8px;">Folder to analyze and organize</small>
                             </div>
                             <div style="padding: 20px; background: #3a3a3a; border-radius: 8px; border: 1px solid #555;">
-                                <h4 style="margin-top: 0; color: #e9ecef;">🎯 Intent (Optional)</h4>
-                                <input type="text" id="fo-intent" placeholder="e.g., 'organize movies'"
+                                <h4 style="margin-top: 0; color: #e9ecef;">🎯 Destination Folder</h4>
+                                <input type="text" id="fo-destination-path" value="/home/mikele/Downloads/Organized" 
                                        style="width: 100%; padding: 12px; border: 1px solid #555; border-radius: 6px; font-size: 14px; background: #2a2a2a; color: #e9ecef;">
-                                <small style="color: #adb5bd; display: block; margin-top: 8px;">What you want to achieve</small>
+                                <small style="color: #adb5bd; display: block; margin-top: 8px;">Where to organize files</small>
+                            </div>
+                            <div style="padding: 20px; background: #3a3a3a; border-radius: 8px; border: 1px solid #555;">
+                                <h4 style="margin-top: 0; color: #e9ecef;">💡 Organization Style</h4>
+                                <select id="fo-organization-style" 
+                                        style="width: 100%; padding: 12px; border: 1px solid #555; border-radius: 6px; font-size: 14px; background: #2a2a2a; color: #e9ecef;">
+                                    <option value="by_type">By File Type</option>
+                                    <option value="by_date">By Date</option>
+                                    <option value="smart_categories">Smart Categories</option>
+                                    <option value="custom">Custom Intent</option>
+                                </select>
+                                <small style="color: #adb5bd; display: block; margin-top: 8px;">How to organize files</small>
+                            </div>
+                        </div>
+                        
+                        <div id="custom-intent-section" style="margin-bottom: 25px; display: none;">
+                            <div style="padding: 20px; background: #3a3a3a; border-radius: 8px; border: 1px solid #555;">
+                                <h4 style="margin-top: 0; color: #e9ecef;">🎯 Custom Intent</h4>
+                                <input type="text" id="fo-intent" placeholder="e.g., 'organize movies by year', 'group photos by event'"
+                                       style="width: 100%; padding: 12px; border: 1px solid #555; border-radius: 6px; font-size: 14px; background: #2a2a2a; color: #e9ecef;">
+                                <small style="color: #adb5bd; display: block; margin-top: 8px;">Describe exactly what you want to achieve</small>
                             </div>
                         </div>
                         
@@ -519,9 +551,23 @@ class HomieTestClient {
         controlsContainer.appendChild(moduleDiv);
         this.updateModuleButtonStates();
         
-        // If File Organizer is selected, start drive monitoring
+        // If File Organizer is selected, start drive monitoring and add event listeners
         if (selectedModule === 'file_organizer') {
             this.startDriveMonitoring();
+            
+            // Add event listener for organization style dropdown
+            const styleSelect = document.getElementById('fo-organization-style');
+            const customSection = document.getElementById('custom-intent-section');
+            
+            if (styleSelect && customSection) {
+                styleSelect.addEventListener('change', function() {
+                    if (this.value === 'custom') {
+                        customSection.style.display = 'block';
+                    } else {
+                        customSection.style.display = 'none';
+                    }
+                });
+            }
         }
     }
     
@@ -572,7 +618,7 @@ class HomieTestClient {
         
         // ONLY update the display if this is the currently selected user
         if (typeof getCurrentUser === 'function' && this === getCurrentUser()) {
-            document.getElementById('connection-time').textContent = this.stats.connectionTime;
+        document.getElementById('connection-time').textContent = this.stats.connectionTime;
         }
     }
     
@@ -637,6 +683,24 @@ class HomieTestClient {
                 statusElement.textContent = '●';
             }
         });
+    }
+    
+    handleDriveEvent(eventType, data) {
+        // Only update drives display if this is the current user and File Organizer is selected
+        if (typeof getCurrentUser === 'function' && this === getCurrentUser() && 
+            this.currentModule === 'file_organizer') {
+            
+            if (eventType === 'drive_discovered' || eventType === 'drive_status') {
+                // Full drive list update
+                this.updateDrivesDisplay(data);
+            } else if (eventType === 'drive_connected') {
+                // Single drive connected - refresh the full list
+                this.refreshDrives();
+            } else if (eventType === 'drive_disconnected') {
+                // Single drive disconnected - refresh the full list
+                this.refreshDrives();
+            }
+        }
     }
     
     updateDrivesDisplay(data) {
@@ -980,14 +1044,34 @@ function onModuleChange() {
 function testFileOrganizerAnalyze() {
     const user = getCurrentUser();
     const sourcePath = document.getElementById('fo-source-path').value;
-    const intent = document.getElementById('fo-intent').value;
+    const destinationPath = document.getElementById('fo-destination-path').value;
+    const organizationStyle = document.getElementById('fo-organization-style').value;
+    const customIntent = document.getElementById('fo-intent')?.value || '';
     
     if (!sourcePath) {
         user.log('error', 'Please enter a source folder path');
         return;
     }
     
-    user.log('info', `Analyzing folder: ${sourcePath}`);
+    if (!destinationPath) {
+        user.log('error', 'Please enter a destination folder path');
+        return;
+    }
+    
+    // Build intent based on organization style
+    let intent = '';
+    if (organizationStyle === 'custom' && customIntent) {
+        intent = customIntent;
+    } else if (organizationStyle === 'by_type') {
+        intent = 'organize files by type (images, documents, videos, etc.)';
+    } else if (organizationStyle === 'by_date') {
+        intent = 'organize files by date (year/month folders)';
+    } else if (organizationStyle === 'smart_categories') {
+        intent = 'organize files into smart categories based on content';
+    }
+    
+    user.log('info', `Analyzing folder: ${sourcePath} → ${destinationPath}`);
+    user.log('info', `Organization style: ${intent}`);
     
     // Make HTTP request to organize endpoint
     fetch('http://localhost:8000/api/file-organizer/organize', {
@@ -997,6 +1081,7 @@ function testFileOrganizerAnalyze() {
         },
         body: JSON.stringify({
             folder_path: sourcePath,
+            destination_path: destinationPath,
             intent: intent || null
         })
     })

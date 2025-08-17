@@ -47,7 +47,16 @@ class DrivesManager:
         # initial scan
         await self._rescan_and_emit_changes(initial=True)
         # background monitoring
-        self._monitor_task = asyncio.create_task(self._monitor_loop())
+        try:
+            # Schedule the monitoring task
+            self._monitor_task = asyncio.create_task(self._monitor_loop())
+            logger.info(f"📋 Monitor task created: {self._monitor_task}")
+            
+            # Ensure the task actually starts by yielding control
+            await asyncio.sleep(0.1)
+            logger.info(f"📋 Monitor task status: {self._monitor_task.done()}, cancelled: {self._monitor_task.cancelled()}")
+        except Exception as e:
+            logger.error(f"❌ Failed to create monitor task: {e}")
         logger.info("✅ DrivesManager started")
 
     async def shutdown(self) -> None:
@@ -64,11 +73,17 @@ class DrivesManager:
         logger.info("✅ DrivesManager shut down")
 
     async def _monitor_loop(self) -> None:
+        """Async monitoring loop"""
         try:
             while self._running:
                 await asyncio.sleep(self._scan_interval_sec)
+                logger.info(f"🔍 DrivesManager monitoring loop running (interval: {self._scan_interval_sec}s)")
                 await self._rescan_and_emit_changes()
         except asyncio.CancelledError:
+            logger.info("🛑 DrivesManager monitoring loop cancelled")
+            return
+        except Exception as e:
+            logger.error(f"❌ DrivesManager monitoring loop error: {e}")
             return
 
     async def _rescan_and_emit_changes(self, initial: bool = False) -> None:
@@ -76,6 +91,8 @@ class DrivesManager:
 
         # Detect removals
         removed = set(self._last_snapshot.keys()) - set(snapshot.keys())
+        if removed:
+            logger.info(f"🔌➖ Drives removed: {list(removed)}")
         for path in removed:
             await self.event_bus.emit(
                 "drive_removed",
@@ -89,6 +106,8 @@ class DrivesManager:
 
         # Detect additions
         added = set(snapshot.keys()) - set(self._last_snapshot.keys())
+        if added:
+            logger.info(f"🔌➕ Drives added: {list(added)}")
         for path in added:
             info = snapshot[path]
             await self.event_bus.emit(
@@ -163,6 +182,13 @@ class DrivesManager:
         return drives
 
     async def get_status(self) -> Dict:
+        # Trigger a rescan on every get_status call to check for changes
+        if self._running:
+            try:
+                await self._rescan_and_emit_changes()
+            except Exception as e:
+                logger.error(f"❌ Error during manual rescan: {e}")
+        
         return {"drives": [drive.__dict__ for drive in self._last_snapshot.values()]}
 
 

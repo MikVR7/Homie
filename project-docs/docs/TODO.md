@@ -70,6 +70,8 @@
 - **Multi-User Architecture**: Proven concurrent user support with data isolation
 - **Drive Detection**: Real-time drive monitoring integrated with File Organizer module
 - **Error Recovery**: Robust error handling and connection management
+- **UI Improvements**: Enhanced File Organizer interface with destination folder input, organization style dropdown, and smart intent handling
+- **Live Drive Updates**: Working USB drive plug/unplug detection with real-time display updates
 
 ## Phase 2: Authentication & Multi-Backend Support (Planned)
 
