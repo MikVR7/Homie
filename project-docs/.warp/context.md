@@ -195,6 +195,14 @@ cd mobile_app && flutter run -d chrome
 - ✅ **File Organizer UI Enhancement**: Added destination folder input, organization style dropdown (By Type/Date/Smart/Custom), and dynamic custom intent field
 - ✅ **Live USB Drive Detection**: Working real-time USB drive plug/unplug detection with immediate UI updates
 
+### Recent Bug Fixes (2025-08-18)
+- ✅ **Critical API URL Fix**: Fixed File Organizer frontend connectivity
+  - **Issue**: Flutter app used `/api/file-organizer/*` URLs (hyphen)
+  - **Backend**: Expected `/api/file_organizer/*` URLs (underscore)  
+  - **Result**: All File Organizer API calls returned 404 errors
+  - **Fix**: Updated 15 endpoints in `api_service.dart` to use correct URL format
+  - **Impact**: File Organizer frontend now connects properly to backend
+
 ### **Current Development Focus**
 - 🎯 **File Organizer Frontend Development**: Build modern, user-friendly interface to replace test client
 - 🔄 **Flutter Integration**: Connect enhanced UI with validated backend architecture
