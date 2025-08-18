@@ -163,8 +163,9 @@ python test_centralized_memory.py
 ### 2. Frontend Development
 1. **UI/UX design**: Create mockups and wireframes
 2. **State management**: Design data flow with Provider
-3. **API integration**: Connect to backend endpoints
-4. **Testing**: Widget and integration tests
+3. **Icons and assets**: Check Material Icons first, use ICONS_AND_ASSETS.md for custom needs
+4. **API integration**: Connect to backend endpoints
+5. **Testing**: Widget and integration tests
 
 ### 3. Integration Testing
 1. **End-to-end testing**: Test complete workflows

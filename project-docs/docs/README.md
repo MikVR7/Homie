@@ -120,6 +120,12 @@ cd mobile_app && flutter run -d chrome --dart-entrypoint-args="--route=/financia
 
 ### For Developers
 
+#### Documentation
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development setup and workflow
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture overview  
+- **[ICONS_AND_ASSETS.md](ICONS_AND_ASSETS.md)** - Icon and asset management process
+- **[TODO.md](TODO.md)** - Project roadmap and current priorities
+
 #### Backend Setup
 1. Clone the repository
 2. Follow setup instructions in DEVELOPMENT.md
