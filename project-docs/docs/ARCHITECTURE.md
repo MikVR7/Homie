@@ -56,7 +56,7 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
 
 ### Frontend
 - **Framework**: Flutter (Dart)
-- **Platforms**: Mobile (Android/iOS), Web, Desktop
+- **Platforms**: Mobile (Android/iOS), Desktop (Windows/macOS/Linux)
 - **UI**: Material Design 3, dark theme
 - **State Management**: Enhanced Provider architecture with comprehensive state management
   - FileOrganizerProvider: Complete state management with 20+ methods

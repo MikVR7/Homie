@@ -117,12 +117,12 @@ The File Organizer is an AI-powered file organization system that uses Google Ge
 
 ### Requirement 10
 
-**User Story:** As a user, I want the application to work seamlessly across different platforms (web, desktop, mobile) with platform-appropriate interactions, so that I can organize files from any device.
+**User Story:** As a user, I want the application to work seamlessly across different platforms (Windows, macOS, Linux, iOS, Android) with platform-appropriate interactions, so that I can organize files from any device.
 
 #### Acceptance Criteria
 
-1. WHEN using the web version THEN the interface SHALL provide browser-appropriate file selection and drag-and-drop support
-2. WHEN using the desktop version THEN the system SHALL integrate with native file managers and system notifications
-3. WHEN using the mobile version THEN the interface SHALL adapt to touch interactions with appropriate button sizes and gestures
-4. WHEN switching between platforms THEN the user experience SHALL remain consistent while respecting platform conventions
-5. WHEN platform-specific features are available THEN the system SHALL utilize them appropriately (native file dialogs, system integration, etc.)
+1. WHEN using the desktop version (Windows, macOS, Linux) THEN the system SHALL integrate with native file managers and system notifications
+2. WHEN using the mobile version (iOS, Android) THEN the interface SHALL adapt to touch interactions with appropriate button sizes and gestures
+3. WHEN switching between platforms THEN the user experience SHALL remain consistent while respecting platform conventions
+4. WHEN platform-specific features are available THEN the system SHALL utilize them appropriately (native file dialogs, system integration, etc.)
+5. WHEN deploying the application THEN it SHALL NOT include web platform support, focusing only on native platforms
