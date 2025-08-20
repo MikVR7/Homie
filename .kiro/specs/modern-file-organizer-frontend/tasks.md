@@ -42,8 +42,8 @@
   - Write tests for progress tracking functionality
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 3. Enhance API service layer
-- [ ] 3.1 Extend existing ApiService with modern methods
+- [x] 3. Enhance API service layer
+- [x] 3.1 Extend existing ApiService with modern methods
   - Add file browser methods (browsePath, getRecentPaths, getBookmarkedPaths)
   - Implement enhanced analysis methods with preview support
   - Create progress tracking methods with Stream support
@@ -51,7 +51,7 @@
   - Write comprehensive API service tests
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 3.2 Implement WebSocket integration enhancements
+- [x] 3.2 Implement WebSocket integration enhancements
   - Enhance WebSocketService for real-time drive updates
   - Add operation progress streaming support
   - Implement connection status management with retry logic
