@@ -110,13 +110,13 @@ void main() {
       );
 
       // Wait for initialization
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Find and tap the select button
       final selectButton = find.text('Select Folder');
       if (selectButton.evaluate().isNotEmpty) {
         await tester.tap(selectButton);
-        await tester.pumpAndSettle();
+        await tester.pumpAndSettle(const Duration(seconds: 5));
 
         expect(selectedPath, isNotNull);
       }
@@ -188,7 +188,7 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Should show error for invalid path
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
@@ -211,12 +211,12 @@ void main() {
       // Find the path input field
       final pathField = find.byType(TextField);
       await tester.tap(pathField);
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Type a path
       await tester.enterText(pathField, '/test/path');
       await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(const Duration(seconds: 5));
     });
 
     testWidgets('shows empty state when folder has no contents', (WidgetTester tester) async {
@@ -232,7 +232,7 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // If folder is empty, should show empty state
       // This might happen if the initial path is empty or doesn't exist

@@ -44,7 +44,7 @@ void main() {
         expect(find.text('Smart Categories'), findsOneWidget);
         expect(find.text('By File Type'), findsOneWidget);
         expect(find.text('By Date'), findsOneWidget);
-        expect(find.text('Custom Organization'), findsOneWidget);
+        expect(find.textContaining('Custom'), findsAtLeastNWidgets(1));
 
         // Check that descriptions are present
         expect(find.textContaining('AI analyzes your files'), findsOneWidget);

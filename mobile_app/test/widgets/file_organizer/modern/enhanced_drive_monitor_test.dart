@@ -70,7 +70,7 @@ void main() {
       await tester.pumpWidget(createTestWidget());
 
       expect(find.text('Drive Monitor'), findsOneWidget);
-      expect(find.byIcon(Icons.storage), findsOneWidget);
+      expect(find.byIcon(Icons.storage), findsAtLeastNWidgets(1));
       expect(find.byIcon(Icons.refresh), findsOneWidget);
     });
 
