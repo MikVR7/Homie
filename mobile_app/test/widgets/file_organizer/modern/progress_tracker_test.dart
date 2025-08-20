@@ -85,7 +85,7 @@ void main() {
         filesPerSecond: filesPerSecond,
         recentErrors: [],
         status: OperationStatus.executing,
-        timestamp: DateTime.now(),
+
       );
     }
 
@@ -329,7 +329,7 @@ void main() {
         filesPerSecond: 2,
         recentErrors: ['Error 1', 'Error 2'],
         status: OperationStatus.executing,
-        timestamp: DateTime.now(),
+
       ));
 
       await tester.pumpWidget(createTestWidget(fileProvider: mockProvider));
