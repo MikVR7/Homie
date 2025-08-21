@@ -1,13 +1,65 @@
 {
-    "name": "homie_app",
-    "short_name": "homie_app",
+    "name": "Homie File Organizer",
+    "short_name": "Homie",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#1976D2",
+    "theme_color": "#1976D2",
+    "description": "AI-powered file organization for your home management ecosystem",
+    "orientation": "any",
     "prefer_related_applications": false,
+    "categories": ["productivity", "utilities"],
+    "scope": "/",
+    "lang": "en",
+    "dir": "ltr",
+    "display_override": ["window-controls-overlay", "standalone"],
+    "edge_side_panel": {
+        "preferred_width": 400
+    },
+    "file_handlers": [
+        {
+            "action": "/organize",
+            "accept": {
+                "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"],
+                "application/pdf": [".pdf"],
+                "text/*": [".txt", ".md", ".csv"],
+                "application/zip": [".zip"],
+                "application/x-rar-compressed": [".rar"]
+            }
+        }
+    ],
+    "protocol_handlers": [
+        {
+            "protocol": "web+homie",
+            "url": "/organize?url=%s"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Quick Organize",
+            "short_name": "Organize",
+            "description": "Quickly organize files",
+            "url": "/organize",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Analytics",
+            "short_name": "Analytics",
+            "description": "View file organization analytics",
+            "url": "/analytics",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",
