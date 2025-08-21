@@ -122,7 +122,7 @@ void main() {
                 builder: (context) {
                   controller = MobilePerformanceOptimizer.optimizeAnimationController(
                     duration: const Duration(milliseconds: 500),
-                    vsync: const TestVSync(),
+                    vsync: TestVSync(),
                   );
                   return const Text('Animation Test');
                 },
