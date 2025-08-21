@@ -64,8 +64,9 @@ Homie is built as a **Flutter cross-platform application** that works seamlessly
   - Material Design 3 interface with full accessibility (WCAG 2.1 AA compliant)
   - Real-time drive monitoring and WebSocket communication
   - Progressive Web App with offline support
+  - Native desktop integration with keyboard shortcuts and system notifications
   - Cross-platform optimization (Web, Desktop, Mobile)
-  - Comprehensive testing suite (42/42 accessibility tests, 9/9 web platform tests)
+  - Comprehensive testing suite (42/42 accessibility tests, 9/9 web platform tests, 22/22 desktop integration tests)
 - **💰 Financial Manager**: Comprehensive financial management with account creation, CSV import with date filtering, securities tracking, and Austrian tax compliance
 - **🏠 Media Manager**: Coming soon - Netflix-style media library
 - **📄 Document Manager**: Coming soon - Austrian business document management

@@ -154,7 +154,7 @@
   - Write web-specific integration tests
   - _Requirements: 10.1, 10.4_
 
-- [ ] 8.2 Build desktop platform integration
+- [x] 8.2 Build desktop platform integration
   - Implement native file dialogs for folder selection
   - Add system notification support for operation completion
   - Create desktop keyboard shortcuts following platform conventions
