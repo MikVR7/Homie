@@ -47,6 +47,35 @@ The Modern File Organizer Frontend is a comprehensive Flutter-based user interfa
 
 ## Technical Implementation
 
+### Caching and Data Management
+
+#### Intelligent Cache System
+- **Multi-level Caching**: Memory, disk, and hybrid caching strategies
+- **TTL-based Expiration**: Automatic cleanup of expired cache entries
+- **Category-based Management**: Organized cache by data types (API responses, thumbnails, preferences)
+- **LRU Eviction**: Least Recently Used eviction for memory optimization
+- **Cache Statistics**: Hit rates, memory usage, and performance metrics
+
+#### Local Storage Service
+- **User Preferences**: Theme, language, accessibility settings
+- **Recent Folders**: Smart tracking with access counts and timestamps
+- **Bookmarked Folders**: Persistent folder bookmarks with custom names
+- **Organization Presets**: Saved organization patterns and rules
+- **Data Export/Import**: Backup and restore functionality
+
+#### Background Synchronization
+- **Automatic Sync**: Connectivity-aware background data synchronization
+- **Category-specific Sync**: Granular control over what data to sync
+- **Storage Optimization**: Automatic cleanup and compaction
+- **Event Streams**: Real-time sync status and progress updates
+
+#### Efficient Data Structures
+- **Trie**: Fast path autocomplete and prefix matching for file browsers
+- **LRU Cache**: Memory-efficient caching with hit rate tracking
+- **Bloom Filter**: Fast duplicate detection with configurable false positive rates
+- **Priority Queue**: Efficient task scheduling and file operation prioritization
+- **String Matcher**: Fuzzy matching, similarity calculation, and regex operations
+
 ### State Management Architecture
 ```dart
 // Enhanced FileOrganizerProvider with comprehensive state

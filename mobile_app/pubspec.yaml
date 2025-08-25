@@ -70,6 +70,12 @@ dependencies:
   
   # WebSocket for real-time communication
   socket_io_client: ^2.0.3+1
+  
+  # Path provider for file system access
+  path_provider: ^2.1.2
+  
+  # Connectivity monitoring
+  connectivity_plus: ^6.0.3
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +91,12 @@ dev_dependencies:
   # JSON serialization
   json_serializable: ^6.7.1
   build_runner: ^2.4.7
+  
+  # Testing dependencies
+  mockito: ^5.4.4
+  test: ^1.24.9
+  integration_test:
+    sdk: flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

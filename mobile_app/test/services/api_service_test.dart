@@ -4,12 +4,13 @@ import 'package:http/http.dart' as http;
 import 'package:homie_app/services/api_service.dart';
 
 void main() {
-  group('ApiService Enhanced Methods Tests', () {
-    late ApiService apiService;
+  late ApiService apiService;
 
-    setUp(() {
-      apiService = ApiService();
-    });
+  setUp(() {
+    apiService = ApiService();
+  });
+
+  group('ApiService Enhanced Methods Tests', () {
 
     group('Task 3.1: Enhanced API Service Methods', () {
       group('getRecentPaths', () {
@@ -245,9 +246,8 @@ void main() {
         expect(true, isTrue);
       });
     });
-  });
 
-  group('Method Signatures and Types', () {
+    group('Method Signatures and Types', () {
     test('getRecentPaths returns Future<List<String>>', () {
       final result = apiService.getRecentPaths();
       expect(result, isA<Future<List<String>>>());
@@ -304,6 +304,7 @@ void main() {
       expect(apiService.cancelOperation('test'), isA<Future<bool>>());
       expect(apiService.pauseOperation('test'), isA<Future<bool>>());
       expect(apiService.resumeOperation('test'), isA<Future<bool>>());
+    });
     });
   });
 }

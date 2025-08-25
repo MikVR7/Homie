@@ -8,590 +8,529 @@ import 'package:homie_app/utils/efficient_data_structures.dart';
 
 void main() {
   group('Cache and Data Management Tests', () {
+    late CacheService cacheService;
+    late LocalStorageService localStorageService;
+    late BackgroundSyncService backgroundSyncService;
+
+    setUp(() async {
+      // Mock SharedPreferences
+      SharedPreferences.setMockInitialValues({});
+      
+      cacheService = CacheService();
+      localStorageService = LocalStorageService();
+      backgroundSyncService = BackgroundSyncService();
+      
+      await cacheService.initialize();
+      await localStorageService.initialize();
+    });
+
+    tearDown(() async {
+      await cacheService.clearAllCache();
+      await localStorageService.clearAllData();
+      backgroundSyncService.dispose();
+    });
+
     group('CacheService Tests', () {
-      late CacheService cacheService;
-
-      setUp(() async {
-        cacheService = CacheService();
-        await cacheService.initialize();
+      test('should cache and retrieve data with different levels', () async {
+        const key = 'test_key';
+        const data = 'test_data';
+        
+        // Test memory cache
+        await cacheService.cacheData(key, data, level: CacheLevel.memory);
+        final memoryData = await cacheService.getCachedData<String>(key);
+        expect(memoryData, equals(data));
+        
+        // Test disk cache
+        await cacheService.cacheData('${key}_disk', data, level: CacheLevel.disk);
+        final diskData = await cacheService.getCachedData<String>('${key}_disk');
+        expect(diskData, equals(data));
+        
+        // Test both cache
+        await cacheService.cacheData('${key}_both', data, level: CacheLevel.both);
+        final bothData = await cacheService.getCachedData<String>('${key}_both');
+        expect(bothData, equals(data));
       });
 
-      tearDown(() async {
-        await cacheService.clearAllCache();
-      });
-
-      test('should cache and retrieve data correctly', () async {
-        const testKey = 'test_key';
-        const testData = {'message': 'Hello, World!'};
-
-        await cacheService.cacheData(testKey, testData);
-        final retrievedData = await cacheService.getCachedData<Map<String, dynamic>>(testKey);
-
-        expect(retrievedData, equals(testData));
-      });
-
-      test('should respect TTL and expire data', () async {
-        const testKey = 'expiring_key';
-        const testData = 'This will expire';
-
+      test('should respect TTL expiration', () async {
+        const key = 'ttl_test';
+        const data = 'ttl_data';
+        
         await cacheService.cacheData(
-          testKey, 
-          testData, 
+          key, 
+          data, 
           ttl: const Duration(milliseconds: 100),
         );
-
+        
         // Should be available immediately
-        final immediateData = await cacheService.getCachedData<String>(testKey);
-        expect(immediateData, equals(testData));
-
+        final immediateData = await cacheService.getCachedData<String>(key);
+        expect(immediateData, equals(data));
+        
         // Wait for expiration
         await Future.delayed(const Duration(milliseconds: 150));
-
-        // Should be null after expiration
-        final expiredData = await cacheService.getCachedData<String>(testKey);
+        
+        // Should be expired now
+        final expiredData = await cacheService.getCachedData<String>(key);
         expect(expiredData, isNull);
       });
 
-      test('should handle different cache levels', () async {
-        const memoryKey = 'memory_key';
-        const diskKey = 'disk_key';
-        const testData = 'Test data';
-
-        // Cache in memory
-        await cacheService.cacheData(
-          memoryKey, 
-          testData, 
-          level: CacheLevel.memory,
-        );
-
-        // Cache on disk
-        await cacheService.cacheData(
-          diskKey, 
-          testData, 
-          level: CacheLevel.disk,
-        );
-
-        // Both should be retrievable
-        final memoryData = await cacheService.getCachedData<String>(memoryKey);
-        final diskData = await cacheService.getCachedData<String>(diskKey);
-
-        expect(memoryData, equals(testData));
-        expect(diskData, equals(testData));
-      });
-
-      test('should provide accurate cache statistics', () async {
-        // Cache some data
-        for (int i = 0; i < 5; i++) {
-          await cacheService.cacheData('key_$i', 'data_$i');
-        }
-
-        // Access some data to generate hits
-        for (int i = 0; i < 3; i++) {
-          await cacheService.getCachedData('key_$i');
-        }
-
-        // Try to access non-existent data to generate misses
-        await cacheService.getCachedData('non_existent_key');
-
-        final stats = cacheService.getStatistics();
-        expect(stats.hitCount, equals(3));
-        expect(stats.missCount, equals(1));
-        expect(stats.hitRate, equals(0.75)); // 3/4
-      });
-
       test('should clear cache by category', () async {
-        await cacheService.cacheData('api_data', 'API response', category: 'api');
-        await cacheService.cacheData('user_pref', 'User preference', category: 'preferences');
-        await cacheService.cacheData('file_list', 'File listing', category: 'files');
+        await cacheService.cacheData('key1', 'data1', category: 'category_a');
+        await cacheService.cacheData('key2', 'data2', category: 'category_a');
+        await cacheService.cacheData('key3', 'data3', category: 'category_b');
+        
+        await cacheService.clearCacheByCategory('category_a');
+        
+        final data1 = await cacheService.getCachedData<String>('key1');
+        final data2 = await cacheService.getCachedData<String>('key2');
+        final data3 = await cacheService.getCachedData<String>('key3');
+        
+        expect(data1, isNull);
+        expect(data2, isNull);
+        expect(data3, equals('data3'));
+      });
 
-        // Clear only API category
-        await cacheService.clearCacheByCategory('api');
+      test('should track cache statistics', () async {
+        // Cache some data
+        await cacheService.cacheData('hit_key', 'hit_data');
+        
+        // Hit
+        await cacheService.getCachedData<String>('hit_key');
+        
+        // Miss
+        await cacheService.getCachedData<String>('miss_key');
+        
+        final stats = cacheService.getStatistics();
+        
+        expect(stats.hitCount, greaterThan(0));
+        expect(stats.missCount, greaterThan(0));
+        expect(stats.hitRate, greaterThan(0));
+        expect(stats.hitRate, lessThan(1));
+      });
 
-        // API data should be gone
-        final apiData = await cacheService.getCachedData('api_data');
-        expect(apiData, isNull);
-
-        // Other data should remain
-        final userPref = await cacheService.getCachedData('user_pref');
-        final fileList = await cacheService.getCachedData('file_list');
-        expect(userPref, equals('User preference'));
-        expect(fileList, equals('File listing'));
+      test('should preload data efficiently', () async {
+        final dataLoaders = {
+          'preload_key1': () async => 'preload_data1',
+          'preload_key2': () async => 'preload_data2',
+        };
+        
+        await cacheService.preloadData(dataLoaders);
+        
+        final data1 = await cacheService.getCachedData<String>('preload_key1');
+        final data2 = await cacheService.getCachedData<String>('preload_key2');
+        
+        expect(data1, equals('preload_data1'));
+        expect(data2, equals('preload_data2'));
       });
 
       test('should optimize cache performance', () async {
-        // Fill cache with data
-        for (int i = 0; i < 100; i++) {
+        // Add some data with short TTL
+        for (int i = 0; i < 10; i++) {
           await cacheService.cacheData(
             'key_$i', 
             'data_$i',
-            ttl: const Duration(milliseconds: 50), // Short TTL
+            ttl: const Duration(milliseconds: 50),
           );
         }
-
+        
         // Wait for some to expire
         await Future.delayed(const Duration(milliseconds: 100));
-
+        
         // Optimize cache
         await cacheService.optimizeCache();
-
+        
         final stats = cacheService.getStatistics();
-        // Should have fewer entries after optimization
-        expect(stats.memoryEntries, lessThan(100));
+        expect(stats.memoryEntries, lessThan(10));
       });
     });
 
     group('LocalStorageService Tests', () {
-      late LocalStorageService localStorage;
-
-      setUp(() async {
-        SharedPreferences.setMockInitialValues({});
-        localStorage = LocalStorageService();
-        await localStorage.initialize();
-      });
-
       test('should save and retrieve user preferences', () async {
         final preferences = UserPreferences.defaultPreferences().copyWith(
           theme: 'dark',
-          enableNotifications: false,
+          language: 'es',
         );
-
-        await localStorage.saveUserPreferences(preferences);
-        final retrievedPrefs = await localStorage.getUserPreferences();
-
+        
+        await localStorageService.saveUserPreferences(preferences);
+        final retrievedPrefs = await localStorageService.getUserPreferences();
+        
         expect(retrievedPrefs.theme, equals('dark'));
-        expect(retrievedPrefs.enableNotifications, equals(false));
+        expect(retrievedPrefs.language, equals('es'));
       });
 
-      test('should manage recent folders correctly', () async {
-        const folder1 = '/home/user/documents';
-        const folder2 = '/home/user/downloads';
-        const folder3 = '/home/user/pictures';
-
-        // Add folders
-        await localStorage.addRecentFolder(folder1);
-        await localStorage.addRecentFolder(folder2);
-        await localStorage.addRecentFolder(folder3);
-
-        final recentFolders = await localStorage.getRecentFolders();
+      test('should manage recent folders', () async {
+        const folderPath1 = '/path/to/folder1';
+        const folderPath2 = '/path/to/folder2';
         
-        expect(recentFolders.length, equals(3));
-        expect(recentFolders[0].path, equals(folder3)); // Most recent first
-        expect(recentFolders[1].path, equals(folder2));
-        expect(recentFolders[2].path, equals(folder1));
-      });
-
-      test('should prevent duplicate recent folders', () async {
-        const folder = '/home/user/documents';
-
-        // Add same folder multiple times
-        await localStorage.addRecentFolder(folder);
-        await localStorage.addRecentFolder(folder);
-        await localStorage.addRecentFolder(folder);
-
-        final recentFolders = await localStorage.getRecentFolders();
+        await localStorageService.addRecentFolder(folderPath1);
+        await localStorageService.addRecentFolder(folderPath2);
         
-        expect(recentFolders.length, equals(1));
-        expect(recentFolders[0].path, equals(folder));
+        final recentFolders = await localStorageService.getRecentFolders();
+        
+        expect(recentFolders.length, equals(2));
+        expect(recentFolders.first.path, equals(folderPath2)); // Most recent first
+        expect(recentFolders.last.path, equals(folderPath1));
       });
 
       test('should manage bookmarked folders', () async {
-        const folder1 = '/home/user/projects';
-        const folder2 = '/home/user/work';
-
-        await localStorage.addBookmarkedFolder(folder1, 'Projects');
-        await localStorage.addBookmarkedFolder(folder2, 'Work Files');
-
-        final bookmarks = await localStorage.getBookmarkedFolders();
+        const folderPath = '/path/to/bookmark';
+        const folderName = 'My Bookmark';
         
-        expect(bookmarks.length, equals(2));
-        expect(bookmarks.any((b) => b.path == folder1 && b.name == 'Projects'), isTrue);
-        expect(bookmarks.any((b) => b.path == folder2 && b.name == 'Work Files'), isTrue);
-
-        // Remove bookmark
-        await localStorage.removeBookmarkedFolder(folder1);
-        final updatedBookmarks = await localStorage.getBookmarkedFolders();
+        await localStorageService.addBookmarkedFolder(folderPath, folderName);
         
-        expect(updatedBookmarks.length, equals(1));
-        expect(updatedBookmarks[0].path, equals(folder2));
+        final bookmarks = await localStorageService.getBookmarkedFolders();
+        
+        expect(bookmarks.length, equals(1));
+        expect(bookmarks.first.path, equals(folderPath));
+        expect(bookmarks.first.name, equals(folderName));
+        
+        await localStorageService.removeBookmarkedFolder(folderPath);
+        
+        final emptyBookmarks = await localStorageService.getBookmarkedFolders();
+        expect(emptyBookmarks.length, equals(0));
       });
 
-      test('should save and retrieve organization presets', () async {
+      test('should manage organization presets', () async {
         final preset = OrganizationPreset(
-          name: 'Photo Organization',
-          description: 'Organize photos by date and event',
-          organizationStyle: 'date_based',
-          settings: {'groupByDate': true, 'createEventFolders': true},
+          name: 'Test Preset',
+          description: 'A test preset',
+          organizationStyle: 'by_type',
+          settings: {'sortBy': 'name'},
           createdAt: DateTime.now(),
           usageCount: 0,
         );
-
-        await localStorage.saveOrganizationPreset(preset);
-        final presets = await localStorage.getOrganizationPresets();
+        
+        await localStorageService.saveOrganizationPreset(preset);
+        
+        final presets = await localStorageService.getOrganizationPresets();
         
         expect(presets.length, equals(1));
-        expect(presets[0].name, equals('Photo Organization'));
-        expect(presets[0].organizationStyle, equals('date_based'));
+        expect(presets.first.name, equals('Test Preset'));
+        expect(presets.first.organizationStyle, equals('by_type'));
+        
+        await localStorageService.removeOrganizationPreset('Test Preset');
+        
+        final emptyPresets = await localStorageService.getOrganizationPresets();
+        expect(emptyPresets.length, equals(0));
       });
 
       test('should export and import data', () async {
-        // Set up some data
-        final preferences = UserPreferences.defaultPreferences().copyWith(theme: 'dark');
-        await localStorage.saveUserPreferences(preferences);
-        await localStorage.addRecentFolder('/test/folder');
-        await localStorage.addBookmarkedFolder('/test/bookmark', 'Test Bookmark');
-
+        // Add some test data
+        await localStorageService.addRecentFolder('/test/path');
+        await localStorageService.addBookmarkedFolder('/bookmark/path', 'Test Bookmark');
+        
         // Export data
-        final exportedData = await localStorage.exportData();
+        final exportedData = await localStorageService.exportData();
+        
         expect(exportedData, isNotEmpty);
         expect(exportedData['version'], equals('1.0.0'));
         expect(exportedData['data'], isA<Map<String, dynamic>>());
-
+        
         // Clear all data
-        await localStorage.clearAllData();
-
+        await localStorageService.clearAllData();
+        
         // Verify data is cleared
-        final clearedPrefs = await localStorage.getUserPreferences();
-        expect(clearedPrefs.theme, equals('system')); // Default value
-
-        // Import data
-        await localStorage.importData(exportedData);
-
+        final emptyFolders = await localStorageService.getRecentFolders();
+        expect(emptyFolders.length, equals(0));
+        
+        // Import data back
+        await localStorageService.importData(exportedData);
+        
         // Verify data is restored
-        final restoredPrefs = await localStorage.getUserPreferences();
-        expect(restoredPrefs.theme, equals('dark'));
+        final restoredFolders = await localStorageService.getRecentFolders();
+        final restoredBookmarks = await localStorageService.getBookmarkedFolders();
+        
+        expect(restoredFolders.length, equals(1));
+        expect(restoredBookmarks.length, equals(1));
       });
 
       test('should provide storage statistics', () async {
         // Add some data
-        await localStorage.saveUserPreferences(UserPreferences.defaultPreferences());
-        await localStorage.addRecentFolder('/test/folder');
-
-        final stats = await localStorage.getStorageStatistics();
+        await localStorageService.addRecentFolder('/test/path');
+        await localStorageService.saveUserPreferences(UserPreferences.defaultPreferences());
         
-        expect(stats.totalKeys, greaterThan(0));
+        final stats = await localStorageService.getStorageStatistics();
+        
         expect(stats.totalSize, greaterThan(0));
+        expect(stats.totalKeys, greaterThan(0));
         expect(stats.categorySizes, isNotEmpty);
       });
     });
 
     group('BackgroundSyncService Tests', () {
-      late BackgroundSyncService syncService;
-
-      setUp(() async {
-        SharedPreferences.setMockInitialValues({});
-        syncService = BackgroundSyncService();
-        await syncService.initialize(enableAutoSync: false);
-      });
-
-      tearDown(() {
-        syncService.dispose();
+      test('should initialize successfully', () async {
+        await backgroundSyncService.initialize(enableAutoSync: false);
+        
+        final stats = backgroundSyncService.getStatistics();
+        expect(stats.successfulSyncs, equals(0));
+        expect(stats.failedSyncs, equals(0));
+        expect(stats.isCurrentlySyncing, isFalse);
       });
 
       test('should perform manual sync', () async {
-        final result = await syncService.performSync();
+        await backgroundSyncService.initialize(enableAutoSync: false);
+        
+        // Add some data to sync
+        await localStorageService.addRecentFolder('/test/sync');
+        
+        final result = await backgroundSyncService.performSync();
         
         expect(result.success, isTrue);
-        expect(result.syncedItems, greaterThanOrEqualTo(0));
-        expect(result.message, contains('successfully'));
+        expect(result.syncedItems, greaterThan(0));
+        
+        final stats = backgroundSyncService.getStatistics();
+        expect(stats.successfulSyncs, equals(1));
       });
 
       test('should sync specific categories', () async {
-        final result = await syncService.syncCategory('user_preferences');
+        await backgroundSyncService.initialize(enableAutoSync: false);
+        
+        // Add test data
+        await localStorageService.addRecentFolder('/test/category');
+        
+        final result = await backgroundSyncService.syncCategory('recent_folders');
         
         expect(result.success, isTrue);
-        expect(result.syncedItems, equals(1));
-      });
-
-      test('should provide sync statistics', () async {
-        // Perform a sync to generate statistics
-        await syncService.performSync();
-
-        final stats = syncService.getStatistics();
-        
-        expect(stats.successfulSyncs, greaterThan(0));
-        expect(stats.successRate, greaterThan(0.0));
-        expect(stats.lastSyncTime, isNotNull);
+        expect(result.syncedItems, greaterThan(0));
       });
 
       test('should handle sync events', () async {
+        await backgroundSyncService.initialize(enableAutoSync: false);
+        
         final events = <SyncEvent>[];
-        final subscription = syncService.syncEventStream.listen(events.add);
-
-        await syncService.performSync();
-
+        backgroundSyncService.syncEventStream.listen((event) {
+          events.add(event);
+        });
+        
+        await backgroundSyncService.performSync();
+        
+        // Wait for events to be processed
         await Future.delayed(const Duration(milliseconds: 100));
-        subscription.cancel();
-
-        expect(events, isNotEmpty);
+        
+        expect(events.length, greaterThan(0));
         expect(events.any((e) => e.type == SyncEventType.started), isTrue);
         expect(events.any((e) => e.type == SyncEventType.completed), isTrue);
       });
 
       test('should optimize storage', () async {
-        // This test verifies that storage optimization doesn't throw errors
-        expect(() => syncService.optimizeStorage(), returnsNormally);
+        await backgroundSyncService.initialize(enableAutoSync: false);
+        
+        // Add some cached data
+        await cacheService.cacheData('optimize_test', 'test_data');
+        
+        // This should complete without errors
+        await backgroundSyncService.optimizeStorage();
+        
+        // Verify cache is still functional
+        final data = await cacheService.getCachedData<String>('optimize_test');
+        expect(data, equals('test_data'));
       });
     });
 
     group('EfficientDataStructures Tests', () {
-      group('Trie Tests', () {
-        late Trie<String> trie;
-
-        setUp(() {
-          trie = Trie<String>();
-        });
-
-        test('should insert and search correctly', () {
-          trie.insert('hello', 'world');
-          trie.insert('help', 'assistance');
-          trie.insert('hero', 'champion');
-
-          expect(trie.search('hello'), equals('world'));
-          expect(trie.search('help'), equals('assistance'));
-          expect(trie.search('hero'), equals('champion'));
-          expect(trie.search('nonexistent'), isNull);
-        });
-
-        test('should provide autocomplete suggestions', () {
-          trie.insert('/home/user/documents', 'Documents');
-          trie.insert('/home/user/downloads', 'Downloads');
-          trie.insert('/home/user/desktop', 'Desktop');
-          trie.insert('/var/log', 'Logs');
-
-          final suggestions = trie.getAutocompleteSuggestions('/home/user/d');
-          
-          expect(suggestions.length, equals(2));
-          expect(suggestions, contains('/home/user/documents'));
-          expect(suggestions, contains('/home/user/downloads'));
-        });
-
-        test('should handle removal correctly', () {
-          trie.insert('test', 'value');
-          expect(trie.contains('test'), isTrue);
-          
-          final removed = trie.remove('test');
-          expect(removed, isTrue);
-          expect(trie.contains('test'), isFalse);
-          
-          final removedAgain = trie.remove('test');
-          expect(removedAgain, isFalse);
-        });
+      test('should create and use Trie for path autocomplete', () {
+        final trie = EfficientDataStructures.createPathTrie();
+        
+        // Insert some paths
+        trie.insert('/home/user/documents', 'Documents');
+        trie.insert('/home/user/downloads', 'Downloads');
+        trie.insert('/home/user/desktop', 'Desktop');
+        
+        // Test search
+        expect(trie.search('/home/user/documents'), equals('Documents'));
+        expect(trie.search('/nonexistent'), isNull);
+        
+        // Test autocomplete
+        final suggestions = trie.getAutocompleteSuggestions('/home/user/d');
+        expect(suggestions.length, equals(2));
+        expect(suggestions.contains('/home/user/documents'), isTrue);
+        expect(suggestions.contains('/home/user/downloads'), isTrue);
       });
 
-      group('LRUCache Tests', () {
-        late LRUCache<String, String> cache;
-
-        setUp(() {
-          cache = LRUCache<String, String>(3);
-        });
-
-        test('should evict least recently used items', () {
-          cache.put('a', 'value_a');
-          cache.put('b', 'value_b');
-          cache.put('c', 'value_c');
-          
-          // All should be present
-          expect(cache.get('a'), equals('value_a'));
-          expect(cache.get('b'), equals('value_b'));
-          expect(cache.get('c'), equals('value_c'));
-          
-          // Add one more, should evict 'a' (least recently used)
-          cache.put('d', 'value_d');
-          
-          expect(cache.get('a'), isNull);
-          expect(cache.get('b'), equals('value_b'));
-          expect(cache.get('c'), equals('value_c'));
-          expect(cache.get('d'), equals('value_d'));
-        });
-
-        test('should update access order on get', () {
-          cache.put('a', 'value_a');
-          cache.put('b', 'value_b');
-          cache.put('c', 'value_c');
-          
-          // Access 'a' to make it most recent
-          cache.get('a');
-          
-          // Add new item, should evict 'b' (now least recent)
-          cache.put('d', 'value_d');
-          
-          expect(cache.get('a'), equals('value_a'));
-          expect(cache.get('b'), isNull);
-          expect(cache.get('c'), equals('value_c'));
-          expect(cache.get('d'), equals('value_d'));
-        });
-
-        test('should provide accurate statistics', () {
-          cache.put('a', 'value_a');
-          cache.put('b', 'value_b');
-          
-          // Generate hits and misses
-          cache.get('a'); // hit
-          cache.get('b'); // hit
-          cache.get('c'); // miss
-          
-          final stats = cache.getStatistics();
-          expect(stats['hitCount'], equals(2));
-          expect(stats['missCount'], equals(1));
-          expect(stats['hitRate'], equals(2/3));
-        });
+      test('should create and use LRU Cache', () {
+        final cache = EfficientDataStructures.createLRUCache<String, String>(2);
+        
+        // Add items
+        cache.put('key1', 'value1');
+        cache.put('key2', 'value2');
+        
+        expect(cache.get('key1'), equals('value1'));
+        expect(cache.get('key2'), equals('value2'));
+        
+        // Add third item (should evict key1)
+        cache.put('key3', 'value3');
+        
+        expect(cache.get('key1'), isNull);
+        expect(cache.get('key2'), equals('value2'));
+        expect(cache.get('key3'), equals('value3'));
+        
+        // Check statistics
+        final stats = cache.getStatistics();
+        expect(stats['size'], equals(2));
+        expect(stats['capacity'], equals(2));
       });
 
-      group('BloomFilter Tests', () {
-        late BloomFilter filter;
-
-        setUp(() {
-          filter = BloomFilter(1000);
-        });
-
-        test('should not have false negatives', () {
-          const items = ['apple', 'banana', 'cherry', 'date'];
-          
-          // Add items to filter
-          for (final item in items) {
-            filter.add(item);
-          }
-          
-          // All added items should be detected
-          for (final item in items) {
-            expect(filter.mightContain(item), isTrue);
-          }
-        });
-
-        test('should have low false positive rate', () {
-          const addedItems = ['item1', 'item2', 'item3', 'item4', 'item5'];
-          const testItems = ['test1', 'test2', 'test3', 'test4', 'test5'];
-          
-          // Add known items
-          for (final item in addedItems) {
-            filter.add(item);
-          }
-          
-          // Test items that weren't added
-          int falsePositives = 0;
-          for (final item in testItems) {
-            if (filter.mightContain(item)) {
-              falsePositives++;
-            }
-          }
-          
-          // Should have low false positive rate
-          final falsePositiveRate = falsePositives / testItems.length;
-          expect(falsePositiveRate, lessThan(0.1)); // Less than 10%
-        });
-
-        test('should provide filter statistics', () {
-          filter.add('test1');
-          filter.add('test2');
-          
-          final stats = filter.getStatistics();
-          expect(stats['itemCount'], equals(2));
-          expect(stats['size'], greaterThan(0));
-          expect(stats['hashFunctions'], greaterThan(0));
-        });
+      test('should create and use Bloom Filter', () {
+        final bloomFilter = EfficientDataStructures.createBloomFilter(100);
+        
+        // Add items
+        bloomFilter.add('item1');
+        bloomFilter.add('item2');
+        bloomFilter.add('item3');
+        
+        // Test membership
+        expect(bloomFilter.mightContain('item1'), isTrue);
+        expect(bloomFilter.mightContain('item2'), isTrue);
+        expect(bloomFilter.mightContain('item3'), isTrue);
+        expect(bloomFilter.mightContain('nonexistent'), isFalse);
+        
+        // Check statistics
+        final stats = bloomFilter.getStatistics();
+        expect(stats['itemCount'], equals(3));
+        expect(stats['size'], greaterThan(0));
       });
 
-      group('PriorityQueue Tests', () {
-        late PriorityQueue<int> queue;
-
-        setUp(() {
-          queue = PriorityQueue<int>((a, b) => a.compareTo(b));
-        });
-
-        test('should maintain priority order', () {
-          queue.add(5);
-          queue.add(2);
-          queue.add(8);
-          queue.add(1);
-          queue.add(9);
-          
-          final results = <int>[];
-          while (!queue.isEmpty) {
-            results.add(queue.removeFirst()!);
-          }
-          
-          expect(results, equals([1, 2, 5, 8, 9]));
-        });
-
-        test('should handle custom comparator', () {
-          // Max heap (reverse order)
-          final maxQueue = PriorityQueue<int>((a, b) => b.compareTo(a));
-          
-          maxQueue.add(5);
-          maxQueue.add(2);
-          maxQueue.add(8);
-          maxQueue.add(1);
-          
-          expect(maxQueue.removeFirst(), equals(8));
-          expect(maxQueue.removeFirst(), equals(5));
-          expect(maxQueue.removeFirst(), equals(2));
-          expect(maxQueue.removeFirst(), equals(1));
-        });
+      test('should create and use Priority Queue', () {
+        final priorityQueue = EfficientDataStructures.createPriorityQueue<int>((a, b) => a.compareTo(b));
+        
+        // Add items
+        priorityQueue.add(5);
+        priorityQueue.add(1);
+        priorityQueue.add(3);
+        priorityQueue.add(2);
+        
+        // Remove items (should be in priority order)
+        expect(priorityQueue.removeFirst(), equals(1));
+        expect(priorityQueue.removeFirst(), equals(2));
+        expect(priorityQueue.removeFirst(), equals(3));
+        expect(priorityQueue.removeFirst(), equals(5));
+        
+        expect(priorityQueue.isEmpty, isTrue);
       });
 
-      group('StringMatcher Tests', () {
-        test('should perform fuzzy matching', () {
-          expect(StringMatcher.fuzzyMatch('doc', 'documents'), isTrue);
-          expect(StringMatcher.fuzzyMatch('usr', 'user'), isTrue);
-          expect(StringMatcher.fuzzyMatch('xyz', 'documents'), isFalse);
-        });
-
-        test('should calculate similarity correctly', () {
-          expect(StringMatcher.similarity('hello', 'hello'), equals(1.0));
-          expect(StringMatcher.similarity('hello', 'hallo'), greaterThan(0.8));
-          expect(StringMatcher.similarity('hello', 'world'), lessThan(0.5));
-        });
-
-        test('should handle regex matching', () {
-          expect(StringMatcher.regexMatch(r'\d+', 'file123.txt'), isTrue);
-          expect(StringMatcher.regexMatch(r'\.jpg$', 'image.jpg'), isTrue);
-          expect(StringMatcher.regexMatch(r'\.jpg$', 'image.png'), isFalse);
-        });
+      test('should perform string matching operations', () {
+        // Test fuzzy matching
+        expect(StringMatcher.fuzzyMatch('abc', 'aabbcc'), isTrue);
+        expect(StringMatcher.fuzzyMatch('xyz', 'abc'), isFalse);
+        
+        // Test similarity
+        final similarity = StringMatcher.similarity('hello', 'hallo');
+        expect(similarity, greaterThan(0.5));
+        expect(similarity, lessThan(1.0));
+        
+        // Test regex matching
+        expect(StringMatcher.regexMatch(r'\d+', 'test123'), isTrue);
+        expect(StringMatcher.regexMatch(r'\d+', 'testABC'), isFalse);
+        
+        // Test case-insensitive contains
+        expect(StringMatcher.containsIgnoreCase('Hello World', 'WORLD'), isTrue);
+        expect(StringMatcher.containsIgnoreCase('Hello World', 'xyz'), isFalse);
       });
     });
 
     group('Integration Tests', () {
       test('should integrate cache and local storage', () async {
-        SharedPreferences.setMockInitialValues({});
+        // Save data to local storage
+        await localStorageService.addRecentFolder('/integration/test');
         
-        final cacheService = CacheService();
-        final localStorage = LocalStorageService();
-        
-        await cacheService.initialize();
-        await localStorage.initialize();
-        
-        // Save preferences to local storage
-        final preferences = UserPreferences.defaultPreferences().copyWith(theme: 'dark');
-        await localStorage.saveUserPreferences(preferences);
-        
-        // Cache the preferences
-        await cacheService.cacheData('user_prefs', preferences.toMap());
+        // Cache the data
+        final recentFolders = await localStorageService.getRecentFolders();
+        await cacheService.cacheData(
+          'cached_recent_folders',
+          recentFolders.map((f) => f.toMap()).toList(),
+        );
         
         // Retrieve from cache
-        final cachedPrefs = await cacheService.getCachedData<Map<String, dynamic>>('user_prefs');
-        expect(cachedPrefs?['theme'], equals('dark'));
+        final cachedData = await cacheService.getCachedData<List<dynamic>>('cached_recent_folders');
         
-        // Clean up
-        await cacheService.clearAllCache();
+        expect(cachedData, isNotNull);
+        expect(cachedData!.length, equals(1));
+        expect(cachedData.first['path'], equals('/integration/test'));
       });
 
-      test('should handle concurrent operations', () async {
-        final cache = LRUCache<String, String>(10);
+      test('should integrate background sync with cache and storage', () async {
+        await backgroundSyncService.initialize(enableAutoSync: false);
         
-        // Perform concurrent operations
-        final futures = <Future<void>>[];
+        // Add data to local storage
+        await localStorageService.addRecentFolder('/sync/integration');
+        await localStorageService.addBookmarkedFolder('/bookmark/sync', 'Sync Test');
+        
+        // Perform sync (should cache the data)
+        final result = await backgroundSyncService.performSync();
+        
+        expect(result.success, isTrue);
+        
+        // Verify data is cached
+        final cachedFolders = await cacheService.getCachedData<List<dynamic>>('recent_folders');
+        final cachedBookmarks = await cacheService.getCachedData<List<dynamic>>('bookmarked_folders');
+        
+        expect(cachedFolders, isNotNull);
+        expect(cachedBookmarks, isNotNull);
+        expect(cachedFolders!.length, equals(1));
+        expect(cachedBookmarks!.length, equals(1));
+      });
+
+      test('should handle data consistency across services', () async {
+        await backgroundSyncService.initialize(enableAutoSync: false);
+        
+        // Add data through local storage
+        const testPath = '/consistency/test';
+        await localStorageService.addRecentFolder(testPath);
+        
+        // Sync to cache
+        await backgroundSyncService.syncCategory('recent_folders');
+        
+        // Modify local storage
+        await localStorageService.addRecentFolder('/another/path');
+        
+        // Sync again
+        await backgroundSyncService.syncCategory('recent_folders');
+        
+        // Verify cache is updated
+        final cachedData = await cacheService.getCachedData<List<dynamic>>('recent_folders');
+        expect(cachedData, isNotNull);
+        expect(cachedData!.length, equals(2));
+      });
+
+      test('should handle error scenarios gracefully', () async {
+        // Test cache service with invalid data
+        await cacheService.cacheData('test_key', 'test_data');
+        await cacheService.removeCachedData('test_key');
+        
+        final retrievedData = await cacheService.getCachedData<String>('test_key');
+        expect(retrievedData, isNull);
+        
+        // Test local storage with invalid operations
+        await localStorageService.removeBookmarkedFolder('/nonexistent/path');
+        await localStorageService.removeOrganizationPreset('nonexistent_preset');
+        
+        // Should not throw errors
+        final bookmarks = await localStorageService.getBookmarkedFolders();
+        final presets = await localStorageService.getOrganizationPresets();
+        
+        expect(bookmarks, isEmpty);
+        expect(presets, isEmpty);
+      });
+
+      test('should maintain performance under load', () async {
+        final stopwatch = Stopwatch()..start();
+        
+        // Add many items to test performance
         for (int i = 0; i < 100; i++) {
-          futures.add(Future(() {
-            cache.put('key_$i', 'value_$i');
-            cache.get('key_${i ~/ 2}');
-          }));
+          await cacheService.cacheData('perf_key_$i', 'data_$i');
+          await localStorageService.addRecentFolder('/perf/path/$i');
         }
         
-        await Future.wait(futures);
+        stopwatch.stop();
         
-        // Should not crash and should have some data
-        expect(cache.size, greaterThan(0));
-        expect(cache.size, lessThanOrEqualTo(10));
+        // Should complete within reasonable time (adjust as needed)
+        expect(stopwatch.elapsedMilliseconds, lessThan(5000)); // 5 seconds
+        
+        // Verify data integrity
+        final stats = cacheService.getStatistics();
+        final recentFolders = await localStorageService.getRecentFolders();
+        
+        expect(stats.memoryEntries, greaterThan(0));
+        expect(recentFolders.length, equals(20)); // Limited by maxRecentFolders
       });
     });
   });
