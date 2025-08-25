@@ -76,6 +76,9 @@ dependencies:
   
   # Connectivity monitoring
   connectivity_plus: ^6.0.3
+  
+  # Animation support for Material Design 3
+  animations: ^2.0.11
 
 dev_dependencies:
   flutter_test:
