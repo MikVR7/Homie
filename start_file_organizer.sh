@@ -25,4 +25,4 @@ fi
 echo "🖥️ Starting File Organizer module on Linux desktop"
 echo "💡 Tip: Use 'r' for hot reload, 'R' for hot restart, 'q' to quit"
 echo "📁 Direct route: File Organizer module only"
-flutter run -d linux --dart-entrypoint-args="--route=/file-organizer" 
+flutter run -d linux --dart-entrypoint-args="--route=/file-organizer" --enable-software-rendering 
