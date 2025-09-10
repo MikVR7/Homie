@@ -3,8 +3,8 @@
 ## Overview
 
 This design document outlines the architecture and implementation approach for creating a modern, intuitive, and visually appealing frontend for the Homie File Organizer module. The design focuses on enhancing user experience while maintaining full compatibility with the existing Python backend infrastructure.
-
-The new frontend will transform the current functional but basic interface into a polished, professional application that makes AI-powered file organization feel effortless and enjoyable. The design emphasizes visual hierarchy, smooth interactions, real-time feedback, and intelligent user assistance.
+will
+The new frontend  transform the current functional but basic interface into a polished, professional application that makes AI-powered file organization feel effortless and enjoyable. The design emphasizes visual hierarchy, smooth interactions, real-time feedback, and intelligent user assistance.
 
 ## Architecture
 
