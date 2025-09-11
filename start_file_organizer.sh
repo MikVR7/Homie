@@ -5,23 +5,14 @@
 
 set -e
 
-# Configuration
-FULL_APP=false
-
 # Hardcoded test paths for File Organizer
 SOURCE_PATH="/media/mikele/ca305bd0-fafb-43b3-8aa4-a596350bb34b/home/mikele/TestingHomie/Source"
 DESTINATION_PATH="/media/mikele/ca305bd0-fafb-43b3-8aa4-a596350bb34b/home/mikele/TestingHomie/Destination"
 
-# Check for --full-app argument only
-if [[ "$1" == "--full-app" ]]; then
-    FULL_APP=true
-    echo "🚀 Starting Full Homie App with Wayland..."
-else
-    echo "🗂️ Starting File Organizer Module with Wayland..."
-    echo "📁 Using hardcoded test paths:"
-    echo "   Source: $SOURCE_PATH"
-    echo "   Destination: $DESTINATION_PATH"
-fi
+echo "🗂️ Starting File Organizer Module with Wayland..."
+echo "📁 Using hardcoded test paths:"
+echo "   Source: $SOURCE_PATH"
+echo "   Destination: $DESTINATION_PATH"
 
 # Colors for output
 RED='\033[0;31m'
@@ -133,15 +124,9 @@ export WAYLAND_DISPLAY="$WAYLAND_SOCKET"
 print_success "Found Wayland display: $WAYLAND_DISPLAY"
 
 # Prepare launch arguments
-if [ "$FULL_APP" = true ]; then
-    print_status "Launching Full Homie App with Wayland..."
-    LAUNCH_ARGS=""
-    SUCCESS_MSG="🎉 Full Homie App launched successfully with Wayland!"
-else
-    print_status "Launching File Organizer module with Wayland..."
-    LAUNCH_ARGS="--route=/file-organizer --source=$SOURCE_PATH --destination=$DESTINATION_PATH"
-    SUCCESS_MSG="🎉 File Organizer module launched successfully with Wayland!"
-fi
+print_status "Launching File Organizer module with Wayland..."
+LAUNCH_ARGS="--route=/file-organizer --source=$SOURCE_PATH --destination=$DESTINATION_PATH"
+SUCCESS_MSG="🎉 File Organizer module launched successfully with Wayland!"
 
 cd mobile_app
 
@@ -177,11 +162,7 @@ trap cleanup EXIT INT TERM
 
 print_status "Press Ctrl+C to stop all services"
 print_status "Backend available at: http://localhost:8000"
-if [ "$FULL_APP" = true ]; then
-    print_status "Full Homie App running in Wayland compositor"
-else
-    print_status "File Organizer module running in Wayland compositor"
-fi
+print_status "File Organizer module running in Wayland compositor"
 
 # Wait for user to stop
 wait 
