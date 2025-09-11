@@ -14,7 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Python lib/ directories only - not Flutter lib/
+backend/venv/lib/
+backend_old/venv/lib/
 lib64/
 parts/
 sdist/
