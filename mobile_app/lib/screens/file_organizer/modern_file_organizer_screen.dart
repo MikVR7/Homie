@@ -798,47 +798,18 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                // Enhanced File Browser Integration
-                Consumer<FileOrganizerProvider>(
-                  builder: (context, provider, child) {
-                    return ModernFileBrowser(
-                      initialPath: provider.sourcePath.isNotEmpty ? provider.sourcePath : null,
-                      onPathSelected: (selectedPath) {
-                        provider.setSourcePath(selectedPath);
-                        // Auto-populate destination if empty
-                        if (provider.destinationPath.isEmpty) {
-                          provider.setDestinationPath('$selectedPath/organized');
-                        }
-                      },
-                      title: 'Select Source Folder',
-                      isDirectoryMode: true,
-                      showHidden: false,
-                    );
-                  },
-                ),
+                // Source and Destination Folder Selection
+                _buildFolderSelectionSection(),
                 
                 const SizedBox(height: 24),
                 
-                // Enhanced Organization Selector
-                Consumer<FileOrganizerProvider>(
-                  builder: (context, provider, child) {
-                    return EnhancedOrganizationSelector(
-                      sourcePath: provider.sourcePath.isNotEmpty ? provider.sourcePath : null,
-                      onStyleChanged: (style) {
-                        // Style is already set by the selector
-                      },
-                      onCustomIntentChanged: (intent) {
-                        // Intent is already set by the selector
-                      },
-                      showAdvancedOptions: true,
-                    );
-                  },
-                ),
+                // Organization Style Selection
+                _buildOrganizationStyleSection(),
                 
                 const SizedBox(height: 24),
                 
-                // Organization Assistant (Advanced Features)
-                const OrganizationAssistant(),
+                // Quick Actions
+                _buildQuickActionsSection(),
               ],
             ),
           ),
@@ -1154,6 +1125,439 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFolderSelectionSection() {
+    return Consumer<FileOrganizerProvider>(
+      builder: (context, provider, child) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Folder Configuration',
+              style: TextStyle(
+                color: AppColors.onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Source Folder
+            _buildFolderInput(
+              label: 'Source Folder',
+              value: provider.sourcePath,
+              hint: 'Choose the folder containing files to organize',
+              icon: Icons.folder_open_rounded,
+              onTap: () => _selectFolder(context, true),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Destination Folder
+            _buildFolderInput(
+              label: 'Destination Folder',
+              value: provider.destinationPath,
+              hint: 'Choose where organized files will be placed',
+              icon: Icons.folder_special_rounded,
+              onTap: () => _selectFolder(context, false),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFolderInput({
+    required String label,
+    required String value,
+    required String hint,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.onSurface,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.border.withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        value.isNotEmpty ? value : hint,
+                        style: TextStyle(
+                          color: value.isNotEmpty 
+                              ? AppColors.onSurface 
+                              : AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: value.isNotEmpty 
+                              ? FontWeight.w500 
+                              : FontWeight.normal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (value.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tap to change',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _selectFolder(BuildContext context, bool isSource) async {
+    // For now, show a simple dialog - in a real app, you'd use a proper file picker
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isSource ? 'Select Source Folder' : 'Select Destination Folder'),
+        content: const Text('File picker integration coming soon!\n\nFor now, paths are set via the startup script.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _analyzeFiles() async {
+    final provider = Provider.of<FileOrganizerProvider>(context, listen: false);
+    
+    if (provider.sourcePath.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a source folder first')),
+      );
+      return;
+    }
+
+    try {
+      await provider.analyzeFolder();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Analysis complete! Check the preview below.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Analysis failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _executeOperations() async {
+    final provider = Provider.of<FileOrganizerProvider>(context, listen: false);
+    
+    if (provider.operations.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please analyze files first to see what will be organized')),
+      );
+      return;
+    }
+
+    try {
+      await provider.executeOperations();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Files organized successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Organization failed: $e')),
+      );
+    }
+  }
+
+  Widget _buildOrganizationStyleSection() {
+    return Consumer<FileOrganizerProvider>(
+      builder: (context, provider, child) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Organization Style',
+              style: TextStyle(
+                color: AppColors.onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Choose how your files should be organized',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Organization style options
+            _buildStyleOption(
+              title: 'By File Type',
+              description: 'Group files by their extensions (images, documents, etc.)',
+              icon: Icons.category_rounded,
+              isSelected: provider.organizationStyle == OrganizationStyle.byType,
+              onTap: () => provider.setOrganizationStyle(OrganizationStyle.byType),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            _buildStyleOption(
+              title: 'By Date',
+              description: 'Organize files by creation or modification date',
+              icon: Icons.date_range_rounded,
+              isSelected: provider.organizationStyle == OrganizationStyle.byDate,
+              onTap: () => provider.setOrganizationStyle(OrganizationStyle.byDate),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            _buildStyleOption(
+              title: 'Smart Categories',
+              description: 'AI-powered organization based on content and context',
+              icon: Icons.psychology_rounded,
+              isSelected: provider.organizationStyle == OrganizationStyle.smartCategories,
+              onTap: () => provider.setOrganizationStyle(OrganizationStyle.smartCategories),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            _buildStyleOption(
+              title: 'Custom Pattern',
+              description: 'Define your own organization rules',
+              icon: Icons.tune_rounded,
+              isSelected: provider.organizationStyle == OrganizationStyle.custom,
+              onTap: () => provider.setOrganizationStyle(OrganizationStyle.custom),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStyleOption({
+    required String title,
+    required String description,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? AppColors.primary.withOpacity(0.1)
+              : AppColors.surfaceVariant.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected 
+                ? AppColors.primary 
+                : AppColors.border.withOpacity(0.5),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? AppColors.primary.withOpacity(0.2)
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.onSurface,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Actions',
+          style: TextStyle(
+            color: AppColors.onSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionButton(
+                title: 'Preview Changes',
+                description: 'See what will happen',
+                icon: Icons.preview_rounded,
+                color: AppColors.secondary,
+                onTap: () => _analyzeFiles(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionButton(
+                title: 'Start Organizing',
+                description: 'Apply changes now',
+                icon: Icons.play_arrow_rounded,
+                color: AppColors.primary,
+                onTap: () => _executeOperations(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: AppColors.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
