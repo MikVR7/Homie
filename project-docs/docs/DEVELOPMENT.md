@@ -74,6 +74,7 @@ flutter run -d chrome
 ```
 
 #### Linux Desktop (Wayland recommended)
+> IMPORTANT: Hot reload is NOT supported for the File Organizer app on Linux desktop. Do not use `--hot-reload` for development; prefer full runs via the script below.
 ```bash
 # Recommended: run via Wayland script for stable rendering
 ./start_file_organizer.sh            # normal build/run
@@ -99,7 +100,7 @@ flutter run -d ios
 
 ### Flutter Linux Desktop Notes
 - Wayland scripts are provided; prefer `./start_file_organizer.sh` for desktop runs.
-- Hot reload is experimental on Linux Wayland and can differ from release layout. Prefer full restart when in doubt.
+- Hot reload is NOT supported for this app on Linux desktop; use full restart instead of `--hot-reload`.
 
 ### Development Recommendations
 1. **Use Flutter Web**: Most stable for development

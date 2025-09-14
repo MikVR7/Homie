@@ -466,6 +466,7 @@ flutter run -d chrome
 
 Additional notes:
 - Hot reload (experimental): `./start_file_organizer.sh --hot-reload`
+  - For this app on Linux desktop, hot reload is NOT supported; prefer full runs.
   - Uses `flutter run` with `--dart-define=INITIAL_ROUTE=/file-organizer`
   - Reads `HOMIE_ROUTE`, `HOMIE_SOURCE`, `HOMIE_DESTINATION` for routing/paths
 - Fullscreen: set `FLUTTER_FULLSCREEN=true` to maximize the GTK window (implemented in `mobile_app/linux/runner/my_application.cc`).
