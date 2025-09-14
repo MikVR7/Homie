@@ -73,10 +73,17 @@ flutter run -d chrome
 # http://localhost:8080
 ```
 
-#### Linux Desktop
+#### Linux Desktop (Wayland recommended)
 ```bash
-# Note: Linux desktop has known UI issues
-flutter run -d linux
+# Recommended: run via Wayland script for stable rendering
+./start_file_organizer.sh            # normal build/run
+
+# Hot reload (experimental): may differ from release behavior
+./start_file_organizer.sh --hot-reload
+
+# Environment variables honored by scripts
+#  - FLUTTER_FULLSCREEN=true  → native GTK maximize
+#  - HOMIE_ROUTE, HOMIE_SOURCE, HOMIE_DESTINATION → initial route/paths
 ```
 
 #### Mobile
@@ -90,10 +97,9 @@ flutter run -d ios
 
 ## Known Issues
 
-### Flutter Linux Desktop Issues
-- **UI Flickering**: Known issue with Flutter on Linux
-- **Black Dialogs**: Some dialogs appear black
-- **Workaround**: Use Flutter Web for development
+### Flutter Linux Desktop Notes
+- Wayland scripts are provided; prefer `./start_file_organizer.sh` for desktop runs.
+- Hot reload is experimental on Linux Wayland and can differ from release layout. Prefer full restart when in doubt.
 
 ### Development Recommendations
 1. **Use Flutter Web**: Most stable for development

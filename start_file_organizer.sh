@@ -1,13 +1,22 @@
 #!/bin/bash
 
-# Homie File Organizer - Wayland Launcher
+# Homie File Organizer - Wayland Launcher with Hot Reload Support
 # Launches the File Organizer (or full app) using Wayland to avoid XCB/X11 display issues
+#
+# Usage:
+#   ./start_file_organizer.sh              # Normal mode (pre-built binary)
+#   ./start_file_organizer.sh --hot-reload # Hot reload mode (flutter run)
+#
+# Hot Reload Commands (when enabled):
+#   r  - Hot reload (apply code changes without restart)
+#   R  - Hot restart (restart app completely)
+#   q  - Quit application
 
 set -e
 
 # Hardcoded test paths for File Organizer
-SOURCE_PATH="/media/mikele/ca305bd0-fafb-43b3-8aa4-a596350bb34b/home/mikele/TestingHomie/Source"
-DESTINATION_PATH="/media/mikele/ca305bd0-fafb-43b3-8aa4-a596350bb34b/home/mikele/TestingHomie/Destination"
+SOURCE_PATH="/home/mikele/Desktop/TestingHomie/Source"
+DESTINATION_PATH="/home/mikele/Desktop/TestingHomie/Destination"
 
 echo "🗂️ Starting File Organizer Module with Wayland..."
 echo "📁 Using hardcoded test paths:"
@@ -55,15 +64,18 @@ else
     print_success "Wayland dependencies found"
 fi
 
-# Check if Flutter app is built
-if [ ! -f "mobile_app/build/linux/x64/release/bundle/homie_app" ]; then
-    print_warning "Flutter Linux release build not found. Building..."
+# Hot reload support - check for --hot-reload flag
+HOT_RELOAD=false
+if [[ "$1" == "--hot-reload" || "$2" == "--hot-reload" || "$3" == "--hot-reload" ]]; then
+    HOT_RELOAD=true
+    print_status "Hot reload mode enabled - using flutter run instead of pre-built binary"
+else
+    # Always rebuild Flutter app to ensure latest changes
+    print_warning "Rebuilding Flutter app to ensure latest changes..."
     cd mobile_app
     flutter build linux --release
     cd ..
     print_success "Flutter Linux build completed"
-else
-    print_success "Flutter Linux build found"
 fi
 
 # Check if backend is already running
@@ -126,7 +138,6 @@ print_success "Found Wayland display: $WAYLAND_DISPLAY"
 # Prepare launch arguments
 print_status "Launching File Organizer module with Wayland..."
 LAUNCH_ARGS="--route=/file-organizer --source=$SOURCE_PATH --destination=$DESTINATION_PATH"
-SUCCESS_MSG="🎉 File Organizer module launched successfully with Wayland!"
 
 cd mobile_app
 
@@ -139,9 +150,30 @@ unset DISPLAY  # Force disable X11 display
 
 print_status "Launching with Wayland display: $WAYLAND_DISPLAY"
 
-# Launch with explicit Wayland environment and proper runtime directory
-env WAYLAND_DISPLAY="$WAYLAND_SOCKET" GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland XDG_RUNTIME_DIR=/tmp ./build/linux/x64/release/bundle/homie_app $LAUNCH_ARGS &
-FLUTTER_PID=$!
+if [ "$HOT_RELOAD" = true ]; then
+    print_status "🔥 Starting Flutter with HOT RELOAD enabled..."
+    print_status "   Press 'r' to hot reload, 'R' to hot restart, 'q' to quit"
+    SUCCESS_MSG="🔥 File Organizer module launched with HOT RELOAD and Wayland!"
+    
+    # Launch with flutter run for hot reload support
+    # Note: flutter run doesn't support --dart-entrypoint-args the same way
+    # We'll need to modify the app to handle environment variables for routing
+    print_warning "Hot reload mode: Using default route (routing args not supported in flutter run)"
+    env WAYLAND_DISPLAY="$WAYLAND_SOCKET" GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland XDG_RUNTIME_DIR=/tmp \
+        HOMIE_ROUTE="/file-organizer" HOMIE_SOURCE="$SOURCE_PATH" HOMIE_DESTINATION="$DESTINATION_PATH" \
+        FLUTTER_FULLSCREEN=true \
+        flutter run -d linux --dart-define=INITIAL_ROUTE=/file-organizer
+    FLUTTER_PID=$!
+else
+    SUCCESS_MSG="🎉 File Organizer module launched successfully with Wayland!"
+    
+    # Launch with pre-built binary (fullscreen)
+    env WAYLAND_DISPLAY="$WAYLAND_SOCKET" GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland XDG_RUNTIME_DIR=/tmp \
+        FLUTTER_FULLSCREEN=true \
+        ./build/linux/x64/release/bundle/homie_app $LAUNCH_ARGS &
+    FLUTTER_PID=$!
+fi
+
 cd ..
 
 print_success "$SUCCESS_MSG"
@@ -151,7 +183,7 @@ print_status "Flutter PID: $FLUTTER_PID"
 # Function to cleanup on exit
 cleanup() {
     print_status "Shutting down File Organizer..."
-    kill $FLUTTER_PID 2>/dev/null || true
+    if [ -n "$FLUTTER_PID" ]; then kill $FLUTTER_PID 2>/dev/null || true; fi
     kill $WESTON_PID 2>/dev/null || true
     # Note: We don't kill the backend - it was already running
     print_success "File Organizer processes terminated (backend left running)"
@@ -163,6 +195,15 @@ trap cleanup EXIT INT TERM
 print_status "Press Ctrl+C to stop all services"
 print_status "Backend available at: http://localhost:8000"
 print_status "File Organizer module running in Wayland compositor"
+
+if [ "$HOT_RELOAD" = true ]; then
+    echo ""
+    print_warning "🔥 HOT RELOAD MODE ACTIVE:"
+    print_status "   Press 'r' + Enter to hot reload after making code changes"
+    print_status "   Press 'R' + Enter to hot restart the entire app"
+    print_status "   Press 'q' + Enter to quit the app"
+    print_status "   Make changes to Dart files and press 'r' to see them instantly!"
+fi
 
 # Wait for user to stop
 wait 

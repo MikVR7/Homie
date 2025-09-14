@@ -17,18 +17,45 @@ import 'package:homie_app/screens/financial/financial_screen.dart';
 import 'package:homie_app/theme/app_theme.dart';
 import 'package:homie_app/config/app_arguments.dart';
 
+// Compile-time route override for hot-reload/dev runs
+const String _kInitialRouteDefine = String.fromEnvironment('INITIAL_ROUTE');
+
 void main(List<String> args) {
   try {
     // Initialize application arguments using professional parser
     AppArguments.initialize(args);
     
     // Handle environment variables as fallback (only on non-web platforms)
-    if (!kIsWeb && args.isEmpty) {
+    if (!kIsWeb) {
       try {
-        final envRoute = Platform.environment['INITIAL_ROUTE'];
-        if (envRoute != null && envRoute.isNotEmpty) {
-          // Re-initialize with environment route if no args provided
-          AppArguments.initialize(['--route=$envRoute']);
+        final envRoute = Platform.environment['HOMIE_ROUTE'] ?? Platform.environment['INITIAL_ROUTE'];
+        final envSource = Platform.environment['HOMIE_SOURCE'];
+        final envDestination = Platform.environment['HOMIE_DESTINATION'];
+        
+        // Check if we have environment variables and no explicit route args
+        bool hasRouteArg = args.any((arg) => arg.startsWith('--route='));
+        
+        // Highest priority: --dart-define INITIAL_ROUTE
+        final defineRoute = _kInitialRouteDefine.isNotEmpty ? _kInitialRouteDefine : null;
+
+        if ((defineRoute != null || (envRoute != null && envRoute.isNotEmpty)) && !hasRouteArg) {
+          // Build args from environment variables
+          final chosenRoute = defineRoute ?? envRoute!;
+          final envArgs = <String>['--route=$chosenRoute'];
+          if (envSource != null && envSource.isNotEmpty) {
+            envArgs.add('--source=$envSource');
+          }
+          if (envDestination != null && envDestination.isNotEmpty) {
+            envArgs.add('--destination=$envDestination');
+          }
+          
+          if (kDebugMode) {
+            print('🌍 Using startup route "$chosenRoute" (dart-define/env). Re-initializing with: ${envArgs.join(' ')}');
+          }
+          
+          // Re-initialize with environment variables
+          AppArguments.resetInstance(); // Reset instance to allow re-initialization
+          AppArguments.initialize(envArgs);
         }
       } catch (e) {
         // Platform.environment not available (e.g., on web), ignore

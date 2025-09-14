@@ -44,12 +44,40 @@ if [ "$USE_WAYLAND" = true ]; then
     echo ""
     echo "📱 Starting Full Homie App with Wayland compositor..."
     
-    # Check if Flutter app is built
-    if [ ! -f "mobile_app/build/linux/x64/release/bundle/homie_app" ]; then
+    # Check if Flutter app needs rebuilding
+    NEEDS_REBUILD=false
+    BUILD_PATH="mobile_app/build/linux/x64/release/bundle/homie_app"
+    
+    if [ ! -f "$BUILD_PATH" ]; then
+        echo "🔧 Flutter Linux release build not found."
+        NEEDS_REBUILD=true
+    else
+        echo "🔍 Checking if source code has changed..."
+        
+        # Find the newest source file in the Flutter app
+        NEWEST_SOURCE=$(find mobile_app/lib -name "*.dart" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+        
+        if [ -n "$NEWEST_SOURCE" ]; then
+            # Compare modification times
+            if [ "$NEWEST_SOURCE" -nt "$BUILD_PATH" ]; then
+                echo "⚠️ Source code is newer than build. Rebuild needed."
+                echo "📝 Changed file: $(basename "$NEWEST_SOURCE")"
+                NEEDS_REBUILD=true
+            else
+                echo "✅ Build is up-to-date with source code"
+            fi
+        else
+            echo "⚠️ Could not check source files. Forcing rebuild."
+            NEEDS_REBUILD=true
+        fi
+    fi
+    
+    if [ "$NEEDS_REBUILD" = true ]; then
         echo "🔧 Building Flutter Linux release..."
         cd mobile_app
         flutter build linux --release
         cd ..
+        echo "✅ Flutter Linux build completed"
     fi
     
     # Check if Wayland dependencies are installed

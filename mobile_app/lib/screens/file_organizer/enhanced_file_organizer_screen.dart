@@ -230,8 +230,10 @@ class _EnhancedFileOrganizerScreenState extends State<EnhancedFileOrganizerScree
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
+        physics: const ClampingScrollPhysics(), // Prevent overscroll and limit scrolling to content bounds
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Only take up the space needed by content
           children: [
             // Main Configuration Panel
             _buildConfigurationPanel(),

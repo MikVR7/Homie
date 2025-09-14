@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import 'package:go_router/go_router.dart';
 import 'package:homie_app/providers/file_organizer_provider.dart';
 import 'package:homie_app/providers/websocket_provider.dart';
@@ -614,8 +616,10 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
   Widget _buildOrganizationTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
+      physics: const ClampingScrollPhysics(), // Prevent overscroll and limit scrolling to content bounds
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Only take up the space needed by content
         children: [
           // Welcome Section
           _buildWelcomeSection(),
@@ -762,6 +766,7 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min, // Only take space needed for content
         children: [
           // Header
           Container(
@@ -797,6 +802,7 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
+              mainAxisSize: MainAxisSize.min, // Only take space needed for content
               children: [
                 // Source and Destination Folder Selection
                 _buildFolderSelectionSection(),
@@ -916,8 +922,10 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
   Widget _buildRightPanel() {
     return const SingleChildScrollView(
       padding: EdgeInsets.all(24),
+      physics: ClampingScrollPhysics(), // Prevent overscroll and limit scrolling to content bounds
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Only take up the space needed by content
         children: [
           // File Insights Dashboard
           FileInsightsDashboard(),
@@ -1020,8 +1028,10 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
   Widget _buildInsightsTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
+      physics: const ClampingScrollPhysics(), // Prevent overscroll and limit scrolling to content bounds
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Only take up the space needed by content
         children: [
           // Header
           Text(
@@ -1052,8 +1062,10 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
   Widget _buildHistoryTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
+      physics: const ClampingScrollPhysics(), // Prevent overscroll and limit scrolling to content bounds
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Only take up the space needed by content
         children: [
           // Header
           Text(
@@ -1133,6 +1145,7 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
       builder: (context, provider, child) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Only take space needed for content
           children: [
             Text(
               'Folder Configuration',
@@ -1254,20 +1267,31 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
   }
 
   Future<void> _selectFolder(BuildContext context, bool isSource) async {
-    // For now, show a simple dialog - in a real app, you'd use a proper file picker
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isSource ? 'Select Source Folder' : 'Select Destination Folder'),
-        content: const Text('File picker integration coming soon!\n\nFor now, paths are set via the startup script.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    final provider = Provider.of<FileOrganizerProvider>(context, listen: false);
+    
+    try {
+      // Use the native directory picker
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      
+      if (selectedDirectory != null) {
+        print('Selected path: $selectedDirectory');
+        if (isSource) {
+          provider.setSourcePath(selectedDirectory);
+        } else {
+          provider.setDestinationPath(selectedDirectory);
+        }
+      } else {
+        print('User cancelled folder selection');
+      }
+    } catch (e) {
+      print('Error selecting folder: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting folder: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _analyzeFiles() async {
@@ -1280,12 +1304,27 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
       return;
     }
 
+    // Debug: Check current paths
+    print('DEBUG: Starting analysis with:');
+    print('  Source: ${provider.sourcePath}');
+    print('  Destination: ${provider.destinationPath}');
+    print('  Organization Style: ${provider.organizationStyle}');
+
     try {
       await provider.analyzeFolder();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Analysis complete! Check the preview below.')),
-      );
+      print('DEBUG: Analysis completed. Operations found: ${provider.operations.length}');
+      
+      if (provider.operations.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Analysis complete! Found ${provider.operations.length} operations to preview.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Analysis complete, but no operations were generated. Check if source folder has files.')),
+        );
+      }
     } catch (e) {
+      print('DEBUG: Analysis failed with error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Analysis failed: $e')),
       );
@@ -1319,6 +1358,7 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
       builder: (context, provider, child) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Only take space needed for content
           children: [
             Text(
               'Organization Style',
@@ -1464,6 +1504,7 @@ class _ModernFileOrganizerScreenState extends State<ModernFileOrganizerScreen>
   Widget _buildQuickActionsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // Only take space needed for content
       children: [
         Text(
           'Quick Actions',

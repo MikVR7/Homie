@@ -50,6 +50,11 @@ class AppArguments {
     return _instance!;
   }
 
+  /// Reset instance to allow re-initialization (for environment variable fallback)
+  static void resetInstance() {
+    _instance = null;
+  }
+
   /// Check if any file organizer specific arguments were provided
   bool get hasFileOrganizerArgs => sourcePath != null || destinationPath != null;
 

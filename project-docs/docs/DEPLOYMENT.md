@@ -262,6 +262,11 @@ sudo crontab -e
 
 ## 🎨 Frontend Deployment
 
+### Linux Desktop Notes
+- Use the provided Wayland scripts for Linux desktop: `./start_homie.sh` or `./start_file_organizer.sh`.
+- Fullscreen/maximize can be enabled by setting `FLUTTER_FULLSCREEN=true` (handled in `mobile_app/linux/runner/my_application.cc`).
+- Hot reload is available via `./start_file_organizer.sh --hot-reload` but is experimental; for stable runs prefer the normal script.
+
 ### 1. Build Production Frontend
 
 ```bash

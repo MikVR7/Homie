@@ -464,6 +464,12 @@ flutter run -d chrome
 ./start_homie.sh --x11
 ```
 
+Additional notes:
+- Hot reload (experimental): `./start_file_organizer.sh --hot-reload`
+  - Uses `flutter run` with `--dart-define=INITIAL_ROUTE=/file-organizer`
+  - Reads `HOMIE_ROUTE`, `HOMIE_SOURCE`, `HOMIE_DESTINATION` for routing/paths
+- Fullscreen: set `FLUTTER_FULLSCREEN=true` to maximize the GTK window (implemented in `mobile_app/linux/runner/my_application.cc`).
+
 ### Module-Specific Services
 ```bash
 # File Organizer Module Only (no back button, focused experience)
@@ -805,7 +811,7 @@ This represents a **€5M+ business opportunity** within 3-4 years, leveraging e
 - **Complete App Structure**: Full Flutter application with Material 3 design
 - **Cross-Platform Support**: Android, iOS, Windows, macOS, Linux from single codebase (NO WEB)
 - **State Management**: Provider pattern for reactive state updates
-- **Navigation**: Go Router for declarative routing system
+- **Navigation**: Go Router for declarative routing
 - **API Integration**: Complete HTTP client with error handling
 - **Data Models**: JSON serialization for all data structures
 - **Responsive Design**: Mobile-first design optimized for all screen sizes

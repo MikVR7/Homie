@@ -394,31 +394,46 @@ class _ModernFileBrowserState extends State<ModernFileBrowser>
             child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Container(
-                width: 800,
-                height: 600,
-                child: Column(
-                  children: [
-                    _buildHeader(),
-                    _buildPathBar(),
-                    if (_errorMessage != null) _buildErrorMessage(),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          _buildSidebar(),
-                          const VerticalDivider(width: 1),
-                          Expanded(
-                            child: SlideTransition(
-                              position: _slideAnimation,
-                              child: _buildFileList(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool hasBoundedWidth = constraints.hasBoundedWidth;
+                  final bool hasBoundedHeight = constraints.hasBoundedHeight;
+                  const double fallbackWidth = 1000;
+                  const double fallbackHeight = 700;
+
+                  final Widget content = Column(
+                    children: [
+                      _buildHeader(),
+                      _buildPathBar(),
+                      if (_errorMessage != null) _buildErrorMessage(),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            _buildSidebar(),
+                            const VerticalDivider(width: 1),
+                            Expanded(
+                              child: SlideTransition(
+                                position: _slideAnimation,
+                                child: _buildFileList(),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    _buildActionBar(),
-                  ],
-                ),
+                      _buildActionBar(),
+                    ],
+                  );
+
+                  if (hasBoundedWidth && hasBoundedHeight) {
+                    return SizedBox.expand(child: content);
+                  } else {
+                    return SizedBox(
+                      width: hasBoundedWidth ? constraints.maxWidth : fallbackWidth,
+                      height: hasBoundedHeight ? constraints.maxHeight : fallbackHeight,
+                      child: content,
+                    );
+                  }
+                },
               ),
             ),
           ),

@@ -288,6 +288,11 @@ class FileOrganizerProvider with ChangeNotifier {
       return;
     }
     
+    print('DEBUG Provider: Starting analysis...');
+    print('  Source: $_sourcePath');
+    print('  Destination: $_destinationPath');
+    print('  Style: ${_organizationStyle.name}');
+    
     _setStatus(OperationStatus.analyzing);
     _clearError();
     
@@ -297,6 +302,8 @@ class FileOrganizerProvider with ChangeNotifier {
         intent = _getDefaultIntentForStyle();
       }
       
+      print('DEBUG Provider: Intent: $intent');
+      
       final result = await _apiService.analyzeFolder(
         sourcePath: _sourcePath,
         destinationPath: _destinationPath,
@@ -304,13 +311,17 @@ class FileOrganizerProvider with ChangeNotifier {
         organizationStyle: _organizationStyle.name,
       );
       
+      print('DEBUG Provider: API result: $result');
+      
       if (result['success'] == true) {
         _parseOperationsFromResult(result);
+        print('DEBUG Provider: Parsed ${_operations.length} operations');
         _setStatus(OperationStatus.idle);
       } else {
         throw Exception(result['error'] ?? 'Analysis failed');
       }
     } catch (e) {
+      print('DEBUG Provider: Error during analysis: $e');
       _setStatus(OperationStatus.error);
       _setError('Analysis failed: ${e.toString()}');
     }
@@ -497,10 +508,16 @@ class FileOrganizerProvider with ChangeNotifier {
   void _parseOperationsFromResult(Map<String, dynamic> result) {
     _operations.clear();
     
+    print('DEBUG Parser: Full result structure: $result');
+    
     final operations = result['data']?['operations'] ?? [];
+    print('DEBUG Parser: Found operations array: $operations');
+    print('DEBUG Parser: Operations array length: ${operations.length}');
     
     for (int i = 0; i < operations.length; i++) {
       final op = operations[i];
+      print('DEBUG Parser: Processing operation $i: $op');
+      
       _operations.add(FileOperation(
         id: 'op_$i',
         type: _parseOperationType(op['type']),
@@ -513,6 +530,7 @@ class FileOrganizerProvider with ChangeNotifier {
       ));
     }
     
+    print('DEBUG Parser: Created ${_operations.length} FileOperation objects');
     notifyListeners();
   }
   

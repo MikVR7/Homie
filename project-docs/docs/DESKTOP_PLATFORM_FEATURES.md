@@ -46,7 +46,7 @@ This document summarizes the desktop platform features implemented for the Moder
 - ✅ **Platform Detection**: Reliable detection of Windows, macOS, and Linux
 - ✅ **Native File Dialogs**: Framework ready for native folder/file selection
 - ✅ **System Notifications**: Desktop notification system integration
-- ✅ **Window State Management**: Minimize, maximize, fullscreen, and restore
+- ✅ **Window State Management**: Minimize, maximize, fullscreen, and restore (Linux honors `FLUTTER_FULLSCREEN=true`)
 - ✅ **Keyboard Shortcuts**: Platform-specific keyboard navigation
 
 ### Platform-Specific Features
@@ -84,6 +84,7 @@ This document summarizes the desktop platform features implemented for the Moder
 - **Minimum Size**: 800x600 pixels
 - **Features**: Resizable, minimizable, maximizable
 - **System Integration**: Platform-appropriate window controls
+- **Linux Wayland Fullscreen**: If the environment variable `FLUTTER_FULLSCREEN=true` is set, the Linux runner maximizes the window using GTK (see `mobile_app/linux/runner/my_application.cc`).
 
 ### Notification Types
 - **Operation Notifications**: Start, complete, pause, resume, cancel

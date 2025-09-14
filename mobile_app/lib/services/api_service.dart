@@ -106,7 +106,7 @@ class ApiService {
   }) async {
     try {
       final response = await _client.post(
-        Uri.parse('$baseUrl/file_organizer/organize'),
+        Uri.parse('$baseUrl/file-organizer/organize'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'downloads_path': downloadsPath,
@@ -443,7 +443,7 @@ class ApiService {
     }
     
     final response = await _client.post(
-      Uri.parse('$baseUrl/file_organizer/execute-operations'),
+      Uri.parse('$baseUrl/file-organizer/execute-operations'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'operations': operations,
@@ -712,12 +712,12 @@ class ApiService {
       String finalIntent = intent ?? _getDefaultIntent(organizationStyle);
       
       final response = await _client.post(
-        Uri.parse('$baseUrl/file_organizer/organize'),
+        Uri.parse('$baseUrl/file-organizer/organize'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'folder_path': sourcePath,
-          'destination_path': destinationPath,
-          'intent': finalIntent,
+          'source_folder': sourcePath,
+          'destination_folder': destinationPath,
+          'organization_style': organizationStyle,
         }),
       ).timeout(const Duration(seconds: 30));
 
@@ -749,7 +749,7 @@ class ApiService {
   }) async {
     try {
       final response = await _client.post(
-        Uri.parse('$baseUrl/file_organizer/execute-operations'),
+        Uri.parse('$baseUrl/file-organizer/execute-operations'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'operations': operations,
@@ -1115,7 +1115,7 @@ class ApiService {
     try {
       // Start the operation
       final response = await _client.post(
-        Uri.parse('$baseUrl/file_organizer/execute-operations-with-progress'),
+        Uri.parse('$baseUrl/file-organizer/execute-operations-with-progress'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'operations': operations,

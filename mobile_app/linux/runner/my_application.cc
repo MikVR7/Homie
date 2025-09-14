@@ -47,7 +47,14 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "homie_app");
   }
 
-  gtk_window_set_default_size(window, 1280, 720);
+  // Check for fullscreen environment variable
+  const gchar* fullscreen_env = g_getenv("FLUTTER_FULLSCREEN");
+  if (fullscreen_env && g_strcmp0(fullscreen_env, "true") == 0) {
+    gtk_window_maximize(window);
+    gtk_window_set_default_size(window, 1920, 1080);
+  } else {
+    gtk_window_set_default_size(window, 1280, 720);
+  }
   gtk_widget_show(GTK_WIDGET(window));
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
