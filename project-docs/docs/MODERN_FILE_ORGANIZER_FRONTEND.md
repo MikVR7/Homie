@@ -19,6 +19,23 @@ The Modern File Organizer Frontend is a comprehensive Flutter-based user interfa
 - **OrganizationAssistant**: AI-powered organization suggestions and preset management
 - **FileInsightsDashboard**: Analytics and insights visualization
 
+### Screen Structure (2025-09-14)
+- **ModernFileOrganizerScreen**: Container screen (app bar, sidebar, right panel, tab switch)
+  - Tabs (split into dedicated widgets):
+    - `OrganizationTab` → composed of section widgets
+      - `WelcomeHeader` (`lib/screens/file_organizer/tabs/sections/welcome_header.dart`)
+      - `FolderConfigurationSection` (`lib/screens/file_organizer/tabs/sections/folder_configuration_section.dart`)
+      - `OrganizationStyleSection` (`lib/screens/file_organizer/tabs/sections/organization_style_section.dart`)
+      - `QuickActionsSection` (`lib/screens/file_organizer/tabs/sections/quick_actions_section.dart`)
+      - Plus shared widgets: `EnhancedDriveMonitor`, `AIOperationsPreview`, `ProgressTracker`
+    - `InsightsTab` (`lib/screens/file_organizer/tabs/insights_tab.dart`)
+    - `HistoryTab` (`lib/screens/file_organizer/tabs/history_tab.dart`)
+- **Panels/Dialogs**:
+  - `RightInsightsPanel` (`lib/screens/file_organizer/panels/right_insights_panel.dart`)
+  - `HomieSettingsDialog` (`lib/screens/file_organizer/dialogs/settings_dialog.dart`)
+
+This refactor replaced large inline builders with small, hierarchical widgets for readability and easier maintenance.
+
 ## Features
 
 ### Core Functionality
@@ -261,5 +278,5 @@ The Modern File Organizer Frontend represents a comprehensive, accessible, and p
 
 ---
 
-*Last Updated: August 21, 2025*
+*Last Updated: September 14, 2025*
 *Status: Complete - Ready for Production*
