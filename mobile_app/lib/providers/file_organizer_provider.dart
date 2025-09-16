@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:homie_app/models/file_organizer_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:homie_app/services/api_service.dart';
 
 enum OrganizationStyle { smartCategories, byType, byDate, custom }
@@ -182,6 +183,9 @@ class FileOrganizerProvider with ChangeNotifier {
   String _destinationPath = '';
   OrganizationStyle _organizationStyle = OrganizationStyle.smartCategories;
   String _customIntent = '';
+  // Recently selected folders
+  List<String> _recentSourceFolders = [];
+  List<String> _recentDestinationFolders = [];
   
   // Operation state
   List<FileOperation> _operations = [];
@@ -213,6 +217,8 @@ class FileOrganizerProvider with ChangeNotifier {
   String get destinationPath => _destinationPath;
   OrganizationStyle get organizationStyle => _organizationStyle;
   String get customIntent => _customIntent;
+  List<String> get recentSourceFolders => List.unmodifiable(_recentSourceFolders);
+  List<String> get recentDestinationFolders => List.unmodifiable(_recentDestinationFolders);
   
   List<FileOperation> get operations => _operations;
   List<Map<String, dynamic>> get results => _results;
@@ -245,11 +251,16 @@ class FileOrganizerProvider with ChangeNotifier {
 
   // Enhanced state management methods
   
+  FileOrganizerProvider() {
+    _loadRecentFolders();
+  }
+
   /// Set source path for file organization
   void setSourcePath(String path) {
     if (_sourcePath != path) {
       _sourcePath = path;
       _clearOperations(); // Clear operations when source changes
+      _addRecentSourceFolder(path);
       notifyListeners();
     }
   }
@@ -259,6 +270,7 @@ class FileOrganizerProvider with ChangeNotifier {
     if (_destinationPath != path) {
       _destinationPath = path;
       _clearOperations(); // Clear operations when destination changes
+      _addRecentDestinationFolder(path);
       notifyListeners();
     }
   }
@@ -593,6 +605,60 @@ class FileOrganizerProvider with ChangeNotifier {
     _operations.clear();
     _results.clear();
     _currentProgress = null;
+  }
+
+  // Recent folders helpers
+  Future<void> _loadRecentFolders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _recentSourceFolders = prefs.getStringList('recent_source_folders') ?? [];
+      _recentDestinationFolders = prefs.getStringList('recent_destination_folders') ?? [];
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> _saveRecentFolders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('recent_source_folders', _recentSourceFolders);
+      await prefs.setStringList('recent_destination_folders', _recentDestinationFolders);
+    } catch (_) {}
+  }
+
+  void _addRecentSourceFolder(String path) {
+    if (path.isEmpty) return;
+    _recentSourceFolders.remove(path);
+    _recentSourceFolders.insert(0, path);
+    if (_recentSourceFolders.length > 10) {
+      _recentSourceFolders = _recentSourceFolders.take(10).toList();
+    }
+    _saveRecentFolders();
+  }
+
+  void _addRecentDestinationFolder(String path) {
+    if (path.isEmpty) return;
+    _recentDestinationFolders.remove(path);
+    _recentDestinationFolders.insert(0, path);
+    if (_recentDestinationFolders.length > 10) {
+      _recentDestinationFolders = _recentDestinationFolders.take(10).toList();
+    }
+    _saveRecentFolders();
+  }
+
+  Future<void> addSourceFolderViaPicker() async {
+    // This is intentionally left for UI layer to handle picker; kept for symmetry if needed later
+  }
+
+  void removeRecentSourceFolder(String path) {
+    _recentSourceFolders.remove(path);
+    _saveRecentFolders();
+    notifyListeners();
+  }
+
+  void removeRecentDestinationFolder(String path) {
+    _recentDestinationFolders.remove(path);
+    _saveRecentFolders();
+    notifyListeners();
   }
 
   // Legacy methods for compatibility

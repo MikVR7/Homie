@@ -7,108 +7,153 @@ import 'package:homie_app/theme/app_theme.dart';
 class FolderConfigurationSection extends StatelessWidget {
   const FolderConfigurationSection({super.key});
 
-  Future<void> _selectFolder(BuildContext context, bool isSource) async {
-    final provider = Provider.of<FileOrganizerProvider>(context, listen: false);
-    try {
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-      if (selectedDirectory != null) {
-        if (isSource) {
-          provider.setSourcePath(selectedDirectory);
-        } else {
-          provider.setDestinationPath(selectedDirectory);
-        }
-      }
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FileOrganizerProvider>();
+    debugPrint('[FolderConfigurationSection] render, sourceCount=' + provider.recentSourceFolders.length.toString() + ', destCount=' + provider.recentDestinationFolders.length.toString());
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Folder Configuration',
-          style: TextStyle(
-            color: AppColors.onSurface,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+        Text('DEBUG: provider loaded', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+        const SizedBox(height: 8),
+        Text('Source Folders (' + provider.recentSourceFolders.length.toString() + ')',
+            style: TextStyle(color: AppColors.onSurface, fontSize: 12, fontWeight: FontWeight.w600)),
+        _buildRecentList(
+          title: 'Source Folders',
+          items: provider.recentSourceFolders,
+          onAdd: () async {
+            final providerRW = Provider.of<FileOrganizerProvider>(context, listen: false);
+            String? dir = await FilePicker.platform.getDirectoryPath();
+            if (dir != null && dir.isNotEmpty) {
+              providerRW.setSourcePath(dir);
+            }
+          },
+          onRemove: (path) => provider.removeRecentSourceFolder(path),
+          onSelect: (path) => provider.setSourcePath(path),
+          emptyLabel: 'No source folders selected yet',
         ),
         const SizedBox(height: 16),
-        _buildFolderInput(
-          context,
-          label: 'Source Folder',
-          value: provider.sourcePath,
-          hint: 'Choose the folder containing files to organize',
-          icon: Icons.folder_open_rounded,
-          onTap: () => _selectFolder(context, true),
-        ),
-        const SizedBox(height: 24),
-        _buildFolderInput(
-          context,
-          label: 'Destination Folder',
-          value: provider.destinationPath,
-          hint: 'Choose where organized files will be placed',
-          icon: Icons.folder_special_rounded,
-          onTap: () => _selectFolder(context, false),
+        Text('Destination Folders (' + provider.recentDestinationFolders.length.toString() + ')',
+            style: TextStyle(color: AppColors.onSurface, fontSize: 12, fontWeight: FontWeight.w600)),
+        _buildRecentList(
+          title: 'Destination Folders',
+          items: provider.recentDestinationFolders,
+          onAdd: () async {
+            final providerRW = Provider.of<FileOrganizerProvider>(context, listen: false);
+            String? dir = await FilePicker.platform.getDirectoryPath();
+            if (dir != null && dir.isNotEmpty) {
+              providerRW.setDestinationPath(dir);
+            }
+          },
+          onRemove: (path) => provider.removeRecentDestinationFolder(path),
+          onSelect: (path) => provider.setDestinationPath(path),
+          emptyLabel: 'No destination folders selected yet',
         ),
       ],
     );
   }
 
-  Widget _buildFolderInput(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required String hint,
-    required IconData icon,
-    required VoidCallback onTap,
+  Widget _buildRecentList({
+    required String title,
+    required List<String> items,
+    required VoidCallback onAdd,
+    required void Function(String) onRemove,
+    required void Function(String) onSelect,
+    required String emptyLabel,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: AppColors.onSurface,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border.withOpacity(0.5), width: 1),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 36,
+              alignment: Alignment.centerLeft,
+              color: Colors.white12,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: const Text('DEBUG: list container visible', style: TextStyle(color: Colors.white)),
             ),
-            child: Row(
+            const SizedBox(height: 8),
+            Row(
               children: [
-                Icon(icon, color: AppColors.primary, size: 20),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    value.isNotEmpty ? value : hint,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: value.isNotEmpty ? AppColors.onSurface : AppColors.textSecondary,
-                      fontSize: 14,
-                      fontWeight: value.isNotEmpty ? FontWeight.w500 : FontWeight.normal,
-                    ),
+                  child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.create_new_folder_rounded, size: 16),
+                  label: const Text('Add'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
               ],
             ),
-          ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: TextButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Add Folder'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: Colors.white10,
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(emptyLabel, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              )
+            else
+              Column(
+                children: items.map((path) {
+                  return InkWell(
+                    onTap: () => onSelect(path),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.folder_rounded, color: AppColors.primary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                          ),
+                          IconButton(
+                            tooltip: 'Remove from list',
+                            onPressed: () => onRemove(path),
+                            icon: Icon(Icons.clear_rounded, color: AppColors.textSecondary, size: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

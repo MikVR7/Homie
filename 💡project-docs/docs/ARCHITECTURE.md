@@ -17,6 +17,11 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
   - `ai_command_generator.py`: Builds AI prompts; returns abstract operations
   - `file_operation_manager.py`: Executes operations via pure Python (`pathlib`/`shutil`)
 
+API alignment:
+- Analyze is exposed as `POST /api/file-organizer/organize`.
+- Responses return executor-compatible operations: `type`, `src`, `dest` (optional `reason`).
+- Additional telemetry fields: `total_files`, `stats.by_category`, `warnings`.
+
 ### Phase 2: Home Server/NAS (Planned)
 - **Status**: Planned
 - **Features**: Centralized storage, backup, media server

@@ -43,6 +43,7 @@ class _OrganizationTabState extends State<OrganizationTab> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[OrganizationTab] build called');
     return RawScrollbar(
       controller: _controller,
       thumbVisibility: true,
@@ -55,18 +56,24 @@ class _OrganizationTabState extends State<OrganizationTab> {
         controller: _controller,
         physics: const ClampingScrollPhysics(),
         slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.all(24),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const WelcomeHeader(),
-                const SizedBox(height: 32),
-                _buildConfigurationPanel(context),
-                const SizedBox(height: 24),
-                const EnhancedDriveMonitor(),
-                const SizedBox(height: 24),
-                _buildActionButtons(context),
-              ]),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    color: Colors.transparent,
+                    child: const WelcomeHeader(),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildConfigurationPanel(context),
+                  const SizedBox(height: 24),
+                  const EnhancedDriveMonitor(),
+                  const SizedBox(height: 24),
+                  _buildActionButtons(context),
+                ],
+              ),
             ),
           ),
           SliverPadding(
@@ -119,6 +126,7 @@ class _OrganizationTabState extends State<OrganizationTab> {
 
   Widget _buildConfigurationPanel(BuildContext context) {
     final provider = context.watch<FileOrganizerProvider>();
+    debugPrint('[OrganizationTab] _buildConfigurationPanel: sourcePath=' + provider.sourcePath + ', destPath=' + provider.destinationPath);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -155,12 +163,15 @@ class _OrganizationTabState extends State<OrganizationTab> {
                   size: 24,
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  'Organization Configuration',
-                  style: TextStyle(
-                    color: AppColors.onSurface,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'Organization Configuration',
+                    style: TextStyle(
+                      color: AppColors.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -169,13 +180,13 @@ class _OrganizationTabState extends State<OrganizationTab> {
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const FolderConfigurationSection(),
-                const SizedBox(height: 24),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: const [
+                FolderConfigurationSection(),
+                SizedBox(height: 24),
                 OrganizationStyleSection(),
-                const SizedBox(height: 24),
-                const QuickActionsSection(),
+                SizedBox(height: 24),
+                QuickActionsSection(),
               ],
             ),
           ),

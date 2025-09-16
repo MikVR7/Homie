@@ -114,6 +114,49 @@ flutter run -d ios
 - `POST /api/file-organizer/execute-operations` - Execute abstract operations (pure Python)
 - Additional module endpoints may be exposed via `core/web_server.py`
 
+#### Analyze (organize) request/response
+
+Endpoint:
+
+```
+POST /api/file-organizer/organize
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "source_folder": "/absolute/path/to/source",
+  "destination_folder": "/absolute/path/to/destination",
+  "organization_style": "by_type"   
+}
+```
+
+Behavior:
+- Scans the `source_folder` and enumerates files (non-recursive, current implementation)
+- Maps files to destination subfolders based on extension (e.g., PDFs → `Documents/`, images → `Pictures/`, videos → `Videos/`, archives → `Archives/`, ISOs → `Software/`, others → `Other/`)
+- Returns abstract operations suitable for the executor using `type`, `src`, and `dest` fields
+
+Response example:
+
+```json
+{
+  "success": true,
+  "operations": [
+    {"type":"move","src":"/src/file.pdf","dest":"/dest/Documents/file.pdf","reason":"Move file.pdf to Documents/"}
+  ],
+  "total_files": 12,
+  "organization_style": "by_type",
+  "stats": { "by_category": { "Documents": 6, "Pictures": 3, "Videos": 1, "Archives": 1, "Software": 1 } },
+  "warnings": []
+}
+```
+
+Note:
+- The operations use `src`/`dest` to match the executor interface used by `/api/file-organizer/execute-operations`.
+- Endpoint naming uses hyphen (`file-organizer`) in most routes; a few utility endpoints may use underscore (`file_organizer`).
+
 ### Financial Manager
 - `GET /api/financial/summary` - Financial summary
 - `GET/POST /api/financial/income` - Income management

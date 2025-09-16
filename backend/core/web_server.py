@@ -147,30 +147,67 @@ class WebServer:
                 source_folder = data.get('source_folder')
                 destination_folder = data.get('destination_folder')
                 organization_style = data.get('organization_style', 'by_type')
-                
+
                 if not source_folder:
                     return jsonify({'success': False, 'error': 'source_folder required'}), 400
+                if not destination_folder:
+                    return jsonify({'success': False, 'error': 'destination_folder required'}), 400
 
-                # Return mock data for now to test the UI
-                return jsonify({
+                # Scan source folder and build real operations
+                from pathlib import Path
+
+                src_path = Path(source_folder).expanduser()
+                dest_root = Path(destination_folder).expanduser()
+                if not src_path.exists() or not src_path.is_dir():
+                    return jsonify({'success': False, 'error': f'source_folder not found or not a directory: {source_folder}'}), 400
+
+                # Extension → category folder mapping
+                ext_map = {
+                    # Documents
+                    '.pdf': 'Documents', '.doc': 'Documents', '.docx': 'Documents', '.txt': 'Documents', '.rtf': 'Documents',
+                    # Images
+                    '.png': 'Pictures', '.jpg': 'Pictures', '.jpeg': 'Pictures', '.gif': 'Pictures', '.webp': 'Pictures',
+                    # Videos
+                    '.mkv': 'Videos', '.mp4': 'Videos', '.avi': 'Videos', '.mov': 'Videos', '.wmv': 'Videos',
+                    # Archives
+                    '.rar': 'Archives', '.zip': 'Archives', '.7z': 'Archives', '.tar': 'Archives', '.gz': 'Archives', '.bz2': 'Archives',
+                    # Disk images
+                    '.iso': 'Software', '.dmg': 'Software', '.img': 'Software',
+                }
+
+                files = [p for p in src_path.iterdir() if p.is_file()]
+
+                operations = []
+                stats_counts = {}
+                warnings = []
+
+                for f in files:
+                    ext = f.suffix.lower()
+                    category = ext_map.get(ext, 'Other')
+                    stats_counts[category] = stats_counts.get(category, 0) + 1
+
+                    dest_dir = dest_root / category
+                    dest_path = dest_dir / f.name
+
+                    operations.append({
+                        'type': 'move',
+                        'src': str(f),
+                        'dest': str(dest_path),
+                        'reason': f'Move {f.name} to {category}/'
+                    })
+
+                response = {
                     'success': True,
-                    'operations': [
-                        {
-                            'type': 'move',
-                            'source': f'{source_folder}/document.pdf',
-                            'destination': f'{destination_folder}/Documents/document.pdf',
-                            'reason': 'PDF document moved to Documents folder'
-                        },
-                        {
-                            'type': 'move', 
-                            'source': f'{source_folder}/photo.jpg',
-                            'destination': f'{destination_folder}/Pictures/photo.jpg',
-                            'reason': 'Image file moved to Pictures folder'
-                        }
-                    ],
-                    'total_files': 2,
-                    'organization_style': organization_style
-                })
+                    'operations': operations,
+                    'total_files': len(files),
+                    'organization_style': organization_style,
+                    'stats': {
+                        'by_category': stats_counts,
+                    },
+                    'warnings': warnings,
+                }
+
+                return jsonify(response)
                     
             except Exception as e:
                 logger.error(f"/organize error: {e}")
