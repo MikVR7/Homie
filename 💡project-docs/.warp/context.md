@@ -8,6 +8,7 @@ Homie is your comprehensive intelligent home management ecosystem that evolves f
 - **Pure Python Execution**: Operations run via `pathlib`/`shutil` (no shell)
 - **AI-Powered File Organization**: Google Gemini integration for intelligent file categorization
 - **Centralized Memory System**: SQLite database tracks all file operations and destination mappings
+- **Persistent Analysis Storage**: Analysis sessions survive app restarts with operation status tracking
 - **Simple USB Drive Recognition**: Hardware-based identification (USB Serial → Partition UUID → Label+Size)
 - **Multi-Drive Support**: Detects and handles local, network (NAS), cloud, and USB drives
 - **Redundant Archive Detection**: AI suggests deletion when content already extracted

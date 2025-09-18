@@ -110,10 +110,14 @@ flutter run -d ios
 ## API Endpoints
 
 ### File Organizer
-- `POST /api/file-organizer/organize` - Analyzes a folder and returns proposed file operations.
+- `POST /api/file-organizer/organize` - Analyzes a folder and creates persistent analysis session with operations.
 - `POST /api/file-organizer/execute-operations` - Executes a list of operations from the `organize` endpoint.
 - `GET /api/file-organizer/destinations` - Retrieves a list of all known destination paths.
 - `DELETE /api/file-organizer/destinations` - Removes a destination path from memory.
+- `GET /api/file-organizer/analyses` - Returns user's analysis history.
+- `GET /api/file-organizer/analyses/{analysis_id}` - Returns specific analysis details with operations.
+- `PUT /api/file-organizer/operations/{operation_id}/status` - Updates operation status (pending/applied/ignored/reverted).
+- `PUT /api/file-organizer/operations/batch-status` - Batch updates multiple operation statuses.
 
 #### Analyze (`organize`) request/response
 
@@ -128,35 +132,195 @@ Request body:
 
 ```json
 {
-  "source_folder": "/absolute/path/to/source",
-  "destination_folder": "/absolute/path/to/destination",
+  "source_path": "/absolute/path/to/source",
+  "destination_path": "/absolute/path/to/destination",
   "organization_style": "by_type"   
 }
 ```
 
 Behavior:
-- Scans the `source_folder` and enumerates files (non-recursive, current implementation)
+- Scans the `source_path` and enumerates files (non-recursive, current implementation)
 - Maps files to destination subfolders based on extension (e.g., PDFs → `Documents/`, images → `Pictures/`, videos → `Videos/`, archives → `Archives/`, ISOs → `Software/`, others → `Other/`)
-- Returns abstract operations suitable for the executor using `type`, `src`, and `dest` fields
+- Creates a persistent analysis session in the database
+- Stores all operations with `pending` status for tracking
+- Returns analysis session info and operations list
 
 Response example:
 
 ```json
 {
   "success": true,
+  "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
+  "analysis": {
+    "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "dev_user",
+    "source_path": "/absolute/path/to/source",
+    "destination_path": "/absolute/path/to/destination",
+    "organization_style": "by_type",
+    "file_count": 12,
+    "created_at": "2025-09-18T21:48:45.362Z",
+    "updated_at": "2025-09-18T21:48:45.362Z",
+    "status": "active"
+  },
   "operations": [
-    {"type":"move","source":"/src/file.pdf","destination":"/dest/Documents/file.pdf","reason":"Move file.pdf to Documents/"}
-  ],
-  "total_files": 12,
-  "organization_style": "by_type",
-  "stats": { "by_category": { "Documents": 6, "Pictures": 3, "Videos": 1, "Archives": 1, "Software": 1 } },
-  "warnings": []
+    {
+      "operation_id": "550e8400-e29b-41d4-a716-446655440000_op_0",
+      "type": "move",
+      "source": "/src/file.pdf",
+      "destination": "/dest/Documents/file.pdf",
+      "reason": "Move file.pdf to Documents/",
+      "status": "pending"
+    }
+  ]
 }
 ```
 
 Note:
-- The `organize` endpoint returns operations with `source` and `destination` keys for frontend compatibility.
-- The `execute-operations` endpoint expects the same format.
+- The `organize` endpoint now creates persistent analysis sessions that survive app restarts
+- Each operation includes an `operation_id` for status tracking
+- Operations are stored with `pending` status and can be updated via status endpoints
+- The `source_path` and `destination_path` keys are used instead of `source_folder`/`destination_folder`
+
+#### Analysis History (`analyses`)
+
+Endpoint:
+```
+GET /api/file-organizer/analyses
+```
+
+Returns a list of all analysis sessions for the current user, ordered by creation date (newest first).
+
+Response example:
+```json
+{
+  "success": true,
+  "analyses": [
+    {
+      "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
+      "user_id": "dev_user",
+      "source_path": "/absolute/path/to/source",
+      "destination_path": "/absolute/path/to/destination",
+      "organization_style": "by_type",
+      "file_count": 12,
+      "created_at": "2025-09-18T21:48:45.362Z",
+      "updated_at": "2025-09-18T21:48:45.362Z",
+      "status": "active"
+    }
+  ]
+}
+```
+
+#### Analysis Detail (`analyses/{analysis_id}`)
+
+Endpoint:
+```
+GET /api/file-organizer/analyses/{analysis_id}
+```
+
+Returns a specific analysis session with its associated operations.
+
+Response example:
+```json
+{
+  "success": true,
+  "analysis": {
+    "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "dev_user",
+    "source_path": "/absolute/path/to/source",
+    "destination_path": "/absolute/path/to/destination",
+    "organization_style": "by_type",
+    "file_count": 12,
+    "created_at": "2025-09-18T21:48:45.362Z",
+    "updated_at": "2025-09-18T21:48:45.362Z",
+    "status": "active"
+  },
+  "operations": [
+    {
+      "operation_id": "550e8400-e29b-41d4-a716-446655440000_op_0",
+      "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
+      "operation_type": "move",
+      "source_path": "/src/file.pdf",
+      "destination_path": "/dest/Documents/file.pdf",
+      "file_name": "file.pdf",
+      "operation_status": "pending",
+      "applied_at": null,
+      "reverted_at": null,
+      "metadata": "{\"reason\": \"Move file.pdf to Documents/\"}"
+    }
+  ]
+}
+```
+
+#### Operation Status Update (`operations/{operation_id}/status`)
+
+Endpoint:
+```
+PUT /api/file-organizer/operations/{operation_id}/status
+Content-Type: application/json
+```
+
+Request body:
+```json
+{
+  "status": "applied",
+  "timestamp": "2025-09-18T21:50:00.000Z"
+}
+```
+
+Updates the status of a single operation. Valid statuses: `pending`, `applied`, `ignored`, `reverted`, `removed`.
+
+Response example:
+```json
+{
+  "success": true,
+  "operation": {
+    "operation_id": "550e8400-e29b-41d4-a716-446655440000_op_0",
+    "operation_status": "applied",
+    "applied_at": "2025-09-18T21:50:00.000Z"
+  }
+}
+```
+
+#### Batch Operation Status Update (`operations/batch-status`)
+
+Endpoint:
+```
+PUT /api/file-organizer/operations/batch-status
+Content-Type: application/json
+```
+
+Request body:
+```json
+{
+  "operation_ids": ["op1", "op2", "op3"],
+  "status": "ignored",
+  "timestamp": "2025-09-18T21:50:00.000Z"
+}
+```
+
+Updates the status of multiple operations in a single request.
+
+Response example:
+```json
+{
+  "success": true,
+  "updated_count": 3,
+  "operations": [
+    {
+      "operation_id": "op1",
+      "operation_status": "ignored"
+    },
+    {
+      "operation_id": "op2", 
+      "operation_status": "ignored"
+    },
+    {
+      "operation_id": "op3",
+      "operation_status": "ignored"
+    }
+  ]
+}
+```
 
 #### Delete Destination
 

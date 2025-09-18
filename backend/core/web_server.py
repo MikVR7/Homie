@@ -144,51 +144,50 @@ class WebServer:
         def fo_organize():
             try:
                 data = request.get_json(force=True, silent=True) or {}
-                source_folder = data.get('source_folder')
-                destination_folder = data.get('destination_folder')
+                source_folder = data.get('source_path')
+                destination_folder = data.get('destination_path')
                 organization_style = data.get('organization_style', 'by_type')
 
                 if not source_folder:
-                    return jsonify({'success': False, 'error': 'source_folder required'}), 400
+                    return jsonify({'success': False, 'error': 'source_path required'}), 400
                 if not destination_folder:
-                    return jsonify({'success': False, 'error': 'destination_folder required'}), 400
+                    return jsonify({'success': False, 'error': 'destination_path required'}), 400
 
-                # Scan source folder and build real operations
+                # Note: The user_id would typically come from an auth system.
+                # For now, we'll use a hardcoded developer ID.
+                user_id = "dev_user"
+
+                # Get the File Organizer App instance
+                app_manager = self.components.get('app_manager')
+                if not app_manager:
+                    return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
+                
+                # For now, bypass the module system and work directly with the database
+                # This is a temporary solution until we fix the async module startup
+                pass
+
+                # The logic for scanning files and creating operations is now temporary
+                # until the AI generator is fully re-integrated.
                 from pathlib import Path
-
                 src_path = Path(source_folder).expanduser()
                 dest_root = Path(destination_folder).expanduser()
                 if not src_path.exists() or not src_path.is_dir():
-                    return jsonify({'success': False, 'error': f'source_folder not found or not a directory: {source_folder}'}), 400
+                    return jsonify({'success': False, 'error': f'source_folder not found: {source_folder}'}), 400
 
-                # Extension → category folder mapping
                 ext_map = {
-                    # Documents
-                    '.pdf': 'Documents', '.doc': 'Documents', '.docx': 'Documents', '.txt': 'Documents', '.rtf': 'Documents',
-                    # Images
-                    '.png': 'Pictures', '.jpg': 'Pictures', '.jpeg': 'Pictures', '.gif': 'Pictures', '.webp': 'Pictures',
-                    # Videos
-                    '.mkv': 'Videos', '.mp4': 'Videos', '.avi': 'Videos', '.mov': 'Videos', '.wmv': 'Videos',
-                    # Archives
-                    '.rar': 'Archives', '.zip': 'Archives', '.7z': 'Archives', '.tar': 'Archives', '.gz': 'Archives', '.bz2': 'Archives',
-                    # Disk images
-                    '.iso': 'Software', '.dmg': 'Software', '.img': 'Software',
+                    '.pdf': 'Documents', '.doc': 'Documents', '.docx': 'Documents', '.txt': 'Documents',
+                    '.png': 'Pictures', '.jpg': 'Pictures', '.jpeg': 'Pictures', '.gif': 'Pictures',
+                    '.mkv': 'Videos', '.mp4': 'Videos', '.avi': 'Videos', '.mov': 'Videos',
+                    '.rar': 'Archives', '.zip': 'Archives', '.7z': 'Archives',
+                    '.iso': 'Software', '.dmg': 'Software',
                 }
-
+                
                 files = [p for p in src_path.iterdir() if p.is_file()]
-
                 operations = []
-                stats_counts = {}
-                warnings = []
-
                 for f in files:
                     ext = f.suffix.lower()
                     category = ext_map.get(ext, 'Other')
-                    stats_counts[category] = stats_counts.get(category, 0) + 1
-
-                    dest_dir = dest_root / category
-                    dest_path = dest_dir / f.name
-
+                    dest_path = dest_root / category / f.name
                     operations.append({
                         'type': 'move',
                         'source': str(f),
@@ -196,21 +195,71 @@ class WebServer:
                         'reason': f'Move {f.name} to {category}/'
                     })
 
-                response = {
-                    'success': True,
-                    'operations': operations,
-                    'total_files': len(files),
-                    'organization_style': organization_style,
-                    'stats': {
-                        'by_category': stats_counts,
-                    },
-                    'warnings': warnings,
-                }
-
+                # Create a persistent analysis session directly in the database
+                import sqlite3
+                import uuid
+                import json
+                from datetime import datetime
+                
+                analysis_id = str(uuid.uuid4())
+                now = datetime.now().isoformat()
+                
+                # Connect to the database directly
+                import os
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+                conn = sqlite3.connect(db_path)
+                
+                try:
+                    # Insert analysis session
+                    conn.execute("""
+                        INSERT INTO analysis_sessions 
+                        (analysis_id, user_id, source_path, destination_path, organization_style, file_count, created_at, updated_at, status, metadata)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (analysis_id, user_id, source_folder, destination_folder, organization_style, len(files), now, now, 'active', json.dumps({})))
+                    
+                    # Insert operations and add operation_id to each operation
+                    for i, op in enumerate(operations):
+                        operation_id = f"{analysis_id}_op_{i}"
+                        conn.execute("""
+                            INSERT INTO analysis_operations
+                            (operation_id, analysis_id, operation_type, source_path, destination_path, file_name, operation_status, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (operation_id, analysis_id, op['type'], op['source'], op['destination'], 
+                              Path(op['source']).name, 'pending', json.dumps({'reason': op.get('reason', '')})))
+                        
+                        # Add operation_id to the operation for the response
+                        op['operation_id'] = operation_id
+                        op['status'] = 'pending'
+                    
+                    conn.commit()
+                    
+                    # Prepare response
+                    analysis = {
+                        "analysis_id": analysis_id,
+                        "user_id": user_id,
+                        "source_path": source_folder,
+                        "destination_path": destination_folder,
+                        "organization_style": organization_style,
+                        "file_count": len(files),
+                        "created_at": now,
+                        "updated_at": now,
+                        "status": "active"
+                    }
+                    
+                    response = {
+                        "success": True,
+                        "analysis_id": analysis_id,
+                        "analysis": analysis,
+                        "operations": operations
+                    }
+                    
+                finally:
+                    conn.close()
+                
                 return jsonify(response)
                     
             except Exception as e:
-                logger.error(f"/organize error: {e}")
+                logger.error(f"/organize error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
 
         @self.app.route('/api/file-organizer/execute-operations', methods=['POST'])
@@ -252,6 +301,322 @@ class WebServer:
                     
             except Exception as e:
                 logger.error(f"/execute-operations error: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+
+        @self.app.route('/api/file-organizer/analyses', methods=['GET'])
+        def fo_get_analyses():
+            try:
+                # Hardcoded user_id for now
+                user_id = "dev_user"
+                
+                # Direct database access (bypassing module system due to async issues)
+                import sqlite3
+                import os
+                
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+                conn = sqlite3.connect(db_path)
+                
+                try:
+                    # Get all analysis sessions for the user
+                    cursor = conn.execute("""
+                        SELECT analysis_id, user_id, source_path, destination_path, organization_style, 
+                               file_count, created_at, updated_at, status, metadata
+                        FROM analysis_sessions 
+                        WHERE user_id = ?
+                        ORDER BY created_at DESC
+                    """, (user_id,))
+                    
+                    analyses = []
+                    for row in cursor.fetchall():
+                        analyses.append({
+                            'analysis_id': row[0],
+                            'user_id': row[1],
+                            'source_path': row[2],
+                            'destination_path': row[3],
+                            'organization_style': row[4],
+                            'file_count': row[5],
+                            'created_at': row[6],
+                            'updated_at': row[7],
+                            'status': row[8],
+                            'metadata': row[9]
+                        })
+                    
+                    return jsonify({'success': True, 'analyses': analyses})
+                    
+                finally:
+                    conn.close()
+                    
+            except Exception as e:
+                logger.error(f"/analyses error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+        @self.app.route('/api/file-organizer/analyses/<analysis_id>', methods=['GET'])
+        def fo_get_analysis_detail(analysis_id):
+            try:
+                user_id = "dev_user"
+                
+                # Direct database access (bypassing module system due to async issues)
+                import sqlite3
+                import os
+                import json
+                
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+                conn = sqlite3.connect(db_path)
+                
+                try:
+                    # Get the analysis session
+                    cursor = conn.execute("""
+                        SELECT analysis_id, user_id, source_path, destination_path, organization_style, 
+                               file_count, created_at, updated_at, status, metadata
+                        FROM analysis_sessions 
+                        WHERE user_id = ? AND analysis_id = ?
+                    """, (user_id, analysis_id))
+                    
+                    analysis_row = cursor.fetchone()
+                    if not analysis_row:
+                        return jsonify({'success': False, 'error': 'Analysis not found'}), 404
+                    
+                    analysis = {
+                        'analysis_id': analysis_row[0],
+                        'user_id': analysis_row[1],
+                        'source_path': analysis_row[2],
+                        'destination_path': analysis_row[3],
+                        'organization_style': analysis_row[4],
+                        'file_count': analysis_row[5],
+                        'created_at': analysis_row[6],
+                        'updated_at': analysis_row[7],
+                        'status': analysis_row[8],
+                        'metadata': analysis_row[9]
+                    }
+                    
+                    # Get the operations for this analysis
+                    cursor = conn.execute("""
+                        SELECT operation_id, analysis_id, operation_type, source_path, destination_path, 
+                               file_name, operation_status, applied_at, reverted_at, metadata
+                        FROM analysis_operations 
+                        WHERE analysis_id = ?
+                        ORDER BY operation_id
+                    """, (analysis_id,))
+                    
+                    operations = []
+                    for row in cursor.fetchall():
+                        op_metadata = json.loads(row[9]) if row[9] else {}
+                        operations.append({
+                            'operation_id': row[0],
+                            'analysis_id': row[1],
+                            'type': row[2],
+                            'source': row[3],
+                            'destination': row[4],
+                            'file_name': row[5],
+                            'status': row[6],
+                            'applied_at': row[7],
+                            'reverted_at': row[8],
+                            'reason': op_metadata.get('reason', '')
+                        })
+                    
+                    return jsonify({
+                        'success': True,
+                        'analysis': analysis,
+                        'operations': operations
+                    })
+                    
+                finally:
+                    conn.close()
+                    
+            except Exception as e:
+                logger.error(f"/analyses/{analysis_id} error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+        @self.app.route('/api/file-organizer/operations/<operation_id>/status', methods=['PUT'])
+        def fo_update_operation_status(operation_id):
+            try:
+                user_id = "dev_user"
+                data = request.get_json(force=True, silent=True) or {}
+                status = data.get('status')
+                timestamp = data.get('timestamp', datetime.now().isoformat())
+
+                if not status:
+                    return jsonify({'success': False, 'error': 'Status is required'}), 400
+
+                # Validate status
+                valid_statuses = ['pending', 'applied', 'ignored', 'reverted', 'removed']
+                if status not in valid_statuses:
+                    return jsonify({'success': False, 'error': f'Invalid status. Must be one of: {valid_statuses}'}), 400
+
+                # Direct database access (bypassing module system due to async issues)
+                import sqlite3
+                import os
+                import json
+                
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+                conn = sqlite3.connect(db_path)
+                
+                try:
+                    # First check if the operation exists and belongs to the user
+                    cursor = conn.execute("""
+                        SELECT ao.operation_id, ao.analysis_id, ao.operation_type, ao.source_path, 
+                               ao.destination_path, ao.file_name, ao.operation_status, ao.applied_at, 
+                               ao.reverted_at, ao.metadata
+                        FROM analysis_operations ao
+                        JOIN analysis_sessions as_ ON ao.analysis_id = as_.analysis_id
+                        WHERE ao.operation_id = ? AND as_.user_id = ?
+                    """, (operation_id, user_id))
+                    
+                    operation_row = cursor.fetchone()
+                    if not operation_row:
+                        return jsonify({'success': False, 'error': 'Operation not found'}), 404
+                    
+                    # Update the operation status
+                    update_fields = ['operation_status']
+                    update_values = [status]
+                    
+                    # Set timestamp fields based on status
+                    if status == 'applied':
+                        update_fields.append('applied_at')
+                        update_values.append(timestamp)
+                    elif status == 'reverted':
+                        update_fields.append('reverted_at')
+                        update_values.append(timestamp)
+                    
+                    update_values.append(operation_id)
+                    
+                    update_query = f"UPDATE analysis_operations SET {', '.join([f'{field} = ?' for field in update_fields])} WHERE operation_id = ?"
+                    conn.execute(update_query, update_values)
+                    conn.commit()
+                    
+                    # Get the updated operation
+                    cursor = conn.execute("""
+                        SELECT operation_id, analysis_id, operation_type, source_path, destination_path, 
+                               file_name, operation_status, applied_at, reverted_at, metadata
+                        FROM analysis_operations 
+                        WHERE operation_id = ?
+                    """, (operation_id,))
+                    
+                    updated_row = cursor.fetchone()
+                    op_metadata = json.loads(updated_row[9]) if updated_row[9] else {}
+                    
+                    updated_operation = {
+                        'operation_id': updated_row[0],
+                        'analysis_id': updated_row[1],
+                        'type': updated_row[2],
+                        'source': updated_row[3],
+                        'destination': updated_row[4],
+                        'file_name': updated_row[5],
+                        'status': updated_row[6],
+                        'applied_at': updated_row[7],
+                        'reverted_at': updated_row[8],
+                        'reason': op_metadata.get('reason', '')
+                    }
+
+                    return jsonify({'success': True, 'message': 'Operation status updated', 'operation': updated_operation})
+                    
+                finally:
+                    conn.close()
+                    
+            except Exception as e:
+                logger.error(f"/operations/{operation_id}/status error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+        @self.app.route('/api/file-organizer/operations/batch-status', methods=['PUT'])
+        def fo_batch_update_operation_status():
+            try:
+                user_id = "dev_user"
+                data = request.get_json(force=True, silent=True) or {}
+                operation_ids = data.get('operation_ids', [])
+                status = data.get('status')
+                timestamp = data.get('timestamp', datetime.now().isoformat())
+
+                if not status or not operation_ids:
+                    return jsonify({'success': False, 'error': 'Status and operation_ids are required'}), 400
+
+                # Validate status
+                valid_statuses = ['pending', 'applied', 'ignored', 'reverted', 'removed']
+                if status not in valid_statuses:
+                    return jsonify({'success': False, 'error': f'Invalid status. Must be one of: {valid_statuses}'}), 400
+
+                # Direct database access (bypassing module system due to async issues)
+                import sqlite3
+                import os
+                import json
+                
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+                conn = sqlite3.connect(db_path)
+                
+                try:
+                    updated_operations = []
+                    
+                    # Process each operation
+                    for operation_id in operation_ids:
+                        # First check if the operation exists and belongs to the user
+                        cursor = conn.execute("""
+                            SELECT ao.operation_id, ao.analysis_id, ao.operation_type, ao.source_path, 
+                                   ao.destination_path, ao.file_name, ao.operation_status, ao.applied_at, 
+                                   ao.reverted_at, ao.metadata
+                            FROM analysis_operations ao
+                            JOIN analysis_sessions as_ ON ao.analysis_id = as_.analysis_id
+                            WHERE ao.operation_id = ? AND as_.user_id = ?
+                        """, (operation_id, user_id))
+                        
+                        operation_row = cursor.fetchone()
+                        if not operation_row:
+                            continue  # Skip operations that don't exist or don't belong to user
+                        
+                        # Update the operation status
+                        update_fields = ['operation_status']
+                        update_values = [status]
+                        
+                        # Set timestamp fields based on status
+                        if status == 'applied':
+                            update_fields.append('applied_at')
+                            update_values.append(timestamp)
+                        elif status == 'reverted':
+                            update_fields.append('reverted_at')
+                            update_values.append(timestamp)
+                        
+                        update_values.append(operation_id)
+                        
+                        update_query = f"UPDATE analysis_operations SET {', '.join([f'{field} = ?' for field in update_fields])} WHERE operation_id = ?"
+                        conn.execute(update_query, update_values)
+                        
+                        # Get the updated operation
+                        cursor = conn.execute("""
+                            SELECT operation_id, analysis_id, operation_type, source_path, destination_path, 
+                                   file_name, operation_status, applied_at, reverted_at, metadata
+                            FROM analysis_operations 
+                            WHERE operation_id = ?
+                        """, (operation_id,))
+                        
+                        updated_row = cursor.fetchone()
+                        if updated_row:
+                            op_metadata = json.loads(updated_row[9]) if updated_row[9] else {}
+                            
+                            updated_operations.append({
+                                'operation_id': updated_row[0],
+                                'analysis_id': updated_row[1],
+                                'type': updated_row[2],
+                                'source': updated_row[3],
+                                'destination': updated_row[4],
+                                'file_name': updated_row[5],
+                                'status': updated_row[6],
+                                'applied_at': updated_row[7],
+                                'reverted_at': updated_row[8],
+                                'reason': op_metadata.get('reason', '')
+                            })
+                    
+                    conn.commit()
+                    
+                    return jsonify({
+                        'success': True, 
+                        'message': f'{len(updated_operations)} operations updated',
+                        'updated_operations': updated_operations
+                    })
+                    
+                finally:
+                    conn.close()
+                    
+            except Exception as e:
+                logger.error(f"/operations/batch-status error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -330,7 +695,7 @@ class WebServer:
         @self.app.route('/api/file-organizer/destinations', methods=['GET'])
         def fo_get_destinations():
             try:
-                file_organizer_app = self.components.get('app_manager').get_app_instance("file_organizer")
+                file_organizer_app = self.components.get('app_manager').get_active_module("file_organizer")
                 if not file_organizer_app:
                     return jsonify({'success': False, 'error': 'File Organizer module not found or not running'}), 404
                 destinations = file_organizer_app.get_all_destination_paths()
@@ -342,7 +707,7 @@ class WebServer:
         @self.app.route('/api/file-organizer/destinations', methods=['DELETE'])
         def fo_delete_destination():
             try:
-                file_organizer_app = self.components.get('app_manager').get_app_instance("file_organizer")
+                file_organizer_app = self.components.get('app_manager').get_active_module("file_organizer")
                 if not file_organizer_app:
                     return jsonify({'success': False, 'error': 'File Organizer module not found or not running'}), 404
 

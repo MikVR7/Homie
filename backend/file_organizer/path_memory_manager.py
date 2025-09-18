@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
+import uuid
+import json
 
 
 logger = logging.getLogger("PathMemoryManager")
@@ -144,6 +146,42 @@ class PathMemoryManager:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analysis_sessions (
+                    analysis_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    source_path TEXT NOT NULL,
+                    destination_path TEXT,
+                    organization_style TEXT,
+                    file_count INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'active',
+                    metadata TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analysis_operations (
+                    operation_id TEXT PRIMARY KEY,
+                    analysis_id TEXT NOT NULL,
+                    operation_type TEXT NOT NULL,
+                    source_path TEXT,
+                    destination_path TEXT,
+                    file_name TEXT NOT NULL,
+                    operation_status TEXT DEFAULT 'pending',
+                    applied_at TIMESTAMP NULL,
+                    reverted_at TIMESTAMP NULL,
+                    metadata TEXT,
+                    FOREIGN KEY (analysis_id) REFERENCES analysis_sessions (analysis_id)
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_sessions_user_id ON analysis_sessions(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_operations_analysis_id ON analysis_operations(analysis_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_operations_status ON analysis_operations(operation_status)")
         self._db_connection = conn
         logger.info(f"📦 PathMemoryManager DB ready at {self._db_path}")
 
@@ -347,6 +385,158 @@ class PathMemoryManager:
             "status": "healthy" if self._started else "stopped",
             "db_path": str(self._db_path) if self._db_path else "",
         }
+
+    def create_analysis_session(self, user_id: str, source_path: str, destination_path: str, organization_style: str, file_count: int, operations: List[Dict]) -> Dict:
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        analysis_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+
+        session_data = {
+            "analysis_id": analysis_id,
+            "user_id": user_id,
+            "source_path": source_path,
+            "destination_path": destination_path,
+            "organization_style": organization_style,
+            "file_count": file_count,
+            "created_at": now,
+            "updated_at": now,
+            "status": "active",
+            "metadata": "{}"
+        }
+
+        with self._db_connection:
+            self._db_connection.execute(
+                """
+                INSERT INTO analysis_sessions (analysis_id, user_id, source_path, destination_path, organization_style, file_count, created_at, updated_at, status, metadata)
+                VALUES (:analysis_id, :user_id, :source_path, :destination_path, :organization_style, :file_count, :created_at, :updated_at, :status, :metadata)
+                """,
+                session_data
+            )
+
+            ops_to_insert = []
+            for op in operations:
+                ops_to_insert.append({
+                    "operation_id": str(uuid.uuid4()),
+                    "analysis_id": analysis_id,
+                    "operation_type": op.get("type"),
+                    "source_path": op.get("source"),
+                    "destination_path": op.get("destination"),
+                    "file_name": Path(op.get("source", "")).name,
+                    "operation_status": "pending",
+                    "metadata": json.dumps({"reason": op.get("reason")})
+                })
+            
+            self._db_connection.executemany(
+                """
+                INSERT INTO analysis_operations (operation_id, analysis_id, operation_type, source_path, destination_path, file_name, operation_status, metadata)
+                VALUES (:operation_id, :analysis_id, :operation_type, :source_path, :destination_path, :file_name, :operation_status, :metadata)
+                """,
+                ops_to_insert
+            )
+        
+        # Fetch the created operations to return them with their new IDs
+        cursor = self._db_connection.execute(
+            "SELECT * FROM analysis_operations WHERE analysis_id = ?", (analysis_id,)
+        )
+        created_ops = [dict(row) for row in cursor.fetchall()]
+
+        return {"analysis": session_data, "operations": created_ops}
+
+    def get_analysis_sessions_for_user(self, user_id: str, limit: int = 50) -> List[Dict]:
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        cursor = self._db_connection.execute(
+            """
+            SELECT
+                s.analysis_id, s.source_path, s.destination_path, s.organization_style,
+                s.file_count, s.created_at, s.status,
+                COUNT(CASE WHEN o.operation_status = 'pending' THEN 1 END) AS pending_operations,
+                COUNT(CASE WHEN o.operation_status = 'applied' THEN 1 END) AS applied_operations,
+                COUNT(CASE WHEN o.operation_status = 'ignored' THEN 1 END) AS ignored_operations
+            FROM analysis_sessions s
+            LEFT JOIN analysis_operations o ON s.analysis_id = o.analysis_id
+            WHERE s.user_id = ?
+            GROUP BY s.analysis_id
+            ORDER BY s.created_at DESC
+            LIMIT ?
+            """,
+            (user_id, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_analysis_with_operations(self, user_id: str, analysis_id: str) -> Optional[Dict]:
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        cursor = self._db_connection.execute(
+            "SELECT * FROM analysis_sessions WHERE analysis_id = ? AND user_id = ?",
+            (analysis_id, user_id)
+        )
+        session = cursor.fetchone()
+        if not session:
+            return None
+
+        cursor = self._db_connection.execute(
+            "SELECT * FROM analysis_operations WHERE analysis_id = ?",
+            (analysis_id,)
+        )
+        operations = [dict(row) for row in cursor.fetchall()]
+        
+        return {"analysis": dict(session), "operations": operations}
+
+    def update_operation_status(self, user_id: str, operation_id: str, status: str, timestamp: str) -> Optional[Dict]:
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        status_field_map = {
+            "applied": "applied_at",
+            "reverted": "reverted_at"
+        }
+        time_field = status_field_map.get(status)
+
+        with self._db_connection:
+            # Check if operation exists and belongs to the user
+            cursor = self._db_connection.execute(
+                """
+                SELECT o.operation_id FROM analysis_operations o
+                JOIN analysis_sessions s ON o.analysis_id = s.analysis_id
+                WHERE o.operation_id = ? AND s.user_id = ?
+                """,
+                (operation_id, user_id)
+            )
+            if not cursor.fetchone():
+                return None
+
+            sql = "UPDATE analysis_operations SET operation_status = ?"
+            params = [status]
+            if time_field:
+                sql += f", {time_field} = ?"
+                params.append(timestamp)
+            
+            sql += " WHERE operation_id = ?"
+            params.append(operation_id)
+
+            self._db_connection.execute(sql, tuple(params))
+
+            cursor = self._db_connection.execute("SELECT * FROM analysis_operations WHERE operation_id = ?", (operation_id,))
+            return dict(cursor.fetchone())
+
+    def batch_update_operation_status(self, user_id: str, operation_ids: List[str], status: str, timestamp: str) -> List[Dict]:
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        updated_ops = []
+        with self._db_connection:
+            for op_id in operation_ids:
+                # This is inefficient but ensures user ownership for each op.
+                # A better way would be a single query with a sub-select.
+                updated_op = self.update_operation_status(user_id, op_id, status, timestamp)
+                if updated_op:
+                    updated_ops.append(updated_op)
+        return updated_ops
 
     def get_all_destination_paths(self):
         if not self._db_connection:

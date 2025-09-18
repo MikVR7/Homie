@@ -187,4 +187,19 @@ class FileOrganizerApp:
     def remove_destination_path(self, path):
         return self.path_memory_manager.remove_destination_path(path)
 
+    def create_analysis_session(self, user_id: str, source_path: str, destination_path: str, organization_style: str, file_count: int, operations: list):
+        return self.path_memory_manager.create_analysis_session(user_id, source_path, destination_path, organization_style, file_count, operations)
+
+    def get_analysis_sessions_for_user(self, user_id: str):
+        return self.path_memory_manager.get_analysis_sessions_for_user(user_id)
+
+    def get_analysis_with_operations(self, user_id: str, analysis_id: str):
+        return self.path_memory_manager.get_analysis_with_operations(user_id, analysis_id)
+
+    def update_operation_status(self, user_id: str, operation_id: str, status: str, timestamp: str):
+        return self.path_memory_manager.update_operation_status(user_id, operation_id, status, timestamp)
+
+    def batch_update_operation_status(self, user_id: str, operation_ids: list, status: str, timestamp: str):
+        return self.path_memory_manager.batch_update_operation_status(user_id, operation_ids, status, timestamp)
+
 

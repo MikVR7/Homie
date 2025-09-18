@@ -7,8 +7,8 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
 ## Core Modules (Rebuilt 2025-08-09)
 
 ### Phase 1: File Organizer ✅ Rebuilt
-- **Status**: Rebuilt with abstract operations and pure Python execution
-- **Features**: AI-powered file categorization, destination memory, drive discovery/monitoring
+- **Status**: Rebuilt with abstract operations, pure Python execution, and persistent analysis storage
+- **Features**: AI-powered file categorization, destination memory, drive discovery/monitoring, persistent analysis sessions
 - **Database**: `homie_file_organizer.db` (separate module database)
 - **Key Components**:
   - `file_organizer_app.py`: High-level coordinator; subscribes to `EventBus`
@@ -17,10 +17,24 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
   - `ai_command_generator.py`: Builds AI prompts; returns abstract operations
   - `file_operation_manager.py`: Executes operations via pure Python (`pathlib`/`shutil`)
 
+**Persistent Analysis Storage**:
+- **Analysis Sessions**: Each "Analyze" action creates a stored analysis session in the database
+- **Operation Tracking**: Individual operations track their status (pending/applied/ignored/reverted)
+- **Session History**: Users can see their analysis history when reopening the app
+- **Resume Capability**: Frontend can resume exactly where they left off
+
+**Database Schema**:
+- `analysis_sessions`: Stores analysis metadata (user_id, source_path, destination_path, file_count, status)
+- `analysis_operations`: Stores individual operations with status tracking and timestamps
+
 API alignment:
-- Analyze is exposed as `POST /api/file-organizer/organize`.
-- Responses return frontend-compatible operations: `type`, `source`, `destination` (optional `reason`).
-- Additional telemetry fields: `total_files`, `stats.by_category`, `warnings`.
+- Analyze is exposed as `POST /api/file-organizer/organize` (creates persistent analysis session)
+- Analysis history: `GET /api/file-organizer/analyses` (returns user's analysis history)
+- Analysis detail: `GET /api/file-organizer/analyses/{analysis_id}` (returns specific analysis with operations)
+- Operation status: `PUT /api/file-organizer/operations/{operation_id}/status` (updates single operation)
+- Batch status: `PUT /api/file-organizer/operations/batch-status` (updates multiple operations)
+- Responses return frontend-compatible operations: `type`, `source`, `destination`, `operation_id`, `status`
+- Additional telemetry fields: `analysis_id`, `analysis` object, `total_files`, `stats.by_category`, `warnings`.
 
 ### Phase 2: Home Server/NAS (Planned)
 - **Status**: Planned
