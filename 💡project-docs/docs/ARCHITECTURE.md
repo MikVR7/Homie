@@ -19,7 +19,7 @@ Homie is a mobile-first intelligent home management platform that provides AI-po
 
 API alignment:
 - Analyze is exposed as `POST /api/file-organizer/organize`.
-- Responses return executor-compatible operations: `type`, `src`, `dest` (optional `reason`).
+- Responses return frontend-compatible operations: `type`, `source`, `destination` (optional `reason`).
 - Additional telemetry fields: `total_files`, `stats.by_category`, `warnings`.
 
 ### Phase 2: Home Server/NAS (Planned)
@@ -58,15 +58,6 @@ API alignment:
 - **vs threading**: Better performance for WebSocket-heavy applications
 - **vs eventlet**: eventlet has compatibility issues with Python 3.12 (removed `distutils`, `ssl.wrap_socket`)
 - **Production ready**: Used by many Flask-SocketIO applications in production
-
-### Frontend
-- **Framework**: Flutter (Dart)
-- **Platforms**: Mobile (Android/iOS), Desktop (Windows/macOS/Linux)
-- **UI**: Material Design 3, dark theme
-- **State Management**: Enhanced Provider architecture with comprehensive state management
-  - FileOrganizerProvider: Complete state management with 20+ methods
-  - WebSocketProvider: Real-time communication with event streaming
-  - Comprehensive unit testing: 22 tests passing
 
 ### Database Architecture
 

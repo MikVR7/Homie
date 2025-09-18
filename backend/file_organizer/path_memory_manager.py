@@ -348,4 +348,22 @@ class PathMemoryManager:
             "db_path": str(self._db_path) if self._db_path else "",
         }
 
+    def get_all_destination_paths(self):
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+        cursor = self._db_connection.execute("SELECT DISTINCT destination_path FROM destination_mappings ORDER BY last_used DESC")
+        return [row[0] for row in cursor.fetchall()]
+
+    def remove_destination_path(self, path: str) -> bool:
+        """Removes a destination path mapping from the database."""
+        if not self._db_connection:
+            raise RuntimeError("PathMemoryManager database not initialized")
+
+        with self._db_connection:
+            cursor = self._db_connection.execute(
+                "DELETE FROM destination_mappings WHERE destination_path = ?",
+                (path,)
+            )
+            return cursor.rowcount > 0
+
 

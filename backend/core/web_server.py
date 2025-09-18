@@ -191,8 +191,8 @@ class WebServer:
 
                     operations.append({
                         'type': 'move',
-                        'src': str(f),
-                        'dest': str(dest_path),
+                        'source': str(f),
+                        'destination': str(dest_path),
                         'reason': f'Move {f.name} to {category}/'
                     })
 
@@ -326,6 +326,41 @@ class WebServer:
             except Exception as e:
                 logger.error(f"/drives error: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
+        
+        @self.app.route('/api/file-organizer/destinations', methods=['GET'])
+        def fo_get_destinations():
+            try:
+                file_organizer_app = self.components.get('app_manager').get_app_instance("file_organizer")
+                if not file_organizer_app:
+                    return jsonify({'success': False, 'error': 'File Organizer module not found or not running'}), 404
+                destinations = file_organizer_app.get_all_destination_paths()
+                return jsonify({'success': True, 'destinations': destinations})
+            except Exception as e:
+                logger.error(f"Error getting destinations: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': 'Failed to get destinations'}), 500
+
+        @self.app.route('/api/file-organizer/destinations', methods=['DELETE'])
+        def fo_delete_destination():
+            try:
+                file_organizer_app = self.components.get('app_manager').get_app_instance("file_organizer")
+                if not file_organizer_app:
+                    return jsonify({'success': False, 'error': 'File Organizer module not found or not running'}), 404
+
+                data = request.get_json(force=True, silent=True) or {}
+                path = data.get('path')
+
+                if not path:
+                    return jsonify({'success': False, 'error': 'Path is required'}), 400
+
+                result = file_organizer_app.remove_destination_path(path)
+
+                if result:
+                    return jsonify({'success': True, 'message': 'Destination removed'}), 200
+                else:
+                    return jsonify({'success': False, 'error': 'Path not found'}), 404
+            except Exception as e:
+                logger.error(f"Error deleting destination: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': 'Failed to delete destination'}), 500
         
         @self.socketio.on('connect')
         def handle_connect(auth):

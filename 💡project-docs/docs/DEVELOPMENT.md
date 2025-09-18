@@ -110,11 +110,12 @@ flutter run -d ios
 ## API Endpoints
 
 ### File Organizer
-- `POST /api/file-organizer/organize` - AI analyzes and returns abstract operations
-- `POST /api/file-organizer/execute-operations` - Execute abstract operations (pure Python)
-- Additional module endpoints may be exposed via `core/web_server.py`
+- `POST /api/file-organizer/organize` - Analyzes a folder and returns proposed file operations.
+- `POST /api/file-organizer/execute-operations` - Executes a list of operations from the `organize` endpoint.
+- `GET /api/file-organizer/destinations` - Retrieves a list of all known destination paths.
+- `DELETE /api/file-organizer/destinations` - Removes a destination path from memory.
 
-#### Analyze (organize) request/response
+#### Analyze (`organize`) request/response
 
 Endpoint:
 
@@ -144,7 +145,7 @@ Response example:
 {
   "success": true,
   "operations": [
-    {"type":"move","src":"/src/file.pdf","dest":"/dest/Documents/file.pdf","reason":"Move file.pdf to Documents/"}
+    {"type":"move","source":"/src/file.pdf","destination":"/dest/Documents/file.pdf","reason":"Move file.pdf to Documents/"}
   ],
   "total_files": 12,
   "organization_style": "by_type",
@@ -154,8 +155,29 @@ Response example:
 ```
 
 Note:
-- The operations use `src`/`dest` to match the executor interface used by `/api/file-organizer/execute-operations`.
-- Endpoint naming uses hyphen (`file-organizer`) in most routes; a few utility endpoints may use underscore (`file_organizer`).
+- The `organize` endpoint returns operations with `source` and `destination` keys for frontend compatibility.
+- The `execute-operations` endpoint expects the same format.
+
+#### Delete Destination
+
+Endpoint:
+
+```
+DELETE /api/file-organizer/destinations
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "path": "/path/to/remove"
+}
+```
+
+Behavior:
+- Removes the specified path from the `destination_mappings` table in the database.
+- Returns `200 OK` on success or `404 Not Found` if the path does not exist.
 
 ### Financial Manager
 - `GET /api/financial/summary` - Financial summary

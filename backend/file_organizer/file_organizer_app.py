@@ -181,4 +181,10 @@ class FileOrganizerApp:
             else {"status": "not_initialized"},
         }
 
+    def get_all_destination_paths(self):
+        return self.path_memory_manager.get_all_destination_paths()
+
+    def remove_destination_path(self, path):
+        return self.path_memory_manager.remove_destination_path(path)
+
 
