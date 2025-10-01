@@ -1,5 +1,28 @@
 # Homie File Organizer - Production Deployment Guide
 
+## Containerized Backend Deployment
+
+The backend is designed to be deployed as a Docker container, providing a consistent and isolated environment. This process is managed by the `homie-devops` MCP server.
+
+### Building the Docker Image
+
+The `backend/Dockerfile` uses a multi-stage build to create a slim and secure final image. It leverages `uv` for fast dependency installation and sets up a virtual environment within the container.
+
+To build the image, use the `docker_build_image` tool via the `homie-devops` server.
+
+**Example AI Prompt:**
+> Use the DevOps tools to build a Docker image for the backend. Name it `homie-backend` and tag it as `1.0.0`.
+
+### Running the Container
+
+Once the image is built, you can run it using the standard `docker run` command. You'll need to map the container's exposed port (8000) to a port on your host machine.
+
+```bash
+docker run -p 8000:8000 homie-backend:1.0.0
+```
+
+The server will then be accessible at `http://localhost:8000`.
+
 ## 🚀 Overview
 
 This guide covers the complete production deployment process for Homie File Organizer, including backend services, frontend applications, and infrastructure requirements.
@@ -687,3 +710,4 @@ lsof | grep database
 **Last Updated**: [Date]  
 **Version**: 1.0.0  
 **Maintainer**: [Your Name/Team]
+<!-- Last updated: 2025-10-01 21:57 - Reason: Added instructions for the new Docker-based deployment workflow. -->

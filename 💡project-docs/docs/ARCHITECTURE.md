@@ -1,5 +1,9 @@
 # Homie Architecture
 
+## Containerization Strategy
+
+The backend is packaged into a Docker container for deployment. This is managed by the `homie-devops` MCP server, which automates the build process defined in `backend/Dockerfile`. The Dockerfile uses a multi-stage build to produce a minimal, secure image, ensuring a consistent and isolated production environment. See the `DEPLOYMENT.md` guide for detailed instructions.
+
 ## Overview
 
 Homie is a mobile-first intelligent home management platform that provides AI-powered file organization, financial management, media management, and document management through a unified ecosystem.
@@ -225,3 +229,4 @@ Each module can be:
 - **Microservices**: Each module can become a separate microservice
 - **Load Balancing**: Individual modules can be load balanced
 - **Caching**: Module-specific caching strategies
+<!-- Last updated: 2025-10-01 21:57 - Reason: Documenting the new container-based deployment strategy. -->

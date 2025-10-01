@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+# Homie Backend Project Constitution
+
+## Core Architectural Principles
+
+*   **Pythonic & Performant:** The backend is written in Python. Code should be clean, efficient, and follow standard Python best practices.
+*   **Centralized Database Logic:** All data persistence is handled through the project's SQLite database. The schema is the single source of truth for data structures.
+*   **Test-Driven:** Changes and new features should be accompanied by tests. The `pytest` framework is the standard for this project.
+*   **Ready for Deployment:** The ultimate goal is to package the backend into a portable Docker container for deployment.
+
+## Your Standard Operating Procedure
+
+1.  **Consult the Backend Docs First:** Before providing any code, you must consult the `homie-docs` server to understand the project's architecture, especially `ARCHITECTURE.md`, `CENTRALIZED_MEMORY.md`, and database-related documents.
+2.  **Analyze Code Before Changing:** When refactoring or adding features, you must first use the `homie-code-intel` tools (`find_function_usage`, `list_class_methods`) to understand the existing codebase and potential impacts.
+3.  **Always Verify with Tests & Linters:** After making any code changes, you must offer to run the test suite (`run_tests`) and the linter (`lint_code`) using the `homie-backend` server to ensure code quality and correctness.
+4.  **Respect the Database:** When working on features that interact with the database, use the `homie-database` tools to check the schema (`db_get_schema`) or reset the environment with test data (`db_seed_test_data`).
+5.  **Documentation is Part of "Done":** When a feature or refactor is complete, you must proactively suggest and perform updates to the relevant documentation files using the `homie-docs` server.
+6.  **Build After Significant Changes:** After completing a major feature or fix, you must always ask if you should build a new Docker image using the `homie-devops` server to prepare for deployment.
