@@ -17,6 +17,7 @@ import asyncio
 import logging
 import os
 import sqlite3
+import threading # Import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -45,18 +46,19 @@ class PathMemoryManager:
     def __init__(self, event_bus, shared_services):
         self.event_bus = event_bus
         self.shared_services = shared_services
-        self._db_connection: Optional[sqlite3.Connection] = None
         self._db_path: Optional[Path] = None
         self._drives_manager = None  # Lazy import to avoid circulars
         self._started = False
         self._subscriptions: List[str] = []
+        self._db_lock = threading.Lock() # Add a lock for thread safety
 
     async def start(self) -> None:
         if self._started:
             return
 
         logger.info("🧠 Starting PathMemoryManager…")
-        self._setup_database()
+        self._setup_database_path() # Renamed to avoid creating connection
+        self._create_tables_if_not_exist() # Ensure tables are created on start
 
         from .drives_manager import DrivesManager
 
@@ -96,26 +98,29 @@ class PathMemoryManager:
         except Exception:
             pass
 
-        if self._db_connection:
-            try:
-                self._db_connection.close()
-            except Exception as e:
-                logger.warning(f"Database close warning: {e}")
-            self._db_connection = None
-
         self._started = False
         logger.info("✅ PathMemoryManager shut down")
 
-    def _setup_database(self) -> None:
+    def _get_db_connection(self):
+        """Creates and returns a new database connection."""
+        if not self._db_path:
+            raise RuntimeError("Database path not configured.")
+        # check_same_thread=False is a pragmatic solution for gevent/asyncio
+        conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _setup_database_path(self) -> None:
+        """Sets up the database path without creating a connection."""
         data_dir = os.getenv("HOMIE_DATA_DIR", str(Path(__file__).resolve().parents[1] / "data"))
         modules_dir = Path(data_dir) / "modules"
         modules_dir.mkdir(parents=True, exist_ok=True)
         self._db_path = modules_dir / "homie_file_organizer.db"
+        logger.info(f"📦 PathMemoryManager DB path set to {self._db_path}")
 
-        conn = sqlite3.connect(str(self._db_path))
-        conn.row_factory = sqlite3.Row
-
-        with conn:
+    def _create_tables_if_not_exist(self) -> None:
+        """Connects to the database and creates tables if they don't exist."""
+        with self._get_db_connection() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS file_actions (
@@ -182,9 +187,7 @@ class PathMemoryManager:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_sessions_user_id ON analysis_sessions(user_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_operations_analysis_id ON analysis_operations(analysis_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_operations_status ON analysis_operations(operation_status)")
-        self._db_connection = conn
-        logger.info(f"📦 PathMemoryManager DB ready at {self._db_path}")
-
+        
     async def _on_operation_done(self, data: Dict[str, Any]):
         """Persist results from executed operations."""
         try:
@@ -258,12 +261,9 @@ class PathMemoryManager:
         error_message: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> None:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
         timestamp = datetime.now().isoformat()
-        with self._db_connection:
-            self._db_connection.execute(
+        with self._get_db_connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO file_actions (user_id, action_type, file_name, source_path, destination_path, success, error_message, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -281,21 +281,19 @@ class PathMemoryManager:
             )
 
     def get_folder_history(self, folder_path: str, limit: int = 50) -> List[FolderUsageRecord]:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
-        cursor = self._db_connection.execute(
-            """
+        with self._get_db_connection() as conn:
+            cursor = conn.execute(
+                """
             SELECT file_name, action_type, destination_path, success, error_message, timestamp
             FROM file_actions
             WHERE source_path = ?
             ORDER BY timestamp DESC
             LIMIT ?
             """,
-            (folder_path, limit),
-        )
+                (folder_path, limit),
+            )
 
-        rows = cursor.fetchall()
+            rows = cursor.fetchall()
         history: List[FolderUsageRecord] = []
         for row in rows:
             history.append(
@@ -312,9 +310,6 @@ class PathMemoryManager:
         return history
 
     def get_folder_summary(self, folder_path: str) -> Dict[str, Any]:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
         summary: Dict[str, Any] = {
             "folder_path": folder_path,
             "total_actions": 0,
@@ -325,53 +320,54 @@ class PathMemoryManager:
             "top_destinations": [],
         }
 
-        # Totals and last activity
-        row = self._db_connection.execute(
-            """
-            SELECT COUNT(*) AS total,
+        with self._get_db_connection() as conn:
+            # Totals and last activity
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS total,
                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) AS success_count,
                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS failure_count,
                    MAX(timestamp) AS last_ts
             FROM file_actions
             WHERE source_path = ?
             """,
-            (folder_path,),
-        ).fetchone()
+                (folder_path,),
+            ).fetchone()
 
-        if row:
-            summary["total_actions"] = int(row["total"] or 0)
-            summary["success_count"] = int(row["success_count"] or 0)
-            summary["failure_count"] = int(row["failure_count"] or 0)
-            summary["last_activity"] = row["last_ts"]
+            if row:
+                summary["total_actions"] = int(row["total"] or 0)
+                summary["success_count"] = int(row["success_count"] or 0)
+                summary["failure_count"] = int(row["failure_count"] or 0)
+                summary["last_activity"] = row["last_ts"]
 
-        # Actions by type
-        cur = self._db_connection.execute(
-            """
-            SELECT action_type, COUNT(*) AS cnt
-            FROM file_actions
-            WHERE source_path = ?
-            GROUP BY action_type
-            ORDER BY cnt DESC
-            """,
-            (folder_path,),
-        )
-        summary["actions_by_type"] = {r["action_type"]: int(r["cnt"]) for r in cur.fetchall()}
+            # Actions by type
+            cur = conn.execute(
+                """
+                SELECT action_type, COUNT(*) AS cnt
+                FROM file_actions
+                WHERE source_path = ?
+                GROUP BY action_type
+                ORDER BY cnt DESC
+                """,
+                (folder_path,),
+            )
+            summary["actions_by_type"] = {r["action_type"]: int(r["cnt"]) for r in cur.fetchall()}
 
-        # Top destinations
-        cur = self._db_connection.execute(
-            """
-            SELECT destination_path, COUNT(*) AS cnt
-            FROM file_actions
-            WHERE source_path = ? AND destination_path IS NOT NULL AND destination_path <> ''
-            GROUP BY destination_path
-            ORDER BY cnt DESC
-            LIMIT 10
-            """,
-            (folder_path,),
-        )
-        summary["top_destinations"] = [
-            {"destination_path": r["destination_path"], "count": int(r["cnt"])} for r in cur.fetchall()
-        ]
+            # Top destinations
+            cur = conn.execute(
+                """
+                SELECT destination_path, COUNT(*) AS cnt
+                FROM file_actions
+                WHERE source_path = ? AND destination_path IS NOT NULL AND destination_path <> ''
+                GROUP BY destination_path
+                ORDER BY cnt DESC
+                LIMIT 10
+                """,
+                (folder_path,),
+            )
+            summary["top_destinations"] = [
+                {"destination_path": r["destination_path"], "count": int(r["cnt"])} for r in cur.fetchall()
+            ]
 
         return summary
 
@@ -387,9 +383,6 @@ class PathMemoryManager:
         }
 
     def create_analysis_session(self, user_id: str, source_path: str, destination_path: str, organization_style: str, file_count: int, operations: List[Dict]) -> Dict:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
         analysis_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
 
@@ -406,8 +399,8 @@ class PathMemoryManager:
             "metadata": "{}"
         }
 
-        with self._db_connection:
-            self._db_connection.execute(
+        with self._get_db_connection() as conn:
+            conn.execute(
                 """
                 INSERT INTO analysis_sessions (analysis_id, user_id, source_path, destination_path, organization_style, file_count, created_at, updated_at, status, metadata)
                 VALUES (:analysis_id, :user_id, :source_path, :destination_path, :organization_style, :file_count, :created_at, :updated_at, :status, :metadata)
@@ -428,29 +421,27 @@ class PathMemoryManager:
                     "metadata": json.dumps({"reason": op.get("reason")})
                 })
             
-            self._db_connection.executemany(
+            conn.executemany(
                 """
                 INSERT INTO analysis_operations (operation_id, analysis_id, operation_type, source_path, destination_path, file_name, operation_status, metadata)
                 VALUES (:operation_id, :analysis_id, :operation_type, :source_path, :destination_path, :file_name, :operation_status, :metadata)
                 """,
                 ops_to_insert
             )
-        
-        # Fetch the created operations to return them with their new IDs
-        cursor = self._db_connection.execute(
-            "SELECT * FROM analysis_operations WHERE analysis_id = ?", (analysis_id,)
-        )
-        created_ops = [dict(row) for row in cursor.fetchall()]
+            
+            # Fetch the created operations to return them with their new IDs
+            cursor = conn.execute(
+                "SELECT * FROM analysis_operations WHERE analysis_id = ?", (analysis_id,)
+            )
+            created_ops = [dict(row) for row in cursor.fetchall()]
 
         return {"analysis": session_data, "operations": created_ops}
 
     def get_analysis_sessions_for_user(self, user_id: str, limit: int = 50) -> List[Dict]:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
-        cursor = self._db_connection.execute(
-            """
-            SELECT
+        with self._get_db_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT
                 s.analysis_id, s.source_path, s.destination_path, s.organization_style,
                 s.file_count, s.created_at, s.status,
                 COUNT(CASE WHEN o.operation_status = 'pending' THEN 1 END) AS pending_operations,
@@ -463,43 +454,38 @@ class PathMemoryManager:
             ORDER BY s.created_at DESC
             LIMIT ?
             """,
-            (user_id, limit)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+                (user_id, limit)
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_analysis_with_operations(self, user_id: str, analysis_id: str) -> Optional[Dict]:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
+        with self._get_db_connection() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM analysis_sessions WHERE analysis_id = ? AND user_id = ?",
+                (analysis_id, user_id)
+            )
+            session = cursor.fetchone()
+            if not session:
+                return None
 
-        cursor = self._db_connection.execute(
-            "SELECT * FROM analysis_sessions WHERE analysis_id = ? AND user_id = ?",
-            (analysis_id, user_id)
-        )
-        session = cursor.fetchone()
-        if not session:
-            return None
-
-        cursor = self._db_connection.execute(
-            "SELECT * FROM analysis_operations WHERE analysis_id = ?",
-            (analysis_id,)
-        )
-        operations = [dict(row) for row in cursor.fetchall()]
+            cursor = conn.execute(
+                "SELECT * FROM analysis_operations WHERE analysis_id = ?",
+                (analysis_id,)
+            )
+            operations = [dict(row) for row in cursor.fetchall()]
         
         return {"analysis": dict(session), "operations": operations}
 
     def update_operation_status(self, user_id: str, operation_id: str, status: str, timestamp: str) -> Optional[Dict]:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
         status_field_map = {
             "applied": "applied_at",
             "reverted": "reverted_at"
         }
         time_field = status_field_map.get(status)
 
-        with self._db_connection:
+        with self._get_db_connection() as conn:
             # Check if operation exists and belongs to the user
-            cursor = self._db_connection.execute(
+            cursor = conn.execute(
                 """
                 SELECT o.operation_id FROM analysis_operations o
                 JOIN analysis_sessions s ON o.analysis_id = s.analysis_id
@@ -519,38 +505,67 @@ class PathMemoryManager:
             sql += " WHERE operation_id = ?"
             params.append(operation_id)
 
-            self._db_connection.execute(sql, tuple(params))
+            conn.execute(sql, tuple(params))
 
-            cursor = self._db_connection.execute("SELECT * FROM analysis_operations WHERE operation_id = ?", (operation_id,))
+            cursor = conn.execute("SELECT * FROM analysis_operations WHERE operation_id = ?", (operation_id,))
             return dict(cursor.fetchone())
 
     def batch_update_operation_status(self, user_id: str, operation_ids: List[str], status: str, timestamp: str) -> List[Dict]:
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
         updated_ops = []
-        with self._db_connection:
+        with self._get_db_connection() as conn: # This can be optimized, but let's keep it simple for now
             for op_id in operation_ids:
                 # This is inefficient but ensures user ownership for each op.
                 # A better way would be a single query with a sub-select.
-                updated_op = self.update_operation_status(user_id, op_id, status, timestamp)
+                
+                # We need to pass the connection to the single update function
+                updated_op = self._update_operation_status_with_conn(conn, user_id, op_id, status, timestamp)
                 if updated_op:
                     updated_ops.append(updated_op)
         return updated_ops
 
+    def _update_operation_status_with_conn(self, conn: sqlite3.Connection, user_id: str, operation_id: str, status: str, timestamp: str) -> Optional[Dict]:
+        """Helper for batch updates that reuses a connection."""
+        status_field_map = {
+            "applied": "applied_at",
+            "reverted": "reverted_at"
+        }
+        time_field = status_field_map.get(status)
+
+        # Check if operation exists and belongs to the user
+        cursor = conn.execute(
+            """
+            SELECT o.operation_id FROM analysis_operations o
+            JOIN analysis_sessions s ON o.analysis_id = s.analysis_id
+            WHERE o.operation_id = ? AND s.user_id = ?
+            """,
+            (operation_id, user_id)
+        )
+        if not cursor.fetchone():
+            return None
+
+        sql = "UPDATE analysis_operations SET operation_status = ?"
+        params = [status]
+        if time_field:
+            sql += f", {time_field} = ?"
+            params.append(timestamp)
+        
+        sql += " WHERE operation_id = ?"
+        params.append(operation_id)
+
+        conn.execute(sql, tuple(params))
+
+        cursor = conn.execute("SELECT * FROM analysis_operations WHERE operation_id = ?", (operation_id,))
+        return dict(cursor.fetchone())
+
     def get_all_destination_paths(self):
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-        cursor = self._db_connection.execute("SELECT DISTINCT destination_path FROM destination_mappings ORDER BY last_used DESC")
-        return [row[0] for row in cursor.fetchall()]
+        with self._get_db_connection() as conn:
+            cursor = conn.execute("SELECT DISTINCT destination_path FROM destination_mappings ORDER BY last_used DESC")
+            return [row[0] for row in cursor.fetchall()]
 
     def remove_destination_path(self, path: str) -> bool:
         """Removes a destination path mapping from the database."""
-        if not self._db_connection:
-            raise RuntimeError("PathMemoryManager database not initialized")
-
-        with self._db_connection:
-            cursor = self._db_connection.execute(
+        with self._get_db_connection() as conn:
+            cursor = conn.execute(
                 "DELETE FROM destination_mappings WHERE destination_path = ?",
                 (path,)
             )

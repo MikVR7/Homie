@@ -700,6 +700,13 @@ class WebServer:
         @self.app.route('/api/file-organizer/destinations', methods=['GET'])
         def fo_get_destinations():
             try:
+                app_manager = self.components.get('app_manager')
+                if not app_manager:
+                    return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
+                
+                # Ensure the module is started before trying to access it
+                run_async(app_manager.start_module('file_organizer'))
+                
                 file_organizer_app = self.components.get('app_manager').get_active_module("file_organizer")
                 if not file_organizer_app:
                     return jsonify({'success': False, 'error': 'File Organizer module not found or not running'}), 404
