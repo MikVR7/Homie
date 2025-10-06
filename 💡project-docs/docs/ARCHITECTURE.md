@@ -1,5 +1,35 @@
 # Homie Architecture
 
+## API Endpoints
+
+## API Endpoints
+
+The backend exposes the following HTTP endpoints:
+
+### Health Check Endpoints
+
+- **`GET /health`**: Simple health check endpoint that returns `{"status": "ok"}` with a 200 status code. This is a lightweight endpoint for the frontend to verify the backend is running and responsive. Does not connect to database or perform any heavy operations.
+
+- **`GET /api/health`**: Detailed health check endpoint that returns comprehensive system status including component health, version information, and timestamp.
+
+### File Organizer Endpoints
+
+- **`POST /api/file-organizer/organize`**: Analyze a folder and generate file organization operations
+- **`POST /api/file-organizer/execute-operations`**: Execute file organization operations
+- **`GET /api/file-organizer/analyses`**: Get all analysis sessions for the current user
+- **`GET /api/file-organizer/analyses/<analysis_id>`**: Get details of a specific analysis session
+- **`PUT /api/file-organizer/operations/<operation_id>/status`**: Update the status of a specific operation
+- **`PUT /api/file-organizer/operations/batch-status`**: Batch update operation statuses
+- **`GET /api/file_organizer/drives`**: Get available drives
+- **`GET /api/file-organizer/destinations`**: Get saved destination paths
+- **`DELETE /api/file-organizer/destinations`**: Remove a destination path
+
+### System Endpoints
+
+- **`GET /api/status`**: Get detailed system status including all component health checks
+- **`POST /api/test-ai`**: Test AI service connection
+- **`POST /__internal__/shutdown`**: Development-only endpoint for graceful shutdown (localhost only)
+
 ## Containerization Strategy
 
 The backend is packaged into a Docker container for deployment. This is managed by the `homie-devops` MCP server, which automates the build process defined in `backend/Dockerfile`. The Dockerfile uses a multi-stage build to produce a minimal, secure image, ensuring a consistent and isolated production environment. See the `DEPLOYMENT.md` guide for detailed instructions.
@@ -229,4 +259,5 @@ Each module can be:
 - **Microservices**: Each module can become a separate microservice
 - **Load Balancing**: Individual modules can be load balanced
 - **Caching**: Module-specific caching strategies
-<!-- Last updated: 2025-10-01 21:57 - Reason: Documenting the new container-based deployment strategy. -->
+
+<!-- Last updated: 2025-10-06 07:14 - Reason: Added new /health endpoint to the backend for simple health checks -->

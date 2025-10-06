@@ -81,6 +81,11 @@ class WebServer:
     def _setup_http_routes(self):
         """Setup HTTP API routes"""
         
+        @self.app.route('/health', methods=['GET'])
+        def simple_health_check():
+            """A simple health check endpoint for the frontend to poll."""
+            return jsonify({"status": "ok"})
+
         @self.app.route('/api/health', methods=['GET'])
         def health_check():
             """Health check endpoint"""
