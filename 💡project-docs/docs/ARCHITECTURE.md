@@ -1,5 +1,46 @@
 # Homie Architecture
 
+## Frontend Architectural Pattern (Model-Component)
+
+The frontend for HomieA follows a custom architectural pattern we call "Model-Component". This pattern is born out of a desire for simplicity, strict adherence to Object-Oriented Programming (OOP) principles, and a clear separation of concerns, while explicitly avoiding complex frameworks like MVVM or MVC.
+
+### Core Tenets
+
+1.  **Model**: A pure C# class that holds data and business logic. It inherits from `ObservableObject` to notify the UI of property changes. It has no knowledge of the UI components that might display it. Example: `FoundFile.cs`.
+2.  **Component (View/Code-Behind)**: The UI is defined in an `.axaml` file (the View). The logic for user interaction within that component is in its `.axaml.cs` code-behind file. The code-behind's only job is to handle UI events (like button clicks) and translate them into actions, usually by modifying the Model's state or publishing an event. It should contain no business logic. Example: `FoundFileLine.axaml` and `FoundFileLine.axaml.cs`.
+3.  **No Direct Dependencies**: UI components **never** directly call or hold instances of services or other components. All communication is decoupled.
+4.  **Strict Single Responsibility**: Every class, whether it's a model, a component, or a service, must have a single, clearly defined purpose.
+
+### Communication: The `CodeEvents` System
+
+All communication and orchestration within the application is handled by the `CodeEvents` system. This is the backbone of our decoupled architecture.
+
+*   **Publishers**: Any component or service can publish an event to announce that something has happened (e.g., a user clicked a button, data is ready, an error occurred).
+*   **Subscribers**: Any component or service can subscribe to specific events it cares about and react accordingly.
+
+This ensures that components are self-contained and reusable, without creating a tangled web of dependencies.
+
+### Orchestration: Services and the Main Window
+
+While components are self-contained, the overall application flow and business logic are orchestrated by dedicated services and the main window controller (`FileOrganizerWindow.axaml.cs`).
+
+*   **Services**: These are stateful, often singleton-like classes that manage a specific domain.
+    *   `DestinationsService`: Manages the state of all known destination drives and folders, handles communication with the backend for this data, and responds to UI requests for changes (add/delete/set root).
+    *   `ExecutionService`: Acts as a controller for the core sorting workflow. It coordinates fetching destinations, finding files, calling the AI backend for suggestions, and then publishing the results for the UI to display.
+*   **Main Window (`FileOrganizerWindow.axaml.cs`)**: This acts as the central "conductor". It is responsible for:
+    *   Instantiating and injecting the core services.
+    *   Subscribing to high-level events (like a button click to start the main process or a backend connection failure).
+    *   Coordinating the overall UI state, such as showing/hiding views, displaying error overlays, or opening dialogs.
+
+### Backend Connection Management
+
+The application is designed to be resilient to backend connection failures.
+
+1.  **`BackendConnectionException`**: The `ApiService` will throw this custom exception if any network request fails.
+2.  **Error Overlay**: The `FileOrganizerWindow` listens for a `Pub_BackendConnectionFailed` event. When this event is caught, it displays a non-closeable `BackendConnectionManagerView` overlay that informs the user of the issue.
+3.  **Automatic Reconnection**: The `BackendConnectionManagerView` contains a timer that periodically attempts to re-establish a connection by making a key API call (`GetDestinationsAsync`).
+4.  **Restoration**: Once the connection is successful, it fires a `Pub_BackendConnectionRestored` event. The `FileOrganizerWindow` catches this, removes the overlay, and re-initializes the application's data state.
+
 ## API Endpoints
 
 ## API Endpoints
@@ -260,4 +301,5 @@ Each module can be:
 - **Load Balancing**: Individual modules can be load balanced
 - **Caching**: Module-specific caching strategies
 
-<!-- Last updated: 2025-10-06 07:14 - Reason: Added new /health endpoint to the backend for simple health checks -->
+
+<!-- Last updated: 2025-10-06 19:25 - Reason: Reflecting the major architectural refactoring: implementing the Model-Component pattern, enforcing event-driven communication, and creating orchestrator services. -->

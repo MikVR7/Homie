@@ -711,7 +711,7 @@ class WebServer:
                 if not file_organizer_app:
                     return jsonify({'success': False, 'error': 'File Organizer module not found or not running'}), 404
                 destinations = file_organizer_app.get_all_destination_paths()
-                return jsonify({'success': True, 'destinations': destinations})
+                return jsonify(destinations)
             except Exception as e:
                 logger.error(f"Error getting destinations: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': 'Failed to get destinations'}), 500

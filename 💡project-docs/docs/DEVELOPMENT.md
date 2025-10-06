@@ -1,5 +1,19 @@
 # Development Guide
 
+## Console Logging
+
+The project uses the **Serilog** library for structured logging. All log output is directed to the console where the application was launched.
+
+### Configuration
+
+The logger is configured in `Program.cs`. We use the `Serilog.Sinks.Console` package with a specific theme to provide color-coded output, making it easy to distinguish between different log levels.
+
+-   **Information (`Log.Information`)**: Standard blue/cyan text for general application flow.
+-   **Warning (`Log.Warning`)**: Yellow text for non-critical issues.
+-   **Error (`Log.Error`)**: Red text for critical failures and exceptions.
+
+This setup ensures that all important events, especially errors, are highly visible in the terminal during development, which is crucial for debugging. To see the logs, you must run the application via one of the provided shell scripts (e.g., `./run-file-organizer.sh`) and not directly from the IDE's debugger if it swallows console output.
+
 ## Environment Setup
 
 ### Required Environment Variables
@@ -470,3 +484,4 @@ flutter run -d chrome
 2. **Test components**: Test individual parts separately
 3. **Documentation**: Check this file and architecture docs
 4. **Git history**: Look at recent changes for issues
+<!-- Last updated: 2025-10-06 19:29 - Reason: Documenting the new Serilog setup for structured, colored console logging. -->
