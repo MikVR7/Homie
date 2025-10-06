@@ -2,6 +2,16 @@
 
 This document contains general rules and guidelines that apply across all projects and should be followed by AI assistants and developers.
 
+## Rule 0: No Architectural Shortcuts
+
+
+### Rule 0: No Architectural Shortcuts
+The most important principle is to maintain the project's decoupled, event-driven architecture.
+- **THINK FIRST:** Before writing any code, think through the full flow of information.
+- **Identify Responsibilities:** Who is responsible for firing an event? Who is responsible for listening? Who is responsible for updating the UI? These are almost always different classes.
+- **No Shortcuts:** Never put business logic in view components. Never make a component listen for the response to an event it fired. Adhere strictly to the single responsibility principle. Violating this is a critical failure.
+
+
 ## 📅 Date Management
 
 ### For AI Assistants
@@ -101,4 +111,5 @@ git commit -m "fix: resolve error handling"          # NO conventional commit pr
 
 ---
 
-**Note**: This document should be referenced in project-specific documentation but content should not be duplicated. Link to this document when referencing general rules. 
+**Note**: This document should be referenced in project-specific documentation but content should not be duplicated. Link to this document when referencing general rules.
+<!-- Last updated: 2025-10-04 11:07 - Reason: The user explicitly and forcefully corrected me for taking architectural shortcuts and instructed me to write down the rule to never do it again. -->
