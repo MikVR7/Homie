@@ -187,6 +187,24 @@ class PathMemoryManager:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_sessions_user_id ON analysis_sessions(user_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_operations_analysis_id ON analysis_operations(analysis_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analysis_operations_status ON analysis_operations(operation_status)")
+            
+            # Phase 5: User history tracking for smart suggestions
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS file_organization_history (
+                    id INTEGER PRIMARY KEY,
+                    user_id TEXT,
+                    source_file_path TEXT,
+                    destination_path TEXT,
+                    content_type TEXT,
+                    company TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    file_extension TEXT
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_org_history_user_id ON file_organization_history(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_org_history_content_type ON file_organization_history(content_type)")
         
     async def _on_operation_done(self, data: Dict[str, Any]):
         """Persist results from executed operations."""
@@ -570,5 +588,97 @@ class PathMemoryManager:
                 (path,)
             )
             return cursor.rowcount > 0
+    
+    def record_organization_history(self, user_id: str, source_file_path: str, destination_path: str, 
+                                   content_type: Optional[str] = None, company: Optional[str] = None) -> None:
+        """Record a file organization action for smart suggestions."""
+        from pathlib import Path
+        file_extension = Path(source_file_path).suffix.lower()
+        
+        with self._get_db_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO file_organization_history 
+                (user_id, source_file_path, destination_path, content_type, company, file_extension)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, source_file_path, destination_path, content_type, company, file_extension)
+            )
+    
+    def get_destination_suggestions(self, user_id: str, content_type: Optional[str] = None, 
+                                   company: Optional[str] = None, file_extension: Optional[str] = None) -> List[Dict]:
+        """Get destination suggestions based on user history."""
+        with self._get_db_connection() as conn:
+            suggestions = []
+            
+            # Query 1: Exact match on content_type and company
+            if content_type and company:
+                cursor = conn.execute(
+                    """
+                    SELECT destination_path, COUNT(*) as usage_count
+                    FROM file_organization_history
+                    WHERE user_id = ? AND content_type = ? AND company = ?
+                    GROUP BY destination_path
+                    ORDER BY usage_count DESC
+                    LIMIT 3
+                    """,
+                    (user_id, content_type, company)
+                )
+                for row in cursor.fetchall():
+                    suggestions.append({
+                        'destination_path': row[0],
+                        'confidence_score': 0.95,
+                        'reason': f'{content_type} from {company} - you previously organized similar files here',
+                        'is_based_on_history': True,
+                        'usage_count': row[1]
+                    })
+            
+            # Query 2: Match on content_type only
+            if content_type and len(suggestions) < 3:
+                cursor = conn.execute(
+                    """
+                    SELECT destination_path, COUNT(*) as usage_count
+                    FROM file_organization_history
+                    WHERE user_id = ? AND content_type = ?
+                    GROUP BY destination_path
+                    ORDER BY usage_count DESC
+                    LIMIT 3
+                    """,
+                    (user_id, content_type)
+                )
+                for row in cursor.fetchall():
+                    if row[0] not in [s['destination_path'] for s in suggestions]:
+                        suggestions.append({
+                            'destination_path': row[0],
+                            'confidence_score': 0.80,
+                            'reason': f'{content_type} files - based on your history',
+                            'is_based_on_history': True,
+                            'usage_count': row[1]
+                        })
+            
+            # Query 3: Match on file extension
+            if file_extension and len(suggestions) < 3:
+                cursor = conn.execute(
+                    """
+                    SELECT destination_path, COUNT(*) as usage_count
+                    FROM file_organization_history
+                    WHERE user_id = ? AND file_extension = ?
+                    GROUP BY destination_path
+                    ORDER BY usage_count DESC
+                    LIMIT 2
+                    """,
+                    (user_id, file_extension)
+                )
+                for row in cursor.fetchall():
+                    if row[0] not in [s['destination_path'] for s in suggestions]:
+                        suggestions.append({
+                            'destination_path': row[0],
+                            'confidence_score': 0.70,
+                            'reason': f'{file_extension} files - based on your history',
+                            'is_based_on_history': True,
+                            'usage_count': row[1]
+                        })
+            
+            return suggestions[:3]  # Return top 3 suggestions
 
 

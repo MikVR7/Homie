@@ -638,6 +638,206 @@ class WebServer:
                 return jsonify(result)
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)}), 500
+        
+        # ==================== Phase 5: Advanced AI Features ====================
+        
+        @self.app.route('/api/file-organizer/analyze-content', methods=['POST'])
+        def fo_analyze_content():
+            """Analyze a single file and extract rich metadata"""
+            try:
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                
+                data = request.get_json(force=True, silent=True) or {}
+                file_path = data.get('file_path')
+                
+                if not file_path:
+                    return jsonify({'success': False, 'error': 'file_path is required'}), 400
+                
+                analyzer = AIContentAnalyzer()
+                result = analyzer.analyze_file(file_path)
+                
+                return jsonify(result)
+                
+            except Exception as e:
+                logger.error(f"/analyze-content error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+        
+        @self.app.route('/api/file-organizer/analyze-content-batch', methods=['POST'])
+        def fo_analyze_content_batch():
+            """Analyze multiple files at once"""
+            try:
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                
+                data = request.get_json(force=True, silent=True) or {}
+                files = data.get('files', [])
+                
+                if not files:
+                    return jsonify({'success': False, 'error': 'files array is required'}), 400
+                
+                if len(files) > 50:
+                    return jsonify({'success': False, 'error': 'Maximum 50 files per batch'}), 400
+                
+                analyzer = AIContentAnalyzer()
+                results = {}
+                
+                for file_path in files:
+                    try:
+                        results[file_path] = analyzer.analyze_file(file_path)
+                    except Exception as e:
+                        logger.warning(f"Error analyzing {file_path}: {e}")
+                        results[file_path] = None
+                
+                return jsonify({
+                    'success': True,
+                    'results': results
+                })
+                
+            except Exception as e:
+                logger.error(f"/analyze-content-batch error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+        
+        @self.app.route('/api/file-organizer/scan-duplicates', methods=['POST'])
+        def fo_scan_duplicates():
+            """Scan for duplicate files based on content hash"""
+            try:
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                
+                data = request.get_json(force=True, silent=True) or {}
+                files = data.get('files', [])
+                
+                if not files:
+                    return jsonify({'success': False, 'error': 'files array is required'}), 400
+                
+                analyzer = AIContentAnalyzer()
+                result = analyzer.scan_duplicates(files)
+                
+                return jsonify(result)
+                
+            except Exception as e:
+                logger.error(f"/scan-duplicates error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+        
+        @self.app.route('/api/file-organizer/analyze-archive', methods=['POST'])
+        def fo_analyze_archive():
+            """Analyze archive contents without extracting"""
+            try:
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                
+                data = request.get_json(force=True, silent=True) or {}
+                archive_path = data.get('archive_path')
+                
+                if not archive_path:
+                    return jsonify({'success': False, 'error': 'archive_path is required'}), 400
+                
+                analyzer = AIContentAnalyzer()
+                result = analyzer.analyze_archive(archive_path)
+                
+                return jsonify(result)
+                
+            except Exception as e:
+                logger.error(f"/analyze-archive error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+        
+        @self.app.route('/api/file-organizer/suggest-destination', methods=['POST'])
+        def fo_suggest_destination():
+            """Suggest destinations based on file content and user history"""
+            try:
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                from pathlib import Path
+                
+                data = request.get_json(force=True, silent=True) or {}
+                file_path = data.get('file_path')
+                content_metadata = data.get('content_metadata', {})
+                user_id = "dev_user"  # Hardcoded for now
+                
+                if not file_path:
+                    return jsonify({'success': False, 'error': 'file_path is required'}), 400
+                
+                # If no metadata provided, analyze the file first
+                if not content_metadata:
+                    analyzer = AIContentAnalyzer()
+                    analysis_result = analyzer.analyze_file(file_path)
+                    if analysis_result.get('success'):
+                        content_metadata = analysis_result
+                
+                # Get user history suggestions
+                app_manager = self.components.get('app_manager')
+                if not app_manager:
+                    return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
+                
+                file_organizer = app_manager.get_active_module('file_organizer')
+                if not file_organizer:
+                    # Start the module if not running
+                    import asyncio
+                    import gevent
+                    def start_module():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            loop.run_until_complete(app_manager.start_module('file_organizer'))
+                        finally:
+                            loop.close()
+                    gevent.spawn(start_module).get()
+                    file_organizer = app_manager.get_active_module('file_organizer')
+                
+                if not file_organizer:
+                    return jsonify({'success': False, 'error': 'File Organizer module not available'}), 500
+                
+                # Get suggestions from history
+                content_type = content_metadata.get('content_type')
+                company = content_metadata.get('company')
+                file_extension = Path(file_path).suffix.lower()
+                
+                suggestions = file_organizer.path_memory_manager.get_destination_suggestions(
+                    user_id=user_id,
+                    content_type=content_type,
+                    company=company,
+                    file_extension=file_extension
+                )
+                
+                # Add generic suggestions if no history
+                if not suggestions:
+                    if content_type == 'Invoice':
+                        suggestions.append({
+                            'destination_path': '/organized/Finances/Invoices',
+                            'category': 'Invoices',
+                            'confidence_score': 0.70,
+                            'reason': 'Default location for invoices',
+                            'is_based_on_history': False
+                        })
+                    elif content_type == 'Photo':
+                        suggestions.append({
+                            'destination_path': '/organized/Photos',
+                            'category': 'Photos',
+                            'confidence_score': 0.70,
+                            'reason': 'Default location for photos',
+                            'is_based_on_history': False
+                        })
+                    elif content_type == 'Movie':
+                        suggestions.append({
+                            'destination_path': '/organized/Movies',
+                            'category': 'Movies',
+                            'confidence_score': 0.70,
+                            'reason': 'Default location for movies',
+                            'is_based_on_history': False
+                        })
+                    else:
+                        suggestions.append({
+                            'destination_path': '/organized/Documents',
+                            'category': 'Documents',
+                            'confidence_score': 0.60,
+                            'reason': 'Default location for documents',
+                            'is_based_on_history': False
+                        })
+                
+                return jsonify({
+                    'success': True,
+                    'suggestions': suggestions
+                })
+                
+            except Exception as e:
+                logger.error(f"/suggest-destination error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
     
     def _setup_websocket_handlers(self):
         """Setup WebSocket event handlers"""

@@ -21,6 +21,13 @@ pathlib2==2.3.7
 python-dotenv==1.0.0
 requests==2.31.0
 
+# Phase 5: Advanced AI Features
+pytesseract==0.3.10
+Pillow==10.1.0
+PyPDF2==3.0.1
+rarfile==4.1
+py7zr==0.20.8
+
 # Development
 pytest==7.4.3
 pytest-asyncio==0.21.1
