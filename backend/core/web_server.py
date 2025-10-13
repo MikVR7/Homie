@@ -679,7 +679,8 @@ class WebServer:
                     return jsonify({'success': False, 'error': 'Maximum 50 files per batch'}), 400
                 
                 # Initialize analyzer with shared_services for AI access
-                analyzer = AIContentAnalyzer(shared_services=self.shared_services)
+                shared_services = self.components.get('shared_services')
+                analyzer = AIContentAnalyzer(shared_services=shared_services)
                 results = {}
                 
                 for file_path in files:
@@ -695,7 +696,7 @@ class WebServer:
                 
                 return jsonify({
                     'success': True,
-                    'ai_enabled': self.shared_services.is_ai_available() and use_ai,
+                    'ai_enabled': shared_services.is_ai_available() and use_ai if shared_services else False,
                     'results': results
                 })
                 
