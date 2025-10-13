@@ -112,14 +112,26 @@ flutter run -d ios
 
 ## Known Issues
 
-### Flutter Linux Desktop Notes
-- Wayland scripts are provided; prefer `./start_file_organizer.sh` for desktop runs.
-- Hot reload is NOT supported for this app on Linux desktop; use full restart instead of `--hot-reload`.
+## Known Issues
 
-### Development Recommendations
-1. **Use Flutter Web**: Most stable for development
-2. **Test on Mobile**: Final testing should be on actual devices
-3. **Backend First**: Test backend functionality before frontend integration
+### Linux Platform Limitations
+
+#### Drag-and-Drop from External File Managers
+**Issue**: Drag-and-drop of folders from external file managers (Nemo, Nautilus, Dolphin, etc.) does not work on Linux with X11.
+
+**Cause**: This is a known limitation in the Avalonia framework's drag-and-drop implementation on Linux. The Avalonia `DragDrop` events do not fire when dragging files from external applications on Linux/X11.
+
+**Affected Components**: 
+- `LetsSortView` - Source folder selection screen
+
+**Workarounds**:
+- Use the "Browse Folders" button instead (works on all platforms)
+- Quick Access buttons for common folders
+- Drag-and-drop should work correctly on Windows
+
+**Status**: Framework limitation, awaiting Avalonia upstream fix
+
+**Testing**: TODO - Test drag-and-drop functionality on Windows to verify it works correctly there
 
 ## API Endpoints
 
@@ -484,4 +496,5 @@ flutter run -d chrome
 2. **Test components**: Test individual parts separately
 3. **Documentation**: Check this file and architecture docs
 4. **Git history**: Look at recent changes for issues
-<!-- Last updated: 2025-10-06 19:29 - Reason: Documenting the new Serilog setup for structured, colored console logging. -->
+
+<!-- Last updated: 2025-10-07 22:13 - Reason: Added Known Issues section documenting the Linux drag-and-drop limitation -->

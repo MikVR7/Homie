@@ -664,12 +664,13 @@ class WebServer:
         
         @self.app.route('/api/file-organizer/analyze-content-batch', methods=['POST'])
         def fo_analyze_content_batch():
-            """Analyze multiple files at once"""
+            """Analyze multiple files at once using AI when available"""
             try:
                 from file_organizer.ai_content_analyzer import AIContentAnalyzer
                 
                 data = request.get_json(force=True, silent=True) or {}
                 files = data.get('files', [])
+                use_ai = data.get('use_ai', True)  # Enable AI by default
                 
                 if not files:
                     return jsonify({'success': False, 'error': 'files array is required'}), 400
@@ -677,18 +678,24 @@ class WebServer:
                 if len(files) > 50:
                     return jsonify({'success': False, 'error': 'Maximum 50 files per batch'}), 400
                 
-                analyzer = AIContentAnalyzer()
+                # Initialize analyzer with shared_services for AI access
+                analyzer = AIContentAnalyzer(shared_services=self.shared_services)
                 results = {}
                 
                 for file_path in files:
                     try:
-                        results[file_path] = analyzer.analyze_file(file_path)
+                        results[file_path] = analyzer.analyze_file(file_path, use_ai=use_ai)
                     except Exception as e:
                         logger.warning(f"Error analyzing {file_path}: {e}")
-                        results[file_path] = None
+                        results[file_path] = {
+                            'success': False,
+                            'error': str(e),
+                            'content_type': 'unknown'
+                        }
                 
                 return jsonify({
                     'success': True,
+                    'ai_enabled': self.shared_services.is_ai_available() and use_ai,
                     'results': results
                 })
                 

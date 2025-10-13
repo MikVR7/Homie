@@ -1,5 +1,37 @@
 # Project History
 
+## 2025-10-13
+
+- Enhanced content analyzer with AI-powered dynamic categorization
+- Integrated Google Gemini for intelligent file categorization
+- Added support for: music, ebooks, tutorials, projects, assets (3D models, brushes, plugins, fonts)
+- No hardcoded categories - AI determines types dynamically
+- Regex fallback system for speed when AI unavailable
+- Added use_ai parameter to batch endpoint for controlling AI usage
+- AI can now detect: movies, TV shows, music, ebooks, tutorials, courses, projects, assets, documents
+- AI extracts project types (Unity, .NET, Rust, Flutter) from filenames
+- Added suggested_folder field to AI responses for organization hints
+- Updated documentation with AI integration details
+## 2025-10-13
+
+- Enhanced File Organizer content analysis endpoint
+- Implemented movie filename parsing (title, year, quality, release group)
+- Added TV show detection with season/episode extraction
+- Implemented archive content listing for ZIP/RAR/7z files
+- Added image EXIF data extraction support
+- Implemented PDF invoice detection and basic metadata extraction
+- Added graceful degradation for files not accessible locally
+- All content types now return lowercase (movie, tvshow, image, archive, document, etc.)
+- Confidence scoring system for all analysis results
+- Comprehensive test suite with 16+ test cases passing
+## 2025-10-07 - Version -
+
+- Fixed a critical UI flow bug where the initial 'Let's Sort!' button was triggering the wrong event, bypassing the destination setup process.
+- Correctly wired the `AreaTop` button to the `Pub_AreaTopOnBtnClickLetsSort` event.
+- Enhanced logging in `FileOrganizerWindow` to better trace the destination setup and folder picker flow.
+### 2025-10-07
+- Created new documentation: UI_AI_SUGGESTION.md - UI AI Suggestion
+  - Reason: To store the UI suggestion provided by the external AI for future reference, as requested by the user.
 ## Development Guidelines 📋
 **See `GENERAL_RULES.md` for complete development guidelines including date management, commit formats, and coding standards.**
 

@@ -1,5 +1,153 @@
 # Homie Architecture
 
+## File Organizer - Phase 5: Advanced AI Features
+
+## File Organizer - Phase 5: Advanced AI Features
+
+### Content Analysis Engine
+
+The File Organizer now includes a sophisticated content analysis system that extracts rich metadata from various file types without manual categorization.
+
+#### Supported File Types
+
+**1. Video Files (.mkv, .mp4, .avi, .mov)**
+- **Movies**: Parses filename to extract title, year, quality, release group
+  - Example: `Thunderbolts.2025.German.TELESYNC.LD.720p.x265-LDO.mkv`
+  - Extracted: title="Thunderbolts", year=2025, quality="720p", release_group="LDO"
+  - Confidence: 0.9
+  
+- **TV Shows**: Detects season/episode information
+  - Example: `Breaking.Bad.S05E16.1080p.WEB-DL.mkv`
+  - Extracted: show="Breaking Bad", season=5, episode=16
+  - Confidence: 0.92
+
+**2. Documents (.pdf, .doc, .docx)**
+- **Invoices**: OCR/text extraction to find company, amount, date
+  - Detects invoice-specific keywords in multiple languages
+  - Extracts monetary amounts and dates
+  - Returns content_type="invoice" with metadata
+  
+- **General Documents**: Basic categorization with confidence scores
+
+**3. Images (.jpg, .png, .gif, .bmp)**
+- EXIF data extraction when file is accessible
+- Extracts: date_taken, camera_model, camera_make, GPS data
+- Graceful degradation when file not accessible (returns image type with note)
+
+**4. Archives (.zip, .rar, .7z)**
+- Lists contents without extraction
+- Returns file_count and sample_files
+- Detects project types (optional, in deep analysis mode)
+- Returns content_type="archive" with archive_type
+
+**5. Unknown Files**
+- Returns content_type="unknown" with file extension
+- Low confidence score (0.5) indicating uncertainty
+
+#### API Endpoints
+
+##### `/api/file-organizer/analyze-content-batch` (POST)
+Analyzes multiple files in a single request.
+
+**Request:**
+```json
+{
+  "files": [
+    "/path/to/movie.mkv",
+    "/path/to/invoice.pdf",
+    "/path/to/archive.zip"
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "results": {
+    "/path/to/movie.mkv": {
+      "success": true,
+      "content_type": "movie",
+      "title": "Movie Title",
+      "year": 2025,
+      "quality": "1080p",
+      "release_group": "GROUP",
+      "confidence_score": 0.9
+    },
+    "/path/to/invoice.pdf": {
+      "success": true,
+      "content_type": "invoice",
+      "company": "ACME Corp",
+      "amount": 1234.56,
+      "currency": "EUR",
+      "confidence_score": 0.88
+    },
+    "/path/to/archive.zip": {
+      "success": true,
+      "content_type": "archive",
+      "archive_type": "zip",
+      "file_count": 42,
+      "sample_files": ["file1.txt", "file2.doc", ...],
+      "confidence_score": 1.0
+    }
+  }
+}
+```
+
+#### Quality Detection
+The analyzer automatically detects video quality from filenames:
+- 4K, 2160p, 1080p, 720p, 480p
+- TELESYNC, CAM, HDRip, BluRay, WEB-DL, WEBRip, DVDRip
+
+#### Release Group Detection
+Extracts release group names from video filenames (e.g., YIFY, SPARKS, LDO)
+
+#### Confidence Scoring
+Each analysis includes a confidence score (0.0 - 1.0):
+- 1.0: Perfect match with all metadata extracted
+- 0.9: High confidence (movie with year/title)
+- 0.8: Good confidence (basic file type)
+- 0.7: Medium confidence (file type known but limited metadata)
+- 0.5: Low confidence (unknown file type)
+
+#### Graceful Degradation
+The analyzer works even when files are not accessible:
+- **Videos**: Filename parsing works without file access
+- **Documents/Images/Archives**: Returns type with note "File not accessible"
+- Never fails hard - always returns analyzable results
+
+#### Implementation Details
+- Location: `backend/file_organizer/ai_content_analyzer.py`
+- Class: `AIContentAnalyzer`
+- Regex-based parsing for movies/TV shows
+- Optional dependencies: PyPDF2, Pillow, rarfile, py7zr
+- Batch processing: Up to 50 files per request
+
+
+## UI Components
+
+
+### AISuggestionsView.axaml / .cs
+*   **Role:** Displays the results of the AI's file sorting analysis.
+*   **Description:** This view presents files grouped into dynamically generated categories based on the AI's response. It uses the `CategoryCard` component to display each category. The view is populated with data after the analysis is triggered from the `FileBrowserView`.
+
+### CategoryCard.axaml / .cs
+*   **Role:** A reusable component to display a single category of sorted files.
+*   **Description:** Shows a category's icon, name, file count, and a list of files within it. The card's background and accent colors are dynamically set based on the category, as defined in `App.axaml`.
+
+
+## UI Components
+
+
+### AISuggestionsView.axaml / .cs
+*   **Role:** Displays the results of the AI's file sorting analysis.
+*   **Description:** This view presents files grouped into dynamically generated categories based on the AI's response. It uses the `CategoryCard` component to display each category. The view is populated with data after the analysis is triggered from the `FileBrowserView`.
+
+### CategoryCard.axaml / .cs
+*   **Role:** A reusable component to display a single category of sorted files.
+*   **Description:** Shows a category's icon, name, file count, and a list of files within it. The card's background and accent colors are dynamically set based on the category, as defined in `App.axaml`.
+
+
 ## Frontend Architectural Pattern (Model-Component)
 
 The frontend for HomieA follows a custom architectural pattern we call "Model-Component". This pattern is born out of a desire for simplicity, strict adherence to Object-Oriented Programming (OOP) principles, and a clear separation of concerns, while explicitly avoiding complex frameworks like MVVM or MVC.
@@ -302,4 +450,8 @@ Each module can be:
 - **Caching**: Module-specific caching strategies
 
 
-<!-- Last updated: 2025-10-06 19:25 - Reason: Reflecting the major architectural refactoring: implementing the Model-Component pattern, enforcing event-driven communication, and creating orchestrator services. -->
+
+
+
+
+<!-- Last updated: 2025-10-13 06:34 - Reason: Implemented comprehensive content analysis system for the File Organizer module with support for movies, TV shows, documents, images, and archives -->

@@ -2,6 +2,54 @@
 
 This document contains general rules and guidelines that apply across all projects and should be followed by AI assistants and developers.
 
+## Git Workflow
+
+## 💬 Git Workflow
+
+### Commit and Push Process
+**Always complete the full git workflow:**
+1. `git add -A` (stage all changes)
+2. `git commit -m "TopicOfJob: Description"`
+3. `git push` (push to remote repository)
+
+### Required Commit Message Format
+```
+TopicOfJob: Detailed description of what we have done in one sentence
+```
+
+**CRITICAL RULES FOR AI ASSISTANTS**: 
+- **TopicOfJob**: Use PascalCase (e.g., BackendConnectivity, FileOrganizer, DatabaseMigration)
+- **Start with capital letter**: Always capitalize the first letter
+- **NO PREFIXES**: ABSOLUTELY NO conventional commit prefixes like "feat:", "fix:", "docs:", etc.
+- **ONE SENTENCE ONLY**: Description must be a single sentence, NO multi-paragraph commit messages
+- **NO BULLET POINTS**: Do not include lists or detailed breakdowns in commit messages
+- **Be descriptive**: Explain what was accomplished in clear terms
+
+### Examples
+```bash
+# Good Examples:
+git commit -m "ModuleLaunchScripts: Created standalone startup scripts for File Organizer and Financial Manager with conditional back button removal"
+git commit -m "Documentation: Updated all docs with correct dates and added AI assistant guidelines"
+git commit -m "BugFix: Resolved Flutter Linux rendering issues by implementing web-based development workflow"
+git commit -m "DatabaseMigration: Migrated user accounts from JSON to SQLite with backward compatibility"
+git commit -m "Phase5Integration: Connected frontend to backend content analysis with AdvancedAIService implementation"
+
+# Bad Examples (NEVER do these):
+git commit -m "Fixed stuff"
+git commit -m "Updates"
+git commit -m "WIP"
+git commit -m "Module scripts"
+git commit -m "feat: implement backend connectivity"  # NO conventional commit prefixes
+git commit -m "fix: resolve error handling"          # NO conventional commit prefixes
+git commit -m "feat(Phase 5): Add data models\n\nNew Models:\n- DuplicateDetection\n- ContentMetadata"  # NO multi-paragraph messages
+```
+
+### Topic Guidelines
+- **Use PascalCase**: ModuleLaunchScripts, DatabaseMigration, BugFix
+- **Be Specific**: Describe the main area of work
+- **Keep Topic Short**: 1-3 words maximum
+- **Common Topics**: Documentation, BugFix, Feature, Refactor, Setup, Migration, Testing, UI, API
+
 ## Rule 0: No Architectural Shortcuts
 
 
@@ -112,4 +160,5 @@ git commit -m "fix: resolve error handling"          # NO conventional commit pr
 ---
 
 **Note**: This document should be referenced in project-specific documentation but content should not be duplicated. Link to this document when referencing general rules.
-<!-- Last updated: 2025-10-04 11:07 - Reason: The user explicitly and forcefully corrected me for taking architectural shortcuts and instructed me to write down the rule to never do it again. -->
+
+<!-- Last updated: 2025-10-12 22:19 - Reason: User feedback: AI was writing verbose multi-paragraph commit messages instead of following the one-sentence format with NO conventional commit prefixes -->

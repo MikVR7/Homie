@@ -19,15 +19,19 @@ logger = logging.getLogger('AIContentAnalyzer')
 class AIContentAnalyzer:
     """
     Analyzes file content to extract rich metadata using AI and various techniques.
-    Supports: Movies, TV Shows, Documents, Photos, Archives, and more.
+    Uses Google Gemini for intelligent categorization with regex fallbacks.
+    Supports dynamic categories: Movies, TV Shows, Music, eBooks, Tutorials, Projects, Assets, etc.
     """
     
-    def __init__(self):
+    def __init__(self, shared_services=None):
+        self.shared_services = shared_services
         self.movie_patterns = [
-            # Pattern: Title.Year.Quality.Format
-            r'(.+?)[\.\s](\d{4})[\.\s]',
+            # Pattern: Title.Year.Quality.Format (most common torrent/release format)
+            r'^(.+?)[\.\s](\d{4})[\.\s]',
             # Pattern: Title (Year)
-            r'(.+?)\s*\((\d{4})\)',
+            r'^(.+?)\s*\((\d{4})\)',
+            # Pattern: Title Year (no separator)
+            r'^(.+?)\s+(\d{4})[\.\s]',
         ]
         
         self.tv_show_patterns = [
@@ -48,39 +52,73 @@ class AIContentAnalyzer:
             'NodeJS': ['package.json', 'node_modules/', '.js'],
         }
     
-    def analyze_file(self, file_path: str) -> Dict[str, Any]:
+    def analyze_file(self, file_path: str, use_ai: bool = True) -> Dict[str, Any]:
         """
         Analyze a single file and return rich metadata.
         
         Args:
             file_path: Path to the file to analyze
+            use_ai: If True, use AI for intelligent categorization (default: True)
             
         Returns:
             Dictionary with content metadata
         """
         try:
-            if not os.path.exists(file_path):
-                return {
-                    'success': False,
-                    'error': f'File not found: {file_path}'
-                }
-            
             file_ext = Path(file_path).suffix.lower()
             file_name = Path(file_path).name
+            file_exists = os.path.exists(file_path)
+            
+            # Try AI-powered analysis first if available and enabled
+            if use_ai and self.shared_services and self.shared_services.is_ai_available():
+                ai_result = self._analyze_with_ai(file_path, file_name, file_ext, file_exists)
+                if ai_result and ai_result.get('success'):
+                    return ai_result
             
             # Determine file category and analyze accordingly
             if file_ext in ['.mkv', '.mp4', '.avi', '.mov', '.wmv']:
+                # Video files can be analyzed from filename alone
                 return self._analyze_video(file_name, file_path)
             elif file_ext in ['.pdf']:
-                return self._analyze_pdf(file_path)
+                # PDF requires file to exist for content extraction
+                if file_exists:
+                    return self._analyze_pdf(file_path)
+                else:
+                    return {
+                        'success': True,
+                        'content_type': 'document',
+                        'document_category': 'PDF',
+                        'confidence_score': 0.7,
+                        'note': 'File not accessible for content analysis'
+                    }
             elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff']:
-                return self._analyze_photo(file_path)
+                # Images require file to exist for EXIF extraction
+                if file_exists:
+                    return self._analyze_photo(file_path)
+                else:
+                    return {
+                        'success': True,
+                        'content_type': 'image',
+                        'confidence_score': 0.8,
+                        'note': 'File not accessible for EXIF analysis'
+                    }
+            elif file_ext in ['.zip', '.rar', '.7z']:
+                # Archives require file to exist for content listing
+                if file_exists:
+                    return self._analyze_archive_for_content(file_path)
+                else:
+                    return {
+                        'success': True,
+                        'content_type': 'archive',
+                        'archive_type': file_ext[1:],
+                        'confidence_score': 0.7,
+                        'note': 'File not accessible for content listing'
+                    }
             elif file_ext in ['.doc', '.docx', '.txt', '.rtf']:
                 return self._analyze_document(file_path)
             else:
                 return {
                     'success': True,
-                    'content_type': 'Generic',
+                    'content_type': 'unknown',
                     'file_name': file_name,
                     'file_extension': file_ext,
                     'confidence_score': 0.5
@@ -93,6 +131,97 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
+    def _analyze_with_ai(self, file_path: str, file_name: str, file_ext: str, file_exists: bool) -> Optional[Dict[str, Any]]:
+        """
+        Use AI (Gemini) to intelligently categorize and extract metadata from files.
+        Supports dynamic categories like: movies, tv_shows, music, ebooks, tutorials, 
+        projects, assets (3d_models, brushes, plugins), documents, etc.
+        """
+        try:
+            if not self.shared_services or not self.shared_services.ai_model:
+                return None
+            
+            # Build context for AI
+            parent_dir = Path(file_path).parent.name
+            file_size_info = ""
+            if file_exists:
+                try:
+                    size = os.path.getsize(file_path)
+                    file_size_info = f", size: {size} bytes"
+                except:
+                    pass
+            
+            prompt = f"""Analyze this file and categorize it with rich metadata.
+
+Filename: {file_name}
+Extension: {file_ext}
+Parent Directory: {parent_dir}
+File Exists: {file_exists}{file_size_info}
+
+Identify the content type and extract relevant metadata. Consider these categories:
+- movie: Movies/films (extract: title, year, quality, release_group)
+- tv_show: TV series episodes (extract: show_name, season, episode)
+- music: Audio files (extract: artist, album, title, year)
+- ebook: Books/PDFs (extract: title, author, format)
+- tutorial: Educational content (extract: topic, instructor, platform)
+- course: Online courses/training
+- project: Programming projects (extract: project_type like dotnet/unity/flutter/rust, language)
+- asset_3d: 3D models, meshes, textures
+- asset_brush: Brushes for digital art
+- asset_plugin: Software plugins/extensions
+- asset_font: Font files
+- document: General documents (extract: document_type like invoice/contract/receipt)
+- image: Photos and images
+- archive: Compressed files
+- audio_sample: Sound effects, samples
+- video_raw: Raw footage, screen recordings
+- unknown: Cannot determine
+
+Return ONLY valid JSON with this structure (no markdown, no extra text):
+{{
+  "success": true,
+  "content_type": "category_name",
+  "confidence_score": 0.0-1.0,
+  "metadata": {{
+    "key": "value pairs specific to the category"
+  }},
+  "description": "brief description",
+  "suggested_folder": "suggested organization folder"
+}}
+
+Focus on accuracy. Use filename patterns, extensions, and context clues."""
+
+            # Call Gemini
+            response = self.shared_services.ai_model.generate_content(prompt)
+            
+            if not response or not response.text:
+                return None
+            
+            # Parse AI response
+            response_text = response.text.strip()
+            
+            # Remove markdown code blocks if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+            
+            import json
+            result = json.loads(response_text)
+            
+            # Flatten metadata into main result
+            if 'metadata' in result:
+                metadata = result.pop('metadata')
+                result.update(metadata)
+            
+            logger.info(f"🤖 AI analysis for {file_name}: {result.get('content_type')} (confidence: {result.get('confidence_score')})")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"AI analysis failed for {file_name}: {e}")
+            return None
+    
     def _analyze_video(self, file_name: str, file_path: str) -> Dict[str, Any]:
         """Analyze video files (movies and TV shows)"""
         # Try movie patterns first
@@ -102,19 +231,35 @@ class AIContentAnalyzer:
                 title = match.group(1).replace('.', ' ').replace('_', ' ').strip()
                 year = int(match.group(2))
                 
+                # Extract quality information
+                quality = self._extract_quality(file_name)
+                
+                # Extract release group
+                release_group = self._extract_release_group(file_name)
+                
                 # Determine genre from filename keywords (basic approach)
                 genre = self._detect_genre(file_name)
                 
-                return {
+                result = {
                     'success': True,
-                    'content_type': 'Movie',
+                    'content_type': 'movie',
                     'title': title,
                     'year': year,
-                    'genre': genre,
-                    'description': f'{title} ({year})',
-                    'keywords': self._extract_keywords(file_name),
                     'confidence_score': 0.90
                 }
+                
+                # Add optional fields
+                if quality:
+                    result['quality'] = quality
+                if release_group:
+                    result['release_group'] = release_group
+                if genre and genre != 'Unknown':
+                    result['genre'] = genre
+                
+                result['description'] = f'{title} ({year})'
+                result['keywords'] = self._extract_keywords(file_name)
+                
+                return result
         
         # Try TV show patterns
         for pattern in self.tv_show_patterns:
@@ -126,7 +271,7 @@ class AIContentAnalyzer:
                 
                 return {
                     'success': True,
-                    'content_type': 'TVShow',
+                    'content_type': 'tvshow',
                     'show_name': show_name,
                     'season': season,
                     'episode': episode,
@@ -137,7 +282,7 @@ class AIContentAnalyzer:
         # Generic video file
         return {
             'success': True,
-            'content_type': 'Video',
+            'content_type': 'video',
             'title': file_name,
             'confidence_score': 0.60
         }
@@ -152,7 +297,7 @@ class AIContentAnalyzer:
             if len(reader.pages) == 0:
                 return {
                     'success': True,
-                    'content_type': 'Document',
+                    'content_type': 'document',
                     'confidence_score': 0.5
                 }
             
@@ -165,14 +310,14 @@ class AIContentAnalyzer:
             elif any(keyword in first_page_text for keyword in ['contract', 'vertrag', 'agreement']):
                 return {
                     'success': True,
-                    'content_type': 'Contract',
+                    'content_type': 'contract',
                     'document_category': 'Contract',
                     'confidence_score': 0.85
                 }
             else:
                 return {
                     'success': True,
-                    'content_type': 'Document',
+                    'content_type': 'document',
                     'document_category': 'General',
                     'confidence_score': 0.70
                 }
@@ -181,7 +326,7 @@ class AIContentAnalyzer:
             logger.warning(f"Error analyzing PDF: {e}")
             return {
                 'success': True,
-                'content_type': 'Document',
+                'content_type': 'document',
                 'confidence_score': 0.5
             }
     
@@ -189,7 +334,7 @@ class AIContentAnalyzer:
         """Extract invoice-specific information"""
         result = {
             'success': True,
-            'content_type': 'Invoice',
+            'content_type': 'invoice',
             'document_category': 'Invoice',
             'confidence_score': 0.88
         }
@@ -245,7 +390,7 @@ class AIContentAnalyzer:
             
             result = {
                 'success': True,
-                'content_type': 'Photo',
+                'content_type': 'image',
                 'confidence_score': 1.0
             }
             
@@ -269,7 +414,7 @@ class AIContentAnalyzer:
             logger.warning(f"Error extracting EXIF data: {e}")
             return {
                 'success': True,
-                'content_type': 'Photo',
+                'content_type': 'image',
                 'confidence_score': 0.8
             }
     
@@ -277,10 +422,122 @@ class AIContentAnalyzer:
         """Analyze general documents"""
         return {
             'success': True,
-            'content_type': 'Document',
+            'content_type': 'document',
             'document_category': 'General',
             'confidence_score': 0.75
         }
+    
+    def _analyze_archive_for_content(self, archive_path: str) -> Dict[str, Any]:
+        """
+        Simplified archive analysis for content batch endpoint.
+        Lists contents without deep project detection.
+        """
+        try:
+            if not os.path.exists(archive_path):
+                return {
+                    'success': False,
+                    'error': f'Archive not found: {archive_path}'
+                }
+            
+            file_ext = Path(archive_path).suffix.lower()
+            
+            if file_ext == '.zip':
+                with zipfile.ZipFile(archive_path, 'r') as zip_file:
+                    file_list = zip_file.namelist()
+                    file_count = len([f for f in file_list if not f.endswith('/')])
+                    total_size = sum(info.file_size for info in zip_file.infolist() if not info.is_dir())
+            elif file_ext == '.rar':
+                try:
+                    import rarfile
+                    with rarfile.RarFile(archive_path, 'r') as rar_file:
+                        file_list = rar_file.namelist()
+                        file_count = len([f for f in file_list if not f.endswith('/')])
+                        total_size = sum(info.file_size for info in rar_file.infolist() if not info.isdir())
+                except ImportError:
+                    return {
+                        'success': True,
+                        'content_type': 'archive',
+                        'archive_type': 'rar',
+                        'error': 'RAR support not available',
+                        'confidence_score': 0.6
+                    }
+            elif file_ext == '.7z':
+                try:
+                    import py7zr
+                    with py7zr.SevenZipFile(archive_path, 'r') as sz_file:
+                        file_list = sz_file.getnames()
+                        file_count = len([f for f in file_list if not f.endswith('/')])
+                        total_size = sum(info.uncompressed for info in sz_file.list() if not info.is_directory)
+                except ImportError:
+                    return {
+                        'success': True,
+                        'content_type': 'archive',
+                        'archive_type': '7z',
+                        'error': '7z support not available',
+                        'confidence_score': 0.6
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Unsupported archive format: {file_ext}'
+                }
+            
+            # Get a sample of files (first 20)
+            sample_files = [f for f in file_list if not f.endswith('/')][:20]
+            
+            return {
+                'success': True,
+                'content_type': 'archive',
+                'archive_type': file_ext[1:],  # Remove the dot
+                'file_count': file_count,
+                'total_size': total_size,
+                'sample_files': sample_files,
+                'confidence_score': 1.0
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error analyzing archive: {e}")
+            return {
+                'success': True,
+                'content_type': 'archive',
+                'error': str(e),
+                'confidence_score': 0.5
+            }
+    
+    def _extract_quality(self, filename: str) -> Optional[str]:
+        """Extract video quality information from filename"""
+        filename_lower = filename.lower()
+        
+        # Quality patterns (in order of preference)
+        quality_patterns = [
+            (r'2160p', '2160p'),
+            (r'4k', '4K'),
+            (r'1080p', '1080p'),
+            (r'720p', '720p'),
+            (r'480p', '480p'),
+            (r'telesync|ts|telecine', 'TELESYNC'),
+            (r'cam|camrip', 'CAM'),
+            (r'hdrip', 'HDRip'),
+            (r'brrip|blu-?ray', 'BluRay'),
+            (r'web-?dl|webdl', 'WEB-DL'),
+            (r'webrip', 'WEBRip'),
+            (r'dvdrip', 'DVDRip'),
+        ]
+        
+        for pattern, quality in quality_patterns:
+            if re.search(pattern, filename_lower):
+                return quality
+        
+        return None
+    
+    def _extract_release_group(self, filename: str) -> Optional[str]:
+        """Extract release group from filename (usually after last dash)"""
+        # Pattern: -GROUPNAME at end (before extension)
+        match = re.search(r'-([A-Za-z0-9]+)(?:\.[a-z0-9]{2,4})?$', filename, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        
+        return None
     
     def _detect_genre(self, filename: str) -> str:
         """Detect movie genre from filename keywords"""
