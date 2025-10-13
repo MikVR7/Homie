@@ -296,3 +296,96 @@ Generate operations for efficient, intelligent file organization:"""
             return []
 
 
+    async def generate_alternatives(self, analysis_id: str, rejected_operation: Dict[str, Any], history_provider) -> Dict[str, Any]:
+        """Generate alternative AI-powered file organization operations for a rejected suggestion."""
+        try:
+            if not self.shared_services or not self.shared_services.is_ai_available():
+                return {"success": True, "alternatives": []}
+
+            # 1. Get context from the rejected operation
+            source_path = rejected_operation.get('source')
+            if not source_path:
+                 return {"success": False, "error": "Rejected operation must have a 'source' path."}
+
+            # 2. Build a targeted AI prompt
+            prompt = self._build_alternatives_prompt(rejected_operation, history_provider)
+
+            # 3. Call AI for new operations
+            logger.info(f"🤖 Calling AI for alternative suggestions for: {Path(source_path).name}")
+            alternatives = await self._call_ai_for_operations(prompt)
+
+            # 4. Assign new, unique IDs to each alternative operation
+            for i, op in enumerate(alternatives):
+                op['operation_id'] = f"{analysis_id}_alt_{Path(source_path).stem}_{i}"
+                op['status'] = 'pending' # All new suggestions are pending
+
+            return {
+                "success": True,
+                "alternatives": alternatives
+            }
+
+        except Exception as e:
+            logger.error(f"AI alternative generation failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def _build_alternatives_prompt(self, rejected_operation: Dict[str, Any], history_provider) -> str:
+        """Build a targeted prompt to ask for alternative suggestions."""
+        
+        source_path = rejected_operation['source']
+        file_name = Path(source_path).name
+        rejected_dest = rejected_operation.get('destination')
+        rejected_reason = rejected_operation.get('reason', 'No reason provided.')
+
+        # We can reuse the main prompt builder's context pieces
+        history = history_provider.get_folder_history(str(Path(source_path).parent), limit=10)
+        history_text = "No previous activity" if not history else "\\n".join([
+            f"- {h.action_type}: {h.file_name} → {h.destination_path}"
+            for h in history
+        ])
+        
+        prompt = f"""You are a smart file organizer. A user has rejected one of your suggestions. 
+Your task is to provide 2-3 new, meaningfully different suggestions for the same file.
+
+FILE TO RE-ANALYZE:
+- Source Path: "{source_path}"
+- Filename: "{file_name}"
+
+REJECTED SUGGESTION:
+- Operation Type: "{rejected_operation.get('type')}"
+- Rejected Destination: "{rejected_dest}"
+- Original Reason: "{rejected_reason}"
+
+USER HISTORY (for context on their preferences):
+{history_text}
+
+RULES:
+1.  **BE DIFFERENT**: The new suggestions MUST be distinct from the rejected one. Do not suggest a minor variation of the same path.
+2.  **BE CREATIVE**: Think about what the user might want.
+    - If the rejected destination was too general (e.g., "/Documents"), suggest something more specific (e.g., "/Documents/Invoices/2024" or "/Archive/ClientX/Receipts").
+    - If the file was to be renamed, suggest a different naming convention.
+    - Consider creating a new folder structure if it makes sense.
+3.  **GENERATE 2-3 ALTERNATIVES**: Provide a few good options for the user to choose from. If you have no other good ideas, return an empty list.
+4.  **MAINTAIN OPERATION STRUCTURE**: The new suggestions must be valid `move`, `rename`, or `mkdir` operations.
+
+OUTPUT FORMAT (JSON only, no other text):
+{{
+  "operations": [
+    {{
+      "type": "move", 
+      "source": "{source_path}", 
+      "destination": "/path/to/new_suggestion_1/{file_name}", 
+      "reason": "A brief explanation of why this is a good alternative."
+    }},
+    {{
+      "type": "move", 
+      "source": "{source_path}", 
+      "destination": "/path/to/new_suggestion_2/{file_name}", 
+      "reason": "Another good alternative with a different logic."
+    }}
+  ]
+}}
+
+Generate new, distinct, and intelligent alternative operations:"""
+        return prompt
+
+

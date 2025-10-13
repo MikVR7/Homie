@@ -202,4 +202,15 @@ class FileOrganizerApp:
     def batch_update_operation_status(self, user_id: str, operation_ids: list, status: str, timestamp: str):
         return self.path_memory_manager.batch_update_operation_status(user_id, operation_ids, status, timestamp)
 
+    async def get_alternative_suggestions(self, analysis_id: str, rejected_operation: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate alternative suggestions for a rejected operation."""
+        if not self._started or not self.ai_command_generator:
+            return {"success": False, "error": "module_not_started"}
+
+        return await self.ai_command_generator.generate_alternatives(
+            analysis_id=analysis_id,
+            rejected_operation=rejected_operation,
+            history_provider=self.path_memory_manager
+        )
+
 

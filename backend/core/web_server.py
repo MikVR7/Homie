@@ -746,6 +746,50 @@ class WebServer:
                 logger.error(f"/analyze-archive error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
         
+        @self.app.route('/api/file-organizer/suggest-alternatives', methods=['POST'])
+        def fo_suggest_alternatives():
+            """Generate alternative suggestions for a rejected file operation."""
+            try:
+                data = request.get_json(force=True, silent=True) or {}
+                analysis_id = data.get('analysis_id')
+                rejected_operation = data.get('rejected_operation')
+
+                if not analysis_id or not rejected_operation:
+                    return jsonify({'success': False, 'error': 'analysis_id and rejected_operation are required'}), 400
+                
+                app_manager = self.components.get('app_manager')
+                if not app_manager:
+                    return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
+
+                # This is an async function, but we're in a sync Flask route.
+                # We need to ensure the module is started and then call the async method.
+                import gevent
+                from gevent import spawn
+                
+                def run_async_task():
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(app_manager.start_module('file_organizer'))
+                        file_organizer = app_manager.get_active_module('file_organizer')
+                        if not file_organizer:
+                            return {'success': False, 'error': 'module_not_running'}
+                        return loop.run_until_complete(
+                            file_organizer.get_alternative_suggestions(analysis_id, rejected_operation)
+                        )
+                    finally:
+                        loop.close()
+                
+                greenlet = spawn(run_async_task)
+                result = greenlet.get() # Wait for the greenlet to finish
+
+                return jsonify(result)
+
+            except Exception as e:
+                logger.error(f"/suggest-alternatives error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+
         @self.app.route('/api/file-organizer/suggest-destination', methods=['POST'])
         def fo_suggest_destination():
             """Suggest destinations based on file content and user history"""
