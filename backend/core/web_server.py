@@ -182,19 +182,6 @@ class WebServer:
 
                 shared_services = self.components.get('shared_services')
                 analyzer = AIContentAnalyzer(shared_services=shared_services)
-                
-                content_to_category_map = {
-                    'movie': 'Movies',
-                    'tvshow': 'TV Shows',
-                    'video': 'Videos',
-                    'document': 'Documents',
-                    'invoice': 'Documents/Invoices',
-                    'contract': 'Documents/Contracts',
-                    'image': 'Pictures',
-                    'archive': 'Archives',
-                    'software': 'Software',
-                    'unknown': 'Other',
-                }
 
                 files = [p for p in src_path.iterdir() if p.is_file()]
                 operations = []
@@ -204,13 +191,11 @@ class WebServer:
                     if not analysis.get('success'):
                         return jsonify({'success': False, 'error': f"Failed to analyze {f.name}: {analysis.get('error')}"}), 503
 
-                    content_type = analysis.get('content_type', 'unknown')
-                    category = content_to_category_map.get(content_type, 'Other')
-                    
-                    # Use the AI-generated reason directly
+                    # Use AI-generated folder suggestion directly
+                    suggested_folder = analysis.get('suggested_folder', 'Other')
                     reason = analysis.get('reason', 'File categorized for organization.')
 
-                    dest_path = dest_root / category / f.name
+                    dest_path = dest_root / suggested_folder / f.name
                     operations.append({
                         'type': 'move',
                         'source': str(f),
@@ -821,40 +806,7 @@ class WebServer:
                     file_extension=file_extension
                 )
                 
-                # Add generic suggestions if no history
-                if not suggestions:
-                    if content_type == 'Invoice':
-                        suggestions.append({
-                            'destination_path': '/organized/Finances/Invoices',
-                            'category': 'Invoices',
-                            'confidence_score': 0.70,
-                            'reason': 'Default location for invoices',
-                            'is_based_on_history': False
-                        })
-                    elif content_type == 'Photo':
-                        suggestions.append({
-                            'destination_path': '/organized/Photos',
-                            'category': 'Photos',
-                            'confidence_score': 0.70,
-                            'reason': 'Default location for photos',
-                            'is_based_on_history': False
-                        })
-                    elif content_type == 'Movie':
-                        suggestions.append({
-                            'destination_path': '/organized/Movies',
-                            'category': 'Movies',
-                            'confidence_score': 0.70,
-                            'reason': 'Default location for movies',
-                            'is_based_on_history': False
-                        })
-                    else:
-                        suggestions.append({
-                            'destination_path': '/organized/Documents',
-                            'category': 'Documents',
-                            'confidence_score': 0.60,
-                            'reason': 'Default location for documents',
-                            'is_based_on_history': False
-                        })
+                # No hardcoded fallback suggestions - let the AI decide everything
                 
                 return jsonify({
                     'success': True,

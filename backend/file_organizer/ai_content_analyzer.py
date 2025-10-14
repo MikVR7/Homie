@@ -154,46 +154,46 @@ class AIContentAnalyzer:
                 except:
                     pass
             
-            prompt = f"""Analyze this file and categorize it with rich metadata.
+            prompt = f"""Analyze this file and determine the best way to organize it.
 
 Filename: {file_name}
 Extension: {file_ext}
 Parent Directory: {parent_dir}
 File Exists: {file_exists}{file_size_info}
 
-Identify the content type and extract relevant metadata. Consider these categories:
-- movie: Movies/films (extract: title, year, quality, release_group)
-- tv_show: TV series episodes (extract: show_name, season, episode)
-- music: Audio files (extract: artist, album, title, year)
-- ebook: Books/PDFs (extract: title, author, format)
-- tutorial: Educational content (extract: topic, instructor, platform)
-- course: Online courses/training
-- project: Programming projects (extract: project_type like dotnet/unity/flutter/rust, language)
-- asset_3d: 3D models, meshes, textures
-- asset_brush: Brushes for digital art
-- asset_plugin: Software plugins/extensions
-- asset_font: Font files
-- document: General documents (extract: document_type like invoice/contract/receipt)
-- image: Photos and images
-- archive: Compressed files
-- audio_sample: Sound effects, samples
-- video_raw: Raw footage, screen recordings
-- unknown: Cannot determine
+Your task:
+1. Identify what type of file this is (movie, document, invoice, photo, project file, etc.)
+2. Extract any relevant metadata from the filename and context
+3. Decide the BEST folder structure for organizing this file
+
+IMPORTANT: You have COMPLETE FREEDOM to create any folder structure you want. Think about:
+- Specific sub-categories (e.g., "Documents/Financial/Invoices/2024" instead of just "Documents")
+- Project names (e.g., "Projects/WebsiteRedesign/Assets")
+- Time-based organization (e.g., "Photos/2024/October" or "Archives/2023")
+- Company or client names (e.g., "Clients/AcmeCorp/Contracts")
+- Any other logical grouping that makes sense
+
+Examples of good folder suggestions:
+- "Movies/Action/2024" for an action movie from 2024
+- "Documents/Financial/Invoices/CompanyName" for a company invoice
+- "Projects/MyApp/Documentation" for project documentation
+- "Photos/Vacation/Italy_2024" for vacation photos
+- "Archives/OldProjects/2020" for old archived projects
 
 Return ONLY valid JSON with this structure (no markdown, no extra text):
 {{
   "success": true,
-  "content_type": "category_name",
+  "content_type": "descriptive_type",
   "confidence_score": 0.0-1.0,
   "metadata": {{
-    "key": "value pairs specific to the category"
+    "key": "value pairs with any relevant info you extracted"
   }},
-  "description": "brief description",
-  "suggested_folder": "suggested organization folder",
-  "reason": "A clear, user-friendly explanation of why this file should be organized in the suggested way. For example: 'Identified as a movie (Thunderbolts, 2025) based on the filename pattern.' or 'This is a RAR archive, a compressed file format that belongs in the Archives category.' Be specific and helpful."
+  "description": "brief description of what this file is",
+  "suggested_folder": "Your/Custom/Folder/Path",
+  "reason": "A clear, user-friendly explanation of why this file should be organized this way. Explain your folder choice."
 }}
 
-Focus on accuracy. Use filename patterns, extensions, and context clues."""
+Be creative and intelligent with your folder suggestions. Use the filename and context to create the most logical organization structure."""
 
             # Call Gemini
             response = self.shared_services.ai_model.generate_content(prompt)

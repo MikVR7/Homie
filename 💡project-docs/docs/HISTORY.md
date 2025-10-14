@@ -2,6 +2,12 @@
 
 ## 2025-10-14
 
+- Removed all hardcoded category mappings - AI now has complete freedom to create any folder structure.
+- Backend is now category-agnostic and only passes data between frontend and AI.
+- AI prompt updated to encourage creative, granular folder organization.
+- Removed hardcoded fallback suggestions in suggest-destination endpoint.
+## 2025-10-14
+
 - Fixed the `reason` field in the `/api/file-organizer/organize` endpoint to use AI-generated explanations directly.
 - Improved the AI prompt in `suggest-alternatives` to generate more diverse and relevant suggestions.
 - Simplified the reason generation logic by letting the AI handle all explanation text.
