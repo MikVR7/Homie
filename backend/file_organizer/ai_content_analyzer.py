@@ -189,7 +189,8 @@ Return ONLY valid JSON with this structure (no markdown, no extra text):
     "key": "value pairs specific to the category"
   }},
   "description": "brief description",
-  "suggested_folder": "suggested organization folder"
+  "suggested_folder": "suggested organization folder",
+  "reason": "A clear, user-friendly explanation of why this file should be organized in the suggested way. For example: 'Identified as a movie (Thunderbolts, 2025) based on the filename pattern.' or 'This is a RAR archive, a compressed file format that belongs in the Archives category.' Be specific and helpful."
 }}
 
 Focus on accuracy. Use filename patterns, extensions, and context clues."""
@@ -670,25 +671,40 @@ Focus on accuracy. Use filename patterns, extensions, and context clues."""
                 return {'success': False, 'error': 'AI service is not available or configured.'}
 
             file_name = Path(file_path).name
-            
-            prompt = f"""Given the file '{file_name}', suggest 2-4 diverse alternative organization destinations.
-            The user disagreed with the following suggestion:
-            - Destination: "{rejected_operation['destination']}"
-            - Reason: "{rejected_operation.get('reason', 'N/A')}"
+            base_path = Path(rejected_operation['destination']).parent.parent
 
-            Here is the content analysis of the file:
-            {json.dumps(current_analysis, indent=2)}
+            prompt = f"""
+            The user rejected an automatic file organization suggestion. Your task is to provide 2-4 diverse and intelligent alternative destinations.
 
-            Provide a variety of suggestions based on different organizational strategies. For each, provide a destination path and a brief, user-friendly reason.
-            The destination path should be based on the rejected destination's parent folder.
+            File Information:
+            - Filename: "{file_name}"
+            - Rejected Destination: "{rejected_operation['destination']}"
+            - Reason for Rejection: The user disagreed with the category.
+            - Content Analysis: {json.dumps(current_analysis, indent=2)}
 
-            Return ONLY valid JSON in this structure (no markdown, no extra text):
+            Instructions:
+            1.  Generate suggestions based on the 'Content Analysis'.
+            2.  All new destination paths MUST start with the base path: "{base_path}/"
+            3.  Provide a variety of organizational strategies. Examples:
+                - By a more specific content type (e.g., a 'document' could be an 'Invoice', 'Contract', or 'Resume').
+                - By a topic or project name mentioned in the content (e.g., 'ProjectAlpha', 'Client_AcmeCorp').
+                - By the year or date (e.g., 'Invoices/2024/', 'Photos/2023-10-October/').
+
+            Example Scenarios:
+            - If a PDF was rejected from '/Docs/', you could suggest '/Invoices/' or '/Contracts/'.
+            - If 'ProjectX_Report.pdf' was rejected from '/Documents/', a good alternative is '/ProjectX/Reports/'.
+
+            Return ONLY a valid JSON object with the following structure. Do not include any other text or markdown.
             {{
               "success": true,
               "alternatives": [
                 {{
-                  "destination": "/path/to/Alternative_A/{file_name}",
-                  "reason": "Reason for this suggestion."
+                  "destination": "{base_path}/Alternative_A/{file_name}",
+                  "reason": "A brief, user-friendly explanation for this suggestion."
+                }},
+                {{
+                  "destination": "{base_path}/Alternative_B/{file_name}",
+                  "reason": "Another explanation."
                 }}
               ]
             }}
@@ -696,9 +712,12 @@ Focus on accuracy. Use filename patterns, extensions, and context clues."""
 
             response = self.shared_services.ai_model.generate_content(prompt)
             if not response or not response.text:
-                raise ValueError("AI returned empty response")
+                logger.error("AI returned an empty response for `suggest-alternatives`.")
+                return {'success': False, 'error': 'AI returned an empty response.'}
 
             response_text = response.text.strip()
+            logger.debug(f"AI raw response for alternatives: {response_text}")
+
             if response_text.startswith('```'):
                 response_text = response_text.split('```')[1]
                 if response_text.startswith('json'):

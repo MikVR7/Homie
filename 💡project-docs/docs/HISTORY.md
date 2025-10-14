@@ -2,6 +2,11 @@
 
 ## 2025-10-14
 
+- Fixed the `reason` field in the `/api/file-organizer/organize` endpoint to use AI-generated explanations directly.
+- Improved the AI prompt in `suggest-alternatives` to generate more diverse and relevant suggestions.
+- Simplified the reason generation logic by letting the AI handle all explanation text.
+## 2025-10-14
+
 - Refactored the `/api/file-organizer/suggest-alternatives` endpoint to use a `rejected_operation` object.
 - Improved the `reason` field in the `/api/file-organizer/organize` endpoint with AI-driven descriptions.
 - Removed fallback logic in `AIContentAnalyzer` to enforce AI availability and return errors on failure.

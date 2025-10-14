@@ -207,15 +207,8 @@ class WebServer:
                     content_type = analysis.get('content_type', 'unknown')
                     category = content_to_category_map.get(content_type, 'Other')
                     
-                    reason = f"This is a {content_type.replace('_', ' ')} file."
-                    if content_type == 'movie' and 'title' in analysis and 'year' in analysis:
-                        reason = f"Identified as a movie ({analysis['title']}, {analysis['year']}) based on the filename pattern."
-                    elif content_type == 'tvshow' and 'show_name' in analysis:
-                        reason = f"Identified as a TV show: {analysis['show_name']} S{analysis.get('season', ''):02d}E{analysis.get('episode', ''):02d}."
-                    elif content_type == 'archive':
-                        reason = f"This is a {analysis.get('archive_type', '')} archive, a compressed file format that belongs in the 'Archives' category."
-                    elif content_type == 'document' and analysis.get('document_category') != 'General':
-                         reason = f"Detected a {analysis.get('document_category', 'document')} document."
+                    # Use the AI-generated reason directly
+                    reason = analysis.get('reason', 'File categorized for organization.')
 
                     dest_path = dest_root / category / f.name
                     operations.append({
