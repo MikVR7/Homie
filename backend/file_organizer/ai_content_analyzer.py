@@ -71,11 +71,10 @@ class AIContentAnalyzer:
             # If AI is requested, it is now required. No more fallbacks.
             if use_ai:
                 if not self.shared_services or not self.shared_services.is_ai_available():
-                    return {'success': False, 'error': 'AI service is not available or configured.'}
+                    return {'success': False, 'error': 'AI service is not available or configured. Please check GEMINI_API_KEY in .env file.'}
                 
                 ai_result = self._analyze_with_ai(file_path, file_name, file_ext, file_exists)
-                if not ai_result or not ai_result.get('success'):
-                    return {'success': False, 'error': 'AI analysis failed.'}
+                # _analyze_with_ai now always returns a dict with 'success' field
                 return ai_result
             
             # Non-AI path remains for legacy or specific calls that disable AI.
@@ -134,15 +133,20 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
-    def _analyze_with_ai(self, file_path: str, file_name: str, file_ext: str, file_exists: bool) -> Optional[Dict[str, Any]]:
+    def _analyze_with_ai(self, file_path: str, file_name: str, file_ext: str, file_exists: bool) -> Dict[str, Any]:
         """
         Use AI (Gemini) to intelligently categorize and extract metadata from files.
         Supports dynamic categories like: movies, tv_shows, music, ebooks, tutorials, 
         projects, assets (3d_models, brushes, plugins), documents, etc.
+        
+        Returns a dict with 'success' field. If success=False, includes 'error' field with details.
         """
         try:
             if not self.shared_services or not self.shared_services.ai_model:
-                return None
+                return {
+                    'success': False,
+                    'error': 'AI service not initialized. Please check GEMINI_API_KEY in .env file.'
+                }
             
             # Build context for AI
             parent_dir = Path(file_path).parent.name
@@ -199,7 +203,10 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
             response = self.shared_services.ai_model.generate_content(prompt)
             
             if not response or not response.text:
-                return None
+                return {
+                    'success': False,
+                    'error': 'AI returned empty response. The API may be rate-limited or unavailable.'
+                }
             
             # Parse AI response
             response_text = response.text.strip()
@@ -222,9 +229,14 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
             logger.info(f"🤖 AI analysis for {file_name}: {result.get('content_type')} (confidence: {result.get('confidence_score')})")
             return result
             
+        except json.JSONDecodeError as e:
+            error_msg = f"AI returned invalid JSON: {str(e)}"
+            logger.warning(f"AI analysis failed for {file_name}: {error_msg}")
+            return {'success': False, 'error': error_msg}
         except Exception as e:
-            logger.warning(f"AI analysis failed for {file_name}: {e}")
-            return None
+            error_msg = f"AI analysis error: {str(e)}"
+            logger.warning(f"AI analysis failed for {file_name}: {error_msg}")
+            return {'success': False, 'error': error_msg}
     
     def _analyze_video(self, file_name: str, file_path: str) -> Dict[str, Any]:
         """Analyze video files (movies and TV shows)"""

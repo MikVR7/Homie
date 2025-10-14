@@ -2,6 +2,12 @@
 
 ## 2025-10-14
 
+- Fixed critical bug: AI errors now return detailed diagnostic messages instead of generic failures
+- Implemented batch operation resilience - individual file failures no longer crash entire operations
+- Added .env.example file with required configuration template
+- Improved error handling in analyze_file and _analyze_with_ai methods
+## 2025-10-14
+
 - Removed all hardcoded category mappings - AI now has complete freedom to create any folder structure.
 - Backend is now category-agnostic and only passes data between frontend and AI.
 - AI prompt updated to encourage creative, granular folder organization.

@@ -303,8 +303,41 @@ AIContentAnalyzer
 
 ## Error Handling
 
-### Robust Error Recovery
-```python
+## Error Handling
+
+### AI Service Errors
+The system now provides detailed error messages when AI analysis fails:
+
+- **Missing API Key**: Returns `"AI service not initialized. Please check GEMINI_API_KEY in .env file."`
+- **Empty AI Response**: Returns `"AI returned empty response. The API may be rate-limited or unavailable."`
+- **Invalid JSON**: Returns `"AI returned invalid JSON: [error details]"`
+- **General Errors**: Returns `"AI analysis error: [error details]"`
+
+### Batch Operation Resilience
+Both `/organize` and `/analyze-content-batch` endpoints handle individual file failures gracefully:
+
+1. **Continue Processing**: If one file fails, the system continues analyzing other files
+2. **Error Collection**: Failed files are tracked with detailed error messages
+3. **Partial Success**: Operations return successfully with both results and errors
+4. **Complete Failure**: Only returns 503 error if ALL files fail to analyze
+
+Example response with partial failures:
+```json
+{
+  "success": true,
+  "errors": [
+    {
+      "file": "/path/to/file.txt",
+      "error": "AI service not initialized. Please check GEMINI_API_KEY in .env file."
+    }
+  ],
+  "operations": [ /* successful operations */ ]
+}
+```
+
+### Configuration
+A `.env.example` file is provided in the backend directory with all required configuration options. Copy it to `.env` and fill in your Gemini API key.
+
 # Never crashes the endpoint
 try:
     result = analyzer.analyze_file(path)
@@ -502,7 +535,8 @@ When the frontend user clicks the "Disagree" button on a file's suggested organi
 ### Fallback Mechanism
 If the AI service is unavailable, the endpoint falls back to a rule-based system that generates suggestions based on the file's content type, extension, and modification date.
 
-<!-- Last updated: 2025-10-14 18:53 - Reason: Refactored the suggest-alternatives endpoint and improved the reason field logic. -->
+
+<!-- Last updated: 2025-10-14 20:58 - Reason: Added comprehensive error handling with detailed messages and batch operation resilience -->
 
 ## ## Endpoint: `POST /api/file-organizer/suggest-alternatives`
 

@@ -185,11 +185,19 @@ class WebServer:
 
                 files = [p for p in src_path.iterdir() if p.is_file()]
                 operations = []
+                errors = []
                 
                 for f in files:
                     analysis = analyzer.analyze_file(str(f))
                     if not analysis.get('success'):
-                        return jsonify({'success': False, 'error': f"Failed to analyze {f.name}: {analysis.get('error')}"}), 503
+                        # Log the error but continue with other files
+                        error_msg = f"Failed to analyze {f.name}: {analysis.get('error')}"
+                        logger.warning(error_msg)
+                        errors.append({
+                            'file': str(f),
+                            'error': analysis.get('error')
+                        })
+                        continue
 
                     # Use AI-generated folder suggestion directly
                     suggested_folder = analysis.get('suggested_folder', 'Other')
@@ -202,6 +210,14 @@ class WebServer:
                         'destination': str(dest_path),
                         'reason': reason
                     })
+                
+                # If ALL files failed, return error
+                if not operations and errors:
+                    return jsonify({
+                        'success': False, 
+                        'error': 'All files failed to analyze',
+                        'details': errors
+                    }), 503
 
                 # Create a persistent analysis session directly in the database
                 import sqlite3
@@ -256,6 +272,7 @@ class WebServer:
                     
                     response = {
                         "success": True,
+                        "errors": errors if errors else None,
                         "analysis_id": analysis_id,
                         "analysis": analysis,
                         "operations": operations
@@ -688,7 +705,11 @@ class WebServer:
                 
                 for file_path in files:
                     try:
-                        results[file_path] = analyzer.analyze_file(file_path, use_ai=use_ai)
+                        result = analyzer.analyze_file(file_path, use_ai=use_ai)
+                        # If analysis failed, ensure content_type is set for backward compatibility
+                        if not result.get('success'):
+                            result['content_type'] = 'unknown'
+                        results[file_path] = result
                     except Exception as e:
                         logger.warning(f"Error analyzing {file_path}: {e}")
                         results[file_path] = {
