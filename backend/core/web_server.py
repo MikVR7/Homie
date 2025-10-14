@@ -746,50 +746,6 @@ class WebServer:
                 logger.error(f"/analyze-archive error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
         
-        @self.app.route('/api/file-organizer/suggest-alternatives', methods=['POST'])
-        def fo_suggest_alternatives():
-            """Generate alternative suggestions for a rejected file operation."""
-            try:
-                data = request.get_json(force=True, silent=True) or {}
-                analysis_id = data.get('analysis_id')
-                rejected_operation = data.get('rejected_operation')
-
-                if not analysis_id or not rejected_operation:
-                    return jsonify({'success': False, 'error': 'analysis_id and rejected_operation are required'}), 400
-                
-                app_manager = self.components.get('app_manager')
-                if not app_manager:
-                    return jsonify({'success': False, 'error': 'app_manager_unavailable'}), 500
-
-                # This is an async function, but we're in a sync Flask route.
-                # We need to ensure the module is started and then call the async method.
-                import gevent
-                from gevent import spawn
-                
-                def run_async_task():
-                    import asyncio
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        loop.run_until_complete(app_manager.start_module('file_organizer'))
-                        file_organizer = app_manager.get_active_module('file_organizer')
-                        if not file_organizer:
-                            return {'success': False, 'error': 'module_not_running'}
-                        return loop.run_until_complete(
-                            file_organizer.get_alternative_suggestions(analysis_id, rejected_operation)
-                        )
-                    finally:
-                        loop.close()
-                
-                greenlet = spawn(run_async_task)
-                result = greenlet.get() # Wait for the greenlet to finish
-
-                return jsonify(result)
-
-            except Exception as e:
-                logger.error(f"/suggest-alternatives error: {e}", exc_info=True)
-                return jsonify({'success': False, 'error': str(e)}), 500
-
         @self.app.route('/api/file-organizer/suggest-destination', methods=['POST'])
         def fo_suggest_destination():
             """Suggest destinations based on file content and user history"""
@@ -890,7 +846,53 @@ class WebServer:
             except Exception as e:
                 logger.error(f"/suggest-destination error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
-    
+        
+        @self.app.route('/api/file-organizer/suggest-alternatives', methods=['POST'])
+        def fo_suggest_alternatives():
+            """Suggest alternative destinations when a user disagrees with a suggestion."""
+            try:
+                data = request.get_json(force=True, silent=True) or {}
+                analysis_id = data.get('analysis_id')
+                file_path = data.get('file_path')
+                current_destination = data.get('current_destination')
+
+                if not all([analysis_id, file_path, current_destination]):
+                    return jsonify({'success': False, 'error': 'analysis_id, file_path, and current_destination are required'}), 400
+
+                # 1. Validate analysis_id by checking if it exists in the database
+                import sqlite3
+                import os
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+                conn = sqlite3.connect(db_path)
+                try:
+                    cursor = conn.execute("SELECT 1 FROM analysis_sessions WHERE analysis_id = ?", (analysis_id,))
+                    if not cursor.fetchone():
+                        return jsonify({'success': False, 'error': 'Analysis ID not found'}), 404
+                finally:
+                    conn.close()
+
+                # 2. Check if the file exists
+                if not os.path.exists(file_path):
+                    return jsonify({'success': False, 'error': 'File path does not exist'}), 404
+
+                # 3. Analyze the file to get its content metadata
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                shared_services = self.components.get('shared_services')
+                analyzer = AIContentAnalyzer(shared_services=shared_services)
+                
+                current_analysis = analyzer.analyze_file(file_path)
+                if not current_analysis.get('success'):
+                    return jsonify({'success': False, 'error': 'Failed to analyze file content', 'details': current_analysis.get('error')}), 500
+
+                # 4. Generate alternative suggestions
+                suggestions = analyzer.suggest_alternatives(file_path, current_analysis, current_destination)
+                
+                return jsonify(suggestions)
+
+            except Exception as e:
+                logger.error(f"/suggest-alternatives error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+
     def _setup_websocket_handlers(self):
         """Setup WebSocket event handlers"""
         

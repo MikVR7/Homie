@@ -459,3 +459,46 @@ The content analysis system provides a robust, production-ready solution for aut
 **Documentation:** ✅ Complete
 **API Integration:** ✅ Working with frontend
 
+## ## Endpoint: `POST /api/file-organizer/suggest-alternatives`
+
+Provides alternative organization suggestions when a user disagrees with an initial AI proposal.
+
+### Purpose
+When the frontend user clicks the "Disagree" button on a file's suggested organization, this endpoint is called to generate a list of alternative destinations. It uses an advanced AI prompt to generate diverse suggestions based on various organizational strategies.
+
+### Request Body
+```json
+{
+  "analysis_id": "unique-analysis-session-id",
+  "file_path": "/path/to/user/file.pdf",
+  "current_destination": "/suggested/destination/Documents/file.pdf"
+}
+```
+
+### Success Response (200 OK)
+```json
+{
+  "success": true,
+  "alternatives": [
+    {
+      "destination": "/suggested/destination/Contracts/file.pdf",
+      "reason": "Move to Contracts/ - Appears to be a legal agreement.",
+      "confidence": 0.85
+    },
+    {
+      "destination": "/suggested/destination/Archive/2023/file.pdf",
+      "reason": "Archive by year.",
+      "confidence": 0.70
+    }
+  ]
+}
+```
+
+### Error Responses
+- **400 Bad Request**: Missing `analysis_id`, `file_path`, or `current_destination`.
+- **404 Not Found**: The provided `analysis_id` does not exist in the database or the `file_path` is invalid.
+- **500 Internal Server Error**: An unexpected error occurred during file analysis or suggestion generation.
+
+### Fallback Mechanism
+If the AI service is unavailable, the endpoint falls back to a rule-based system that generates suggestions based on the file's content type, extension, and modification date.
+<!-- Last updated: 2025-10-14 07:15 - Reason: Added the new `suggest-alternatives` endpoint to provide disagreement suggestions. -->

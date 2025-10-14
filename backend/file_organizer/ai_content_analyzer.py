@@ -655,6 +655,112 @@ Focus on accuracy. Use filename patterns, extensions, and context clues."""
                 'error': str(e)
             }
     
+    def suggest_alternatives(self, file_path: str, current_analysis: Dict[str, Any], current_destination: str) -> Dict[str, Any]:
+        """
+        Suggest alternative destinations for a file using AI.
+        """
+        try:
+            if not self.shared_services or not self.shared_services.is_ai_available():
+                logger.warning("AI not available, using fallback for suggestions.")
+                return self._suggest_alternatives_fallback(file_path, current_analysis, current_destination)
+
+            file_name = Path(file_path).name
+            
+            prompt = f"""Given the file '{file_name}' and its analysis, suggest 3-5 diverse alternative organization destinations.
+            The user disagreed with the current suggestion.
+
+            Current Suggestion:
+            - Destination: "{current_destination}"
+            - Analysis: {json.dumps(current_analysis, indent=2)}
+
+            Provide a variety of suggestions based on different organizational strategies:
+            - By document/content type (e.g., 'Contracts', 'Invoices', 'Photos', 'Tutorials')
+            - By project name or company (e.g., 'Project_X/Assets', 'Client_A/Invoices')
+            - By date (e.g., '2023/2023-10_October')
+            - By status or purpose (e.g., 'Archive/Old_Contracts', 'Action_Required/Invoices')
+
+            For each alternative, provide a destination path, a brief reason, and a confidence score (0.0 to 1.0).
+            The destination path should be based on the current destination's parent folder. For example if the current destination is '/home/user/Desktop/Dest/Documents/file.pdf', the base for suggestions should be '/home/user/Desktop/Dest/'.
+
+            Return ONLY valid JSON in this structure (no markdown, no extra text):
+            {{
+              "success": true,
+              "alternatives": [
+                {{
+                  "destination": "/path/to/Alternative_A/file.ext",
+                  "reason": "Reason for this suggestion.",
+                  "confidence": 0.9
+                }},
+                {{
+                  "destination": "/path/to/Alternative_B/file.ext",
+                  "reason": "Another reason.",
+                  "confidence": 0.8
+                }}
+              ]
+            }}
+            """
+
+            response = self.shared_services.ai_model.generate_content(prompt)
+            if not response or not response.text:
+                raise ValueError("AI returned empty response")
+
+            response_text = response.text.strip()
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            import json
+            result = json.loads(response_text)
+            
+            logger.info(f"🤖 AI suggestions for {file_name} generated successfully.")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error generating AI suggestions for {file_path}: {e}", exc_info=True)
+            return self._suggest_alternatives_fallback(file_path, current_analysis, current_destination)
+
+    def _suggest_alternatives_fallback(self, file_path: str, current_analysis: Dict[str, Any], current_destination: str) -> Dict[str, Any]:
+        """Fallback for generating suggestions without AI."""
+        alternatives = []
+        p = Path(file_path)
+        dest_path = Path(current_destination)
+        base_dest = dest_path.parent.parent # /.../Destination/Category -> /.../Destination/
+        
+        # 1. Suggestion based on content type
+        content_type = current_analysis.get('content_type', 'General').capitalize()
+        if content_type:
+            alternatives.append({
+                "destination": str(base_dest / content_type / p.name),
+                "reason": f"Categorize by content type: {content_type}",
+                "confidence": 0.75
+            })
+
+        # 2. Suggestion based on file extension
+        ext_folder = p.suffix[1:].upper() + "_Files" if p.suffix else "Other_Files"
+        alternatives.append({
+            "destination": str(base_dest / ext_folder / p.name),
+            "reason": f"Group by file type ({p.suffix})",
+            "confidence": 0.65
+        })
+
+        # 3. Suggestion based on date
+        try:
+            mtime = p.stat().st_mtime
+            date = datetime.fromtimestamp(mtime)
+            year_folder = date.strftime('%Y')
+            month_folder = date.strftime('%Y-%m')
+            alternatives.append({
+                "destination": str(base_dest / "Dated" / year_folder / month_folder / p.name),
+                "reason": f"Organize by modification date ({month_folder})",
+                "confidence": 0.60
+            })
+        except FileNotFoundError:
+            pass
+
+        return {"success": True, "alternatives": alternatives}
+        
     def _calculate_file_hash(self, file_path: str) -> str:
         """Calculate SHA256 hash of a file"""
         sha256_hash = hashlib.sha256()
