@@ -1,5 +1,13 @@
 # Homie Architecture
 
+## Phase 6: Granular Control
+
+- **Outcome:** Selecting an alternative updates the file's proposed destination and reason in the UI. The file view model is then visually moved to the appropriate category card, creating a new category on the fly if one does not already exist. The actual file operation is not executed until the user clicks one of the "Apply" buttons.
+
+## Phase 6: Granular Control (Completed)
+
+- **Outcome:** Selecting an alternative updates the file's proposed destination and reason in the UI. The file view model is then visually moved to the appropriate category card, creating a new category on the fly if one does not already exist. The actual file operation is not executed until the user clicks one of the "Apply" buttons.
+
 ## File Organizer - Phase 5: Advanced AI Features
 
 ## File Organizer - Phase 5: Advanced AI Features
@@ -454,4 +462,6 @@ Each module can be:
 
 
 
-<!-- Last updated: 2025-10-13 06:34 - Reason: Implemented comprehensive content analysis system for the File Organizer module with support for movies, TV shows, documents, images, and archives -->
+
+
+<!-- Last updated: 2025-10-14 07:31 - Reason: The behavior of the Disagree button has been refined to only update the UI state and visually move the file between categories, instead of executing the operation immediately. -->

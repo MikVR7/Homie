@@ -501,4 +501,46 @@ When the frontend user clicks the "Disagree" button on a file's suggested organi
 
 ### Fallback Mechanism
 If the AI service is unavailable, the endpoint falls back to a rule-based system that generates suggestions based on the file's content type, extension, and modification date.
-<!-- Last updated: 2025-10-14 07:15 - Reason: Added the new `suggest-alternatives` endpoint to provide disagreement suggestions. -->
+
+<!-- Last updated: 2025-10-14 18:53 - Reason: Refactored the suggest-alternatives endpoint and improved the reason field logic. -->
+
+## ## Endpoint: `POST /api/file-organizer/suggest-alternatives`
+
+Provides alternative organization suggestions when a user disagrees with an initial AI proposal. If the AI service is unavailable, this endpoint will return a `503 Service Unavailable` error.
+
+### Purpose
+When the frontend user clicks the "Disagree" button on a file's suggested organization, this endpoint is called to generate a list of alternative destinations. It uses an advanced AI prompt to generate diverse suggestions based on various organizational strategies.
+
+### Request Body
+```json
+{
+  "analysis_id": "unique-analysis-identifier-string",
+  "rejected_operation": {
+    "source": "/path/to/original/file.mkv",
+    "destination": "/path/to/suggested/destination/Movies/file.mkv",
+    "reason": "Identified as a movie (Example, 2025) based on the filename pattern.",
+    "type": "move"
+  }
+}
+```
+
+### Success Response (200 OK)
+```json
+{
+  "success": true,
+  "alternatives": [
+    {
+      "source": "/path/to/original/file.mkv",
+      "destination": "/path/to/suggested/destination/TV Shows/file.mkv",
+      "reason": "This file could also be a TV show episode. Consider this if it's part of a series.",
+      "type": "move"
+    }
+  ]
+}
+```
+
+### Error Responses
+- **400 Bad Request**: Missing `analysis_id` or `rejected_operation`.
+- **404 Not Found**: The provided `analysis_id` does not exist or the `source` file path is invalid.
+- **503 Service Unavailable**: The AI service is not available or failed to generate suggestions.
+- **500 Internal Server Error**: An unexpected error occurred.

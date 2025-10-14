@@ -2,6 +2,12 @@
 
 ## 2025-10-14
 
+- Refactored the `/api/file-organizer/suggest-alternatives` endpoint to use a `rejected_operation` object.
+- Improved the `reason` field in the `/api/file-organizer/organize` endpoint with AI-driven descriptions.
+- Removed fallback logic in `AIContentAnalyzer` to enforce AI availability and return errors on failure.
+- Updated the test suite to correctly handle AI-disabled scenarios.
+## 2025-10-14
+
 - Implemented the `/api/file-organizer/suggest-alternatives` endpoint.
 - Added AI-powered alternative suggestion generation for file organization.
 - Included a fallback mechanism for suggestions when AI is unavailable.

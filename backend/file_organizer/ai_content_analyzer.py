@@ -68,15 +68,18 @@ class AIContentAnalyzer:
             file_name = Path(file_path).name
             file_exists = os.path.exists(file_path)
             
-            # Try AI-powered analysis first if available and enabled
-            if use_ai and self.shared_services and self.shared_services.is_ai_available():
+            # If AI is requested, it is now required. No more fallbacks.
+            if use_ai:
+                if not self.shared_services or not self.shared_services.is_ai_available():
+                    return {'success': False, 'error': 'AI service is not available or configured.'}
+                
                 ai_result = self._analyze_with_ai(file_path, file_name, file_ext, file_exists)
-                if ai_result and ai_result.get('success'):
-                    return ai_result
+                if not ai_result or not ai_result.get('success'):
+                    return {'success': False, 'error': 'AI analysis failed.'}
+                return ai_result
             
-            # Determine file category and analyze accordingly
+            # Non-AI path remains for legacy or specific calls that disable AI.
             if file_ext in ['.mkv', '.mp4', '.avi', '.mov', '.wmv']:
-                # Video files can be analyzed from filename alone
                 return self._analyze_video(file_name, file_path)
             elif file_ext in ['.pdf']:
                 # PDF requires file to exist for content extraction
@@ -655,46 +658,37 @@ Focus on accuracy. Use filename patterns, extensions, and context clues."""
                 'error': str(e)
             }
     
-    def suggest_alternatives(self, file_path: str, current_analysis: Dict[str, Any], current_destination: str) -> Dict[str, Any]:
+    def suggest_alternatives(self, rejected_operation: Dict[str, Any]) -> Dict[str, Any]:
         """
         Suggest alternative destinations for a file using AI.
         """
         try:
+            file_path = rejected_operation['source']
+            current_analysis = self.analyze_file(file_path)
+
             if not self.shared_services or not self.shared_services.is_ai_available():
-                logger.warning("AI not available, using fallback for suggestions.")
-                return self._suggest_alternatives_fallback(file_path, current_analysis, current_destination)
+                return {'success': False, 'error': 'AI service is not available or configured.'}
 
             file_name = Path(file_path).name
             
-            prompt = f"""Given the file '{file_name}' and its analysis, suggest 3-5 diverse alternative organization destinations.
-            The user disagreed with the current suggestion.
+            prompt = f"""Given the file '{file_name}', suggest 2-4 diverse alternative organization destinations.
+            The user disagreed with the following suggestion:
+            - Destination: "{rejected_operation['destination']}"
+            - Reason: "{rejected_operation.get('reason', 'N/A')}"
 
-            Current Suggestion:
-            - Destination: "{current_destination}"
-            - Analysis: {json.dumps(current_analysis, indent=2)}
+            Here is the content analysis of the file:
+            {json.dumps(current_analysis, indent=2)}
 
-            Provide a variety of suggestions based on different organizational strategies:
-            - By document/content type (e.g., 'Contracts', 'Invoices', 'Photos', 'Tutorials')
-            - By project name or company (e.g., 'Project_X/Assets', 'Client_A/Invoices')
-            - By date (e.g., '2023/2023-10_October')
-            - By status or purpose (e.g., 'Archive/Old_Contracts', 'Action_Required/Invoices')
-
-            For each alternative, provide a destination path, a brief reason, and a confidence score (0.0 to 1.0).
-            The destination path should be based on the current destination's parent folder. For example if the current destination is '/home/user/Desktop/Dest/Documents/file.pdf', the base for suggestions should be '/home/user/Desktop/Dest/'.
+            Provide a variety of suggestions based on different organizational strategies. For each, provide a destination path and a brief, user-friendly reason.
+            The destination path should be based on the rejected destination's parent folder.
 
             Return ONLY valid JSON in this structure (no markdown, no extra text):
             {{
               "success": true,
               "alternatives": [
                 {{
-                  "destination": "/path/to/Alternative_A/file.ext",
-                  "reason": "Reason for this suggestion.",
-                  "confidence": 0.9
-                }},
-                {{
-                  "destination": "/path/to/Alternative_B/file.ext",
-                  "reason": "Another reason.",
-                  "confidence": 0.8
+                  "destination": "/path/to/Alternative_A/{file_name}",
+                  "reason": "Reason for this suggestion."
                 }}
               ]
             }}
@@ -714,35 +708,50 @@ Focus on accuracy. Use filename patterns, extensions, and context clues."""
             import json
             result = json.loads(response_text)
             
+            # Convert to FileOperation format
+            final_alternatives = []
+            for alt in result.get('alternatives', []):
+                final_alternatives.append({
+                    'source': file_path,
+                    'destination': alt['destination'],
+                    'reason': alt['reason'],
+                    'type': 'move'
+                })
+            
             logger.info(f"🤖 AI suggestions for {file_name} generated successfully.")
-            return result
+            return {"success": True, "alternatives": final_alternatives}
 
         except Exception as e:
-            logger.error(f"Error generating AI suggestions for {file_path}: {e}", exc_info=True)
-            return self._suggest_alternatives_fallback(file_path, current_analysis, current_destination)
+            logger.error(f"Error generating AI suggestions for {rejected_operation['source']}: {e}", exc_info=True)
+            return {'success': False, 'error': f'An exception occurred while generating AI suggestions: {e}'}
 
-    def _suggest_alternatives_fallback(self, file_path: str, current_analysis: Dict[str, Any], current_destination: str) -> Dict[str, Any]:
+    def _suggest_alternatives_fallback(self, rejected_operation: Dict[str, Any], current_analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Fallback for generating suggestions without AI."""
+        # This method is now deprecated and will be removed in a future refactor.
+        # For now, it remains to avoid breaking other parts of the system that might call it directly.
         alternatives = []
-        p = Path(file_path)
-        dest_path = Path(current_destination)
-        base_dest = dest_path.parent.parent # /.../Destination/Category -> /.../Destination/
+        source_path = rejected_operation['source']
+        p = Path(source_path)
+        dest_path = Path(rejected_operation['destination'])
+        base_dest = dest_path.parent.parent
         
         # 1. Suggestion based on content type
         content_type = current_analysis.get('content_type', 'General').capitalize()
         if content_type:
             alternatives.append({
+                "source": source_path,
                 "destination": str(base_dest / content_type / p.name),
                 "reason": f"Categorize by content type: {content_type}",
-                "confidence": 0.75
+                "type": "move"
             })
 
         # 2. Suggestion based on file extension
         ext_folder = p.suffix[1:].upper() + "_Files" if p.suffix else "Other_Files"
         alternatives.append({
+            "source": source_path,
             "destination": str(base_dest / ext_folder / p.name),
             "reason": f"Group by file type ({p.suffix})",
-            "confidence": 0.65
+            "type": "move"
         })
 
         # 3. Suggestion based on date
@@ -752,9 +761,10 @@ Focus on accuracy. Use filename patterns, extensions, and context clues."""
             year_folder = date.strftime('%Y')
             month_folder = date.strftime('%Y-%m')
             alternatives.append({
+                "source": source_path,
                 "destination": str(base_dest / "Dated" / year_folder / month_folder / p.name),
                 "reason": f"Organize by modification date ({month_folder})",
-                "confidence": 0.60
+                "type": "move"
             })
         except FileNotFoundError:
             pass

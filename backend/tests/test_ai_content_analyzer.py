@@ -19,7 +19,7 @@ class TestMovieAnalysis:
     
     def test_movie_with_year_and_quality(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("Thunderbolts.2025.German.TELESYNC.LD.720p.x265-LDO.mkv")
+        result = analyzer.analyze_file("Thunderbolts.2025.German.TELESYNC.LD.720p.x265-LDO.mkv", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'movie'
@@ -31,7 +31,7 @@ class TestMovieAnalysis:
     
     def test_movie_1080p_bluray(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("The.Matrix.1999.1080p.BluRay.x264-YIFY.mp4")
+        result = analyzer.analyze_file("The.Matrix.1999.1080p.BluRay.x264-YIFY.mp4", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'movie'
@@ -42,7 +42,7 @@ class TestMovieAnalysis:
     
     def test_movie_parentheses_format(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("Avatar (2009).mp4")
+        result = analyzer.analyze_file("Avatar (2009).mp4", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'movie'
@@ -51,7 +51,7 @@ class TestMovieAnalysis:
     
     def test_movie_4k_quality(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("Dune.2021.4K.HDR.x265-GROUP.mkv")
+        result = analyzer.analyze_file("Dune.2021.4K.HDR.x265-GROUP.mkv", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'movie'
@@ -65,7 +65,7 @@ class TestTVShowAnalysis:
     
     def test_tvshow_sxxexx_format(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("Breaking.Bad.S05E16.1080p.WEB-DL.mkv")
+        result = analyzer.analyze_file("Breaking.Bad.S05E16.1080p.WEB-DL.mkv", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'tvshow'
@@ -76,7 +76,7 @@ class TestTVShowAnalysis:
     
     def test_tvshow_x_format(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("Game.of.Thrones.8x06.mkv")
+        result = analyzer.analyze_file("Game.of.Thrones.8x06.mkv", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'tvshow'
@@ -90,7 +90,7 @@ class TestArchiveAnalysis:
     
     def test_zip_archive_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("project_backup.zip")
+        result = analyzer.analyze_file("project_backup.zip", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'archive'
@@ -99,7 +99,7 @@ class TestArchiveAnalysis:
     
     def test_rar_archive_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("game_installer.rar")
+        result = analyzer.analyze_file("game_installer.rar", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'archive'
@@ -107,7 +107,7 @@ class TestArchiveAnalysis:
     
     def test_7z_archive_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("compressed.7z")
+        result = analyzer.analyze_file("compressed.7z", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'archive'
@@ -119,7 +119,7 @@ class TestImageAnalysis:
     
     def test_jpeg_image_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("photo.jpg")
+        result = analyzer.analyze_file("photo.jpg", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'image'
@@ -127,7 +127,7 @@ class TestImageAnalysis:
     
     def test_png_image_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("screenshot.png")
+        result = analyzer.analyze_file("screenshot.png", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'image'
@@ -138,7 +138,7 @@ class TestDocumentAnalysis:
     
     def test_pdf_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("Invoice_2024.pdf")
+        result = analyzer.analyze_file("Invoice_2024.pdf", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'document'
@@ -146,7 +146,7 @@ class TestDocumentAnalysis:
     
     def test_docx_no_file(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("report.docx")
+        result = analyzer.analyze_file("report.docx", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'document'
@@ -187,7 +187,7 @@ class TestUnknownFiles:
     
     def test_unknown_extension(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("file.xyz")
+        result = analyzer.analyze_file("file.xyz", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'unknown'
@@ -200,7 +200,7 @@ class TestGenericVideo:
     
     def test_generic_video(self):
         analyzer = AIContentAnalyzer()
-        result = analyzer.analyze_file("family_vacation.avi")
+        result = analyzer.analyze_file("family_vacation.avi", use_ai=False)
         
         assert result['success'] is True
         assert result['content_type'] == 'video'

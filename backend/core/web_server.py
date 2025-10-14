@@ -171,33 +171,58 @@ class WebServer:
                 # This is a temporary solution until we fix the async module startup
                 pass
 
-                # The logic for scanning files and creating operations is now temporary
                 # until the AI generator is fully re-integrated.
                 from pathlib import Path
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                
                 src_path = Path(source_folder).expanduser()
                 dest_root = Path(destination_folder).expanduser()
                 if not src_path.exists() or not src_path.is_dir():
                     return jsonify({'success': False, 'error': f'source_folder not found: {source_folder}'}), 400
 
-                ext_map = {
-                    '.pdf': 'Documents', '.doc': 'Documents', '.docx': 'Documents', '.txt': 'Documents',
-                    '.png': 'Pictures', '.jpg': 'Pictures', '.jpeg': 'Pictures', '.gif': 'Pictures',
-                    '.mkv': 'Videos', '.mp4': 'Videos', '.avi': 'Videos', '.mov': 'Videos',
-                    '.rar': 'Archives', '.zip': 'Archives', '.7z': 'Archives',
-                    '.iso': 'Software', '.dmg': 'Software',
-                }
+                shared_services = self.components.get('shared_services')
+                analyzer = AIContentAnalyzer(shared_services=shared_services)
                 
+                content_to_category_map = {
+                    'movie': 'Movies',
+                    'tvshow': 'TV Shows',
+                    'video': 'Videos',
+                    'document': 'Documents',
+                    'invoice': 'Documents/Invoices',
+                    'contract': 'Documents/Contracts',
+                    'image': 'Pictures',
+                    'archive': 'Archives',
+                    'software': 'Software',
+                    'unknown': 'Other',
+                }
+
                 files = [p for p in src_path.iterdir() if p.is_file()]
                 operations = []
+                
                 for f in files:
-                    ext = f.suffix.lower()
-                    category = ext_map.get(ext, 'Other')
+                    analysis = analyzer.analyze_file(str(f))
+                    if not analysis.get('success'):
+                        return jsonify({'success': False, 'error': f"Failed to analyze {f.name}: {analysis.get('error')}"}), 503
+
+                    content_type = analysis.get('content_type', 'unknown')
+                    category = content_to_category_map.get(content_type, 'Other')
+                    
+                    reason = f"This is a {content_type.replace('_', ' ')} file."
+                    if content_type == 'movie' and 'title' in analysis and 'year' in analysis:
+                        reason = f"Identified as a movie ({analysis['title']}, {analysis['year']}) based on the filename pattern."
+                    elif content_type == 'tvshow' and 'show_name' in analysis:
+                        reason = f"Identified as a TV show: {analysis['show_name']} S{analysis.get('season', ''):02d}E{analysis.get('episode', ''):02d}."
+                    elif content_type == 'archive':
+                        reason = f"This is a {analysis.get('archive_type', '')} archive, a compressed file format that belongs in the 'Archives' category."
+                    elif content_type == 'document' and analysis.get('document_category') != 'General':
+                         reason = f"Detected a {analysis.get('document_category', 'document')} document."
+
                     dest_path = dest_root / category / f.name
                     operations.append({
                         'type': 'move',
                         'source': str(f),
                         'destination': str(dest_path),
-                        'reason': f'Move {f.name} to {category}/'
+                        'reason': reason
                     })
 
                 # Create a persistent analysis session directly in the database
@@ -853,11 +878,10 @@ class WebServer:
             try:
                 data = request.get_json(force=True, silent=True) or {}
                 analysis_id = data.get('analysis_id')
-                file_path = data.get('file_path')
-                current_destination = data.get('current_destination')
+                rejected_operation = data.get('rejected_operation')
 
-                if not all([analysis_id, file_path, current_destination]):
-                    return jsonify({'success': False, 'error': 'analysis_id, file_path, and current_destination are required'}), 400
+                if not analysis_id or not rejected_operation:
+                    return jsonify({'success': False, 'error': 'analysis_id and rejected_operation are required'}), 400
 
                 # 1. Validate analysis_id by checking if it exists in the database
                 import sqlite3
@@ -871,22 +895,20 @@ class WebServer:
                 finally:
                     conn.close()
 
-                # 2. Check if the file exists
-                if not os.path.exists(file_path):
-                    return jsonify({'success': False, 'error': 'File path does not exist'}), 404
+                file_path = rejected_operation.get('source')
+                if not file_path or not os.path.exists(file_path):
+                    return jsonify({'success': False, 'error': 'File path from rejected_operation does not exist'}), 404
 
-                # 3. Analyze the file to get its content metadata
+                # 2. Generate alternative suggestions
                 from file_organizer.ai_content_analyzer import AIContentAnalyzer
                 shared_services = self.components.get('shared_services')
                 analyzer = AIContentAnalyzer(shared_services=shared_services)
                 
-                current_analysis = analyzer.analyze_file(file_path)
-                if not current_analysis.get('success'):
-                    return jsonify({'success': False, 'error': 'Failed to analyze file content', 'details': current_analysis.get('error')}), 500
-
-                # 4. Generate alternative suggestions
-                suggestions = analyzer.suggest_alternatives(file_path, current_analysis, current_destination)
+                suggestions = analyzer.suggest_alternatives(rejected_operation)
                 
+                if not suggestions.get('success'):
+                    return jsonify(suggestions), 503
+
                 return jsonify(suggestions)
 
             except Exception as e:
