@@ -2,6 +2,12 @@
 
 ## 2025-10-15
 
+- Implemented /api/file-organizer/explain-operation endpoint for on-demand 'Why?' explanations
+- AI generates human-friendly 2-3 sentence explanations only when user clicks 'Why?' button
+- Includes automatic model recovery if AI fails
+- Complete on-demand explanation system now ready for frontend integration
+## 2025-10-15
+
 - MAJOR PERFORMANCE FIX: Changed from individual AI calls to batch analysis
 - Speed improvement: 60 seconds (12 files × 5s) → ~5 seconds total (ONE batch call)
 - Removed wasteful 'reason' generation - now only generated on-demand when user clicks 'Why?'

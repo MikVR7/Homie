@@ -850,6 +850,81 @@ class WebServer:
                 logger.error(f"/suggest-destination error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
         
+        @self.app.route('/api/file-organizer/explain-operation', methods=['POST'])
+        def fo_explain_operation():
+            """Generate on-demand explanation for why a file should be organized in a specific way."""
+            try:
+                data = request.get_json(force=True, silent=True) or {}
+                source = data.get('source')
+                destination = data.get('destination')
+                operation_type = data.get('operation_type', 'move')
+                
+                if not source or not destination:
+                    return jsonify({'success': False, 'error': 'source and destination are required'}), 400
+                
+                # Generate explanation using AI
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                shared_services = self.components.get('shared_services')
+                analyzer = AIContentAnalyzer(shared_services=shared_services)
+                
+                # Build prompt for explanation
+                from pathlib import Path
+                file_name = Path(source).name
+                file_ext = Path(source).suffix.lower()
+                dest_folder = str(Path(destination).parent)
+                
+                if not shared_services or not shared_services.is_ai_available():
+                    return jsonify({
+                        'success': False,
+                        'error': 'AI service not available'
+                    }), 503
+                
+                prompt = f"""Explain why this file should be organized this way.
+
+File: {file_name}
+Extension: {file_ext}
+Suggested Destination: {dest_folder}
+Operation: {operation_type}
+
+Provide a clear, user-friendly explanation (2-3 sentences) that explains:
+1. What type of file this is
+2. Why it should go in the suggested folder
+3. What you identified from the filename/extension
+
+Be specific and helpful. Return ONLY the explanation text, no JSON, no formatting."""
+
+                try:
+                    response = shared_services.ai_model.generate_content(prompt)
+                except Exception as first_error:
+                    logger.warning(f"AI model failed, attempting recovery: {str(first_error)[:100]}")
+                    shared_services._model_discovery_attempted = False
+                    shared_services._discover_and_select_model()
+                    recovered_model = shared_services.ai_model
+                    if not recovered_model:
+                        return jsonify({
+                            'success': False,
+                            'error': 'AI service unavailable after recovery attempt'
+                        }), 503
+                    logger.info("🔄 Retrying with recovered model...")
+                    response = recovered_model.generate_content(prompt)
+                
+                if not response or not response.text:
+                    return jsonify({
+                        'success': False,
+                        'error': 'AI returned empty response'
+                    }), 503
+                
+                reason = response.text.strip()
+                
+                return jsonify({
+                    'success': True,
+                    'reason': reason
+                })
+                
+            except Exception as e:
+                logger.error(f"/explain-operation error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
+        
         @self.app.route('/api/file-organizer/suggest-alternatives', methods=['POST'])
         def fo_suggest_alternatives():
             """Suggest alternative destinations when a user disagrees with a suggestion."""
