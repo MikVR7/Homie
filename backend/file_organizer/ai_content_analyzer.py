@@ -203,9 +203,14 @@ class AIContentAnalyzer:
             
             prompt = f"""Analyze these {len(file_list)} files and suggest the best folder structure for each.
 
-You have COMPLETE FREEDOM to create any folder structure. Think about:
-- Specific sub-categories (e.g., "Documents/Financial/Invoices/2024")
-- Project names, companies, time-based organization, etc.
+CRITICAL RULE: Use ONLY ONE LEVEL of folder depth. NO nested folders!
+
+Examples:
+✅ GOOD: "Documents", "Images", "Software", "Media"
+❌ BAD: "Documents/Contracts/2024", "Images/Photos/Vacation"
+
+You have COMPLETE FREEDOM to choose the folder name, but keep it to ONE level only.
+Later, the user can request more granularity if needed.
 
 Files to analyze:
 {json.dumps(file_list, indent=2)}
@@ -214,14 +219,14 @@ Return ONLY valid JSON (no markdown) with this structure:
 {{
   "results": {{
     "full_file_path": {{
-      "suggested_folder": "Your/Custom/Folder/Path",
+      "suggested_folder": "SingleFolderName",
       "content_type": "brief_type_description"
     }},
     ...
   }}
 }}
 
-Be fast and efficient - just folder paths and types, no detailed explanations needed."""
+Be fast and efficient - just single-level folder names and types, no detailed explanations needed."""
 
             # Call AI with recovery (using shared method)
             try:
