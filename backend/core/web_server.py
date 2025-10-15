@@ -184,31 +184,43 @@ class WebServer:
                 analyzer = AIContentAnalyzer(shared_services=shared_services)
 
                 files = [p for p in src_path.iterdir() if p.is_file()]
+                file_paths = [str(f) for f in files]
+                
+                # Batch analyze all files in ONE AI call (much faster!)
+                batch_result = analyzer.analyze_files_batch(file_paths)
+                
+                if not batch_result.get('success'):
+                    return jsonify({
+                        'success': False,
+                        'error': f"Batch analysis failed: {batch_result.get('error')}"
+                    }), 503
+                
                 operations = []
                 errors = []
+                results = batch_result.get('results', {})
                 
                 for f in files:
-                    analysis = analyzer.analyze_file(str(f))
-                    if not analysis.get('success'):
-                        # Log the error but continue with other files
-                        error_msg = f"Failed to analyze {f.name}: {analysis.get('error')}"
+                    file_path = str(f)
+                    file_result = results.get(file_path)
+                    
+                    if not file_result:
+                        error_msg = f"No analysis result for {f.name}"
                         logger.warning(error_msg)
                         errors.append({
-                            'file': str(f),
-                            'error': analysis.get('error')
+                            'file': file_path,
+                            'error': 'No analysis result returned'
                         })
                         continue
-
-                    # Use AI-generated folder suggestion directly
-                    suggested_folder = analysis.get('suggested_folder', 'Other')
-                    reason = analysis.get('reason', 'File categorized for organization.')
-
+                    
+                    suggested_folder = file_result.get('suggested_folder', 'Other')
+                    # NO REASON - will be generated on-demand when user asks "why?"
+                    
                     dest_path = dest_root / suggested_folder / f.name
                     operations.append({
                         'type': 'move',
-                        'source': str(f),
+                        'source': file_path,
                         'destination': str(dest_path),
-                        'reason': reason
+                        # reason will be generated on-demand via /explain endpoint
                     })
                 
                 # If ALL files failed, return error

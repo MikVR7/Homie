@@ -2,6 +2,18 @@
 
 ## 2025-10-15
 
+- MAJOR PERFORMANCE FIX: Changed from individual AI calls to batch analysis
+- Speed improvement: 60 seconds (12 files × 5s) → ~5 seconds total (ONE batch call)
+- Removed wasteful 'reason' generation - now only generated on-demand when user clicks 'Why?'
+- API efficiency: 12 API calls → 1 API call per organization
+## 2025-10-15
+
+- Added persistent model configuration in backend/data/config/ai_service.json
+- System now remembers the last working AI model across restarts
+- Model selection priority: 1) User override (GEMINI_MODEL), 2) Last working model, 3) Default (gemini-flash-latest)
+- Discovered models are automatically saved when validated
+## 2025-10-15
+
 - Optimized AI initialization - no performance impact on startup (< 100ms)
 - Implemented runtime auto-recovery - if model fails after years, system automatically discovers and switches to working model
 - Model discovery is lazy/on-demand - only happens when first needed or on failure

@@ -134,6 +134,101 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
+    def analyze_files_batch(self, file_paths: List[str]) -> Dict[str, Any]:
+        """
+        Analyze multiple files in a single AI call (MUCH faster than individual calls).
+        Returns only folder suggestions, no reasons (reasons generated on-demand).
+        
+        Args:
+            file_paths: List of file paths to analyze
+            
+        Returns:
+            {
+                'success': True/False,
+                'results': {
+                    'file_path': {'suggested_folder': 'path', 'content_type': 'type'},
+                    ...
+                },
+                'error': 'error message if failed'
+            }
+        """
+        if not self.shared_services or not self.shared_services.is_ai_available():
+            return {'success': False, 'error': 'AI service not available'}
+        
+        if not file_paths:
+            return {'success': True, 'results': {}}
+        
+        try:
+            # Build file list for AI
+            file_list = []
+            for fp in file_paths:
+                file_list.append({
+                    'path': fp,
+                    'name': Path(fp).name,
+                    'extension': Path(fp).suffix.lower()
+                })
+            
+            prompt = f"""Analyze these {len(file_list)} files and suggest the best folder structure for each.
+
+You have COMPLETE FREEDOM to create any folder structure. Think about:
+- Specific sub-categories (e.g., "Documents/Financial/Invoices/2024")
+- Project names, companies, time-based organization, etc.
+
+Files to analyze:
+{json.dumps(file_list, indent=2)}
+
+Return ONLY valid JSON (no markdown) with this structure:
+{{
+  "results": {{
+    "full_file_path": {{
+      "suggested_folder": "Your/Custom/Folder/Path",
+      "content_type": "brief_type_description"
+    }},
+    ...
+  }}
+}}
+
+Be fast and efficient - just folder paths and types, no detailed explanations needed."""
+
+            # Call AI with recovery
+            try:
+                response = self.shared_services.ai_model.generate_content(prompt)
+            except Exception as first_error:
+                logger.warning(f"AI model failed, attempting recovery: {str(first_error)[:100]}")
+                self.shared_services._model_discovery_attempted = False
+                self.shared_services._discover_and_select_model()
+                recovered_model = self.shared_services.ai_model
+                if not recovered_model:
+                    raise first_error
+                logger.info("🔄 Retrying with recovered model...")
+                response = recovered_model.generate_content(prompt)
+            
+            if not response or not response.text:
+                return {'success': False, 'error': 'AI returned empty response'}
+            
+            # Parse response
+            response_text = response.text.strip()
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+            
+            result = json.loads(response_text)
+            return {
+                'success': True,
+                'results': result.get('results', {})
+            }
+            
+        except json.JSONDecodeError as e:
+            error_msg = f"AI returned invalid JSON: {str(e)}"
+            logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
+        except Exception as e:
+            error_msg = f"Batch analysis error: {str(e)}"
+            logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
+    
     def _analyze_with_ai(self, file_path: str, file_name: str, file_ext: str, file_exists: bool) -> Dict[str, Any]:
         """
         Use AI (Gemini) to intelligently categorize and extract metadata from files.
