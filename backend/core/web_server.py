@@ -713,12 +713,39 @@ class WebServer:
                 # Initialize analyzer with shared_services for AI access
                 shared_services = self.components.get('shared_services')
                 analyzer = AIContentAnalyzer(shared_services=shared_services)
-                results = {}
                 
+                if use_ai:
+                    # Use batch analysis for AI (MUCH faster - ONE call for all files!)
+                    batch_result = analyzer.analyze_files_batch(files)
+                    
+                    if not batch_result.get('success'):
+                        # If batch fails, fall back to individual non-AI analysis
+                        logger.warning(f"Batch AI analysis failed: {batch_result.get('error')}, falling back to individual analysis")
+                        use_ai = False
+                    else:
+                        results = batch_result.get('results', {})
+                        # Ensure all results have content_type
+                        for file_path in files:
+                            if file_path in results:
+                                results[file_path]['success'] = True
+                            else:
+                                results[file_path] = {
+                                    'success': False,
+                                    'error': 'No result from batch analysis',
+                                    'content_type': 'unknown'
+                                }
+                        
+                        return jsonify({
+                            'success': True,
+                            'ai_enabled': True,
+                            'results': results
+                        })
+                
+                # Non-AI path or fallback: analyze files individually
+                results = {}
                 for file_path in files:
                     try:
-                        result = analyzer.analyze_file(file_path, use_ai=use_ai)
-                        # If analysis failed, ensure content_type is set for backward compatibility
+                        result = analyzer.analyze_file(file_path, use_ai=False)
                         if not result.get('success'):
                             result['content_type'] = 'unknown'
                         results[file_path] = result
@@ -732,7 +759,7 @@ class WebServer:
                 
                 return jsonify({
                     'success': True,
-                    'ai_enabled': shared_services.is_ai_available() and use_ai if shared_services else False,
+                    'ai_enabled': False,
                     'results': results
                 })
                 
