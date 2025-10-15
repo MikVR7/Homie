@@ -200,8 +200,22 @@ Return ONLY valid JSON with this structure (no markdown, no extra text):
 
 Be creative and intelligent with your folder suggestions. Use the filename and context to create the most logical organization structure."""
 
-            # Call Gemini
-            response = self.shared_services.ai_model.generate_content(prompt)
+            # Call Gemini with automatic recovery on model failure
+            try:
+                response = self.shared_services.ai_model.generate_content(prompt)
+            except Exception as first_error:
+                # If model fails (e.g., deprecated), try discovery and retry once
+                logger.warning(f"AI model failed, attempting recovery: {str(first_error)[:100]}")
+                self.shared_services._model_discovery_attempted = False  # Reset flag to allow retry
+                self.shared_services._discover_and_select_model()
+                
+                # Retry with recovered model
+                recovered_model = self.shared_services.ai_model
+                if not recovered_model:
+                    raise first_error  # If recovery failed, raise original error
+                
+                logger.info("🔄 Retrying with recovered model...")
+                response = recovered_model.generate_content(prompt)
             
             if not response or not response.text:
                 return {

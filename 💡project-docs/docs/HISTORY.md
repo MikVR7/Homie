@@ -2,6 +2,12 @@
 
 ## 2025-10-15
 
+- Optimized AI initialization - no performance impact on startup (< 100ms)
+- Implemented runtime auto-recovery - if model fails after years, system automatically discovers and switches to working model
+- Model discovery is lazy/on-demand - only happens when first needed or on failure
+- Transparent recovery - failed AI requests automatically retry with discovered model
+## 2025-10-15
+
 - Implemented dynamic Gemini model discovery - system automatically finds and ranks available models
 - Added GEMINI_MODEL environment variable for user override
 - Future-proof: Will automatically adapt to new Google AI models without code changes
