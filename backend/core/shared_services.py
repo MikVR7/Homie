@@ -75,7 +75,7 @@ class SharedServices:
             raise
     
     def _initialize_ai(self):
-        """Initialize Google Gemini AI service"""
+        """Initialize Google Gemini AI service with dynamic model discovery"""
         try:
             if not self._ai_api_key:
                 logger.warning("⚠️ No AI API key available, AI features will be disabled")
@@ -84,10 +84,93 @@ class SharedServices:
             # Configure Gemini
             genai.configure(api_key=self._ai_api_key)
             
-            # Initialize model - use latest flash model
-            self._ai_model = genai.GenerativeModel('gemini-2.5-flash')
+            # Allow user to override model via environment variable
+            user_model = os.getenv('GEMINI_MODEL')
+            if user_model:
+                logger.info(f"🎯 Using user-specified model: {user_model}")
+                try:
+                    self._ai_model = genai.GenerativeModel(user_model)
+                    logger.info(f"🤖 AI service initialized ({user_model})")
+                    return
+                except Exception as e:
+                    logger.error(f"❌ User-specified model '{user_model}' failed: {e}")
+                    logger.info("⚡ Falling back to automatic model discovery...")
             
-            logger.info("🤖 AI service initialized (Gemini 2.5 Flash)")
+            # Dynamic model discovery: Query Google's API for available models
+            logger.info("🔍 Discovering available Gemini models...")
+            try:
+                available_models = [
+                    m for m in genai.list_models() 
+                    if 'generateContent' in m.supported_generation_methods
+                ]
+                
+                if not available_models:
+                    logger.error("❌ No models with generateContent support found")
+                    self._ai_model = None
+                    return
+                
+                logger.info(f"📋 Found {len(available_models)} compatible models")
+                
+                # Score and rank models by preference keywords
+                def score_model(model_name: str) -> int:
+                    """Score models based on preference (higher = better)"""
+                    name_lower = model_name.lower()
+                    score = 0
+                    
+                    # Prefer 'flash' models (faster, cheaper)
+                    if 'flash' in name_lower:
+                        score += 100
+                    
+                    # Prefer 'latest' aliases
+                    if 'latest' in name_lower:
+                        score += 50
+                    
+                    # Prefer higher version numbers (2.5 > 2.0 > 1.5)
+                    if '2.5' in name_lower or '2-5' in name_lower:
+                        score += 30
+                    elif '2.0' in name_lower or '2-0' in name_lower:
+                        score += 20
+                    elif '1.5' in name_lower or '1-5' in name_lower:
+                        score += 10
+                    
+                    # Avoid experimental/preview models
+                    if 'exp' in name_lower or 'preview' in name_lower:
+                        score -= 20
+                    
+                    return score
+                
+                # Sort models by score (best first)
+                ranked_models = sorted(
+                    available_models,
+                    key=lambda m: score_model(m.name),
+                    reverse=True
+                )
+                
+                # Try models in ranked order
+                for model in ranked_models[:5]:  # Try top 5 models
+                    model_name = model.name
+                    try:
+                        logger.info(f"🔍 Trying model: {model_name}")
+                        self._ai_model = genai.GenerativeModel(model_name)
+                        # Quick validation test
+                        test_response = self._ai_model.generate_content("Hi")
+                        if test_response and test_response.text:
+                            logger.info(f"✅ AI service initialized with {model_name}")
+                            return
+                    except Exception as e:
+                        logger.warning(f"⚠️ Model {model_name} failed: {str(e)[:100]}")
+                        continue
+                
+                # If top 5 failed, log all available models for debugging
+                logger.error("❌ Top models failed. Available models:")
+                for m in ranked_models[:10]:
+                    logger.error(f"   - {m.name}")
+                
+                self._ai_model = None
+                
+            except Exception as e:
+                logger.error(f"❌ Model discovery failed: {e}")
+                self._ai_model = None
             
         except Exception as e:
             logger.error(f"❌ Error initializing AI service: {e}")

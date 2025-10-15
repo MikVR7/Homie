@@ -1,5 +1,11 @@
 # Project History
 
+## 2025-10-15
+
+- Implemented dynamic Gemini model discovery - system automatically finds and ranks available models
+- Added GEMINI_MODEL environment variable for user override
+- Future-proof: Will automatically adapt to new Google AI models without code changes
+- Scoring system prefers: flash models > latest aliases > higher versions, avoids experimental/preview
 ## 2025-10-14
 
 - Fixed critical bug: AI errors now return detailed diagnostic messages instead of generic failures
