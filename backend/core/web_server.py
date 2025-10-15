@@ -296,18 +296,41 @@ class WebServer:
 
         # ===== FILE ORGANIZER ROUTES (MODULAR) =====
         # Import and register all file organizer routes from separate modules
+        from core.routes.destination_routes import register_destination_routes
         from core.routes.file_organizer_routes import register_file_organizer_routes
         from core.routes.analysis_routes import register_analysis_routes
         from core.routes.operation_routes import register_operation_routes
         from core.routes.ai_routes import register_ai_routes
-        from core.routes.destination_routes import register_destination_routes
         
         # Register all route modules
+        register_destination_routes(self.app, self)
         register_file_organizer_routes(self.app, self)
         register_analysis_routes(self.app, self)
         register_operation_routes(self.app, self)
         register_ai_routes(self.app, self)
-        register_destination_routes(self.app, self)
+
+        @self.app.route('/api/file-organizer/destinations', methods=['GET'])
+        def fo_get_destinations():
+            """Get saved destination folders for the user"""
+            try:
+                user_id = request.args.get('user_id', 'dev_user')
+                conn = self._get_file_organizer_db_connection()
+                try:
+                    cursor = conn.execute("""
+                        SELECT id, destination_path, file_category
+                        FROM destination_mappings
+                        WHERE user_id = ?
+                        ORDER BY file_category ASC
+                    """, (user_id,))
+                    
+                    rows = cursor.fetchall()
+                    destinations = [{'id': row[0], 'path': row[1], 'name': row[2]} for row in rows]
+                    return jsonify({'success': True, 'destinations': destinations})
+                finally:
+                    conn.close()
+            except Exception as e:
+                logger.error(f"/destinations error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
     
     def _setup_websocket_handlers(self):
         """Setup WebSocket event handlers"""
