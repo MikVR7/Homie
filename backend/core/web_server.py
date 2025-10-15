@@ -43,6 +43,51 @@ class WebServer:
         
         logger.info(f"🌐 Web Server initialized for {self.host}:{self.port}")
     
+    def _get_file_organizer_db_connection(self):
+        """
+        SINGLE SOURCE OF TRUTH for file organizer database connection.
+        Returns: sqlite3.Connection object
+        """
+        import sqlite3
+        import os
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
+        return sqlite3.connect(db_path)
+    
+    def _call_ai_with_recovery(self, prompt):
+        """
+        SINGLE SOURCE OF TRUTH for AI calls with automatic model recovery.
+        Handles deprecated/failed models by discovering and retrying with a working model.
+        
+        Args:
+            prompt: The prompt string to send to the AI
+            
+        Returns:
+            AI response object
+            
+        Raises:
+            Exception: If AI is unavailable or both attempts fail
+        """
+        shared_services = self.components.get('shared_services')
+        
+        if not shared_services or not shared_services.is_ai_available():
+            raise Exception("AI service not available")
+        
+        try:
+            return shared_services.ai_model.generate_content(prompt)
+        except Exception as first_error:
+            # If model fails (e.g., deprecated), try discovery and retry once
+            logger.warning(f"AI model failed, attempting recovery: {str(first_error)[:100]}")
+            shared_services._model_discovery_attempted = False  # Reset flag to allow retry
+            shared_services._discover_and_select_model()
+            
+            # Retry with recovered model
+            recovered_model = shared_services.ai_model
+            if not recovered_model:
+                raise Exception("AI service unavailable after recovery attempt")
+            
+            logger.info("🔄 Retrying with recovered model...")
+            return recovered_model.generate_content(prompt)
+    
     def _batch_analyze_files(self, file_paths, use_ai=True):
         """
         SINGLE SOURCE OF TRUTH for batch file analysis.
@@ -292,7 +337,6 @@ class WebServer:
                     }), 503
 
                 # Create a persistent analysis session directly in the database
-                import sqlite3
                 import uuid
                 import json
                 from datetime import datetime
@@ -300,10 +344,8 @@ class WebServer:
                 analysis_id = str(uuid.uuid4())
                 now = datetime.now().isoformat()
                 
-                # Connect to the database directly
-                import os
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
-                conn = sqlite3.connect(db_path)
+                # Connect to the database using shared method
+                conn = self._get_file_organizer_db_connection()
                 
                 try:
                     # Insert analysis session
@@ -408,11 +450,7 @@ class WebServer:
                 user_id = "dev_user"
                 
                 # Direct database access (bypassing module system due to async issues)
-                import sqlite3
-                import os
-                
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
-                conn = sqlite3.connect(db_path)
+                conn = self._get_file_organizer_db_connection()
                 
                 try:
                     # Get all analysis sessions for the user
@@ -454,12 +492,9 @@ class WebServer:
                 user_id = "dev_user"
                 
                 # Direct database access (bypassing module system due to async issues)
-                import sqlite3
-                import os
                 import json
                 
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
-                conn = sqlite3.connect(db_path)
+                conn = self._get_file_organizer_db_connection()
                 
                 try:
                     # Get the analysis session
@@ -542,12 +577,9 @@ class WebServer:
                     return jsonify({'success': False, 'error': f'Invalid status. Must be one of: {valid_statuses}'}), 400
 
                 # Direct database access (bypassing module system due to async issues)
-                import sqlite3
-                import os
                 import json
                 
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
-                conn = sqlite3.connect(db_path)
+                conn = self._get_file_organizer_db_connection()
                 
                 try:
                     # First check if the operation exists and belongs to the user
@@ -633,12 +665,9 @@ class WebServer:
                     return jsonify({'success': False, 'error': f'Invalid status. Must be one of: {valid_statuses}'}), 400
 
                 # Direct database access (bypassing module system due to async issues)
-                import sqlite3
-                import os
                 import json
                 
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
-                conn = sqlite3.connect(db_path)
+                conn = self._get_file_organizer_db_connection()
                 
                 try:
                     updated_operations = []
@@ -938,19 +967,12 @@ Provide a clear, user-friendly explanation (2-3 sentences) that explains:
 Be specific and helpful. Return ONLY the explanation text, no JSON, no formatting."""
 
                 try:
-                    response = shared_services.ai_model.generate_content(prompt)
-                except Exception as first_error:
-                    logger.warning(f"AI model failed, attempting recovery: {str(first_error)[:100]}")
-                    shared_services._model_discovery_attempted = False
-                    shared_services._discover_and_select_model()
-                    recovered_model = shared_services.ai_model
-                    if not recovered_model:
-                        return jsonify({
-                            'success': False,
-                            'error': 'AI service unavailable after recovery attempt'
-                        }), 503
-                    logger.info("🔄 Retrying with recovered model...")
-                    response = recovered_model.generate_content(prompt)
+                    response = self._call_ai_with_recovery(prompt)
+                except Exception as e:
+                    return jsonify({
+                        'success': False,
+                        'error': str(e)
+                    }), 503
                 
                 if not response or not response.text:
                     return jsonify({
@@ -981,10 +1003,8 @@ Be specific and helpful. Return ONLY the explanation text, no JSON, no formattin
                     return jsonify({'success': False, 'error': 'analysis_id and rejected_operation are required'}), 400
 
                 # 1. Validate analysis_id by checking if it exists in the database
-                import sqlite3
                 import os
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "modules", "homie_file_organizer.db")
-                conn = sqlite3.connect(db_path)
+                conn = self._get_file_organizer_db_connection()
                 try:
                     cursor = conn.execute("SELECT 1 FROM analysis_sessions WHERE analysis_id = ?", (analysis_id,))
                     if not cursor.fetchone():
