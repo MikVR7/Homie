@@ -43,6 +43,70 @@ class WebServer:
         
         logger.info(f"🌐 Web Server initialized for {self.host}:{self.port}")
     
+    def _batch_analyze_files(self, file_paths, use_ai=True):
+        """
+        SINGLE SOURCE OF TRUTH for batch file analysis.
+        Both /organize and /analyze-content-batch call this method.
+        
+        Returns: dict with 'success', 'results', 'ai_enabled', 'error' (if failed)
+        """
+        from file_organizer.ai_content_analyzer import AIContentAnalyzer
+        
+        shared_services = self.components.get('shared_services')
+        analyzer = AIContentAnalyzer(shared_services=shared_services)
+        
+        if use_ai:
+            # Use batch analysis for AI (ONE call for all files!)
+            batch_result = analyzer.analyze_files_batch(file_paths)
+            
+            if not batch_result.get('success'):
+                logger.warning(f"Batch AI analysis failed: {batch_result.get('error')}")
+                return {
+                    'success': False,
+                    'error': batch_result.get('error'),
+                    'ai_enabled': False
+                }
+            
+            results = batch_result.get('results', {})
+            # Ensure all results have success flag
+            for file_path in file_paths:
+                if file_path in results:
+                    results[file_path]['success'] = True
+                else:
+                    results[file_path] = {
+                        'success': False,
+                        'error': 'No result from batch analysis',
+                        'content_type': 'unknown'
+                    }
+            
+            return {
+                'success': True,
+                'ai_enabled': True,
+                'results': results
+            }
+        
+        # Non-AI path: analyze files individually
+        results = {}
+        for file_path in file_paths:
+            try:
+                result = analyzer.analyze_file(file_path, use_ai=False)
+                if not result.get('success'):
+                    result['content_type'] = 'unknown'
+                results[file_path] = result
+            except Exception as e:
+                logger.warning(f"Error analyzing {file_path}: {e}")
+                results[file_path] = {
+                    'success': False,
+                    'error': str(e),
+                    'content_type': 'unknown'
+                }
+        
+        return {
+            'success': True,
+            'ai_enabled': False,
+            'results': results
+        }
+    
     async def start(self):
         """Start the Flask + SocketIO server (non-blocking)."""
         try:
@@ -173,21 +237,17 @@ class WebServer:
 
                 # until the AI generator is fully re-integrated.
                 from pathlib import Path
-                from file_organizer.ai_content_analyzer import AIContentAnalyzer
                 
                 src_path = Path(source_folder).expanduser()
                 dest_root = Path(destination_folder).expanduser()
                 if not src_path.exists() or not src_path.is_dir():
                     return jsonify({'success': False, 'error': f'source_folder not found: {source_folder}'}), 400
 
-                shared_services = self.components.get('shared_services')
-                analyzer = AIContentAnalyzer(shared_services=shared_services)
-
                 files = [p for p in src_path.iterdir() if p.is_file()]
                 file_paths = [str(f) for f in files]
                 
-                # Batch analyze all files in ONE AI call (much faster!)
-                batch_result = analyzer.analyze_files_batch(file_paths)
+                # Use shared batch analysis method (SINGLE SOURCE OF TRUTH)
+                batch_result = self._batch_analyze_files(file_paths, use_ai=True)
                 
                 if not batch_result.get('success'):
                     return jsonify({
@@ -710,57 +770,14 @@ class WebServer:
                 if len(files) > 50:
                     return jsonify({'success': False, 'error': 'Maximum 50 files per batch'}), 400
                 
-                # Initialize analyzer with shared_services for AI access
-                shared_services = self.components.get('shared_services')
-                analyzer = AIContentAnalyzer(shared_services=shared_services)
-                
-                if use_ai:
-                    # Use batch analysis for AI (MUCH faster - ONE call for all files!)
-                    batch_result = analyzer.analyze_files_batch(files)
-                    
-                    if not batch_result.get('success'):
-                        # If batch fails, fall back to individual non-AI analysis
-                        logger.warning(f"Batch AI analysis failed: {batch_result.get('error')}, falling back to individual analysis")
-                        use_ai = False
-                    else:
-                        results = batch_result.get('results', {})
-                        # Ensure all results have content_type
-                        for file_path in files:
-                            if file_path in results:
-                                results[file_path]['success'] = True
-                            else:
-                                results[file_path] = {
-                                    'success': False,
-                                    'error': 'No result from batch analysis',
-                                    'content_type': 'unknown'
-                                }
-                        
-                        return jsonify({
-                            'success': True,
-                            'ai_enabled': True,
-                            'results': results
-                        })
-                
-                # Non-AI path or fallback: analyze files individually
-                results = {}
-                for file_path in files:
-                    try:
-                        result = analyzer.analyze_file(file_path, use_ai=False)
-                        if not result.get('success'):
-                            result['content_type'] = 'unknown'
-                        results[file_path] = result
-                    except Exception as e:
-                        logger.warning(f"Error analyzing {file_path}: {e}")
-                        results[file_path] = {
-                            'success': False,
-                            'error': str(e),
-                            'content_type': 'unknown'
-                        }
+                # Use shared batch analysis method (SINGLE SOURCE OF TRUTH)
+                batch_result = self._batch_analyze_files(files, use_ai=use_ai)
                 
                 return jsonify({
-                    'success': True,
-                    'ai_enabled': False,
-                    'results': results
+                    'success': batch_result.get('success'),
+                    'ai_enabled': batch_result.get('ai_enabled'),
+                    'results': batch_result.get('results', {}),
+                    'error': batch_result.get('error')
                 })
                 
             except Exception as e:
