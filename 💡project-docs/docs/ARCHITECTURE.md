@@ -1,5 +1,119 @@
 # Homie Architecture
 
+## Web Server Component
+
+## Web Server Component
+
+**Location:** `backend/core/web_server.py`
+
+**Purpose:** Flask + SocketIO server that handles HTTP API and WebSocket connections.
+
+### Architecture
+
+The web server is now **modular** with routes split into separate files:
+
+```
+backend/core/
+├── web_server.py          # Main server class (500 lines)
+└── routes/
+    ├── __init__.py
+    ├── file_organizer_routes.py    # Core organization endpoints
+    ├── analysis_routes.py          # Content analysis endpoints
+    ├── operation_routes.py         # Operation management endpoints
+    ├── ai_routes.py                # AI-powered features
+    └── destination_routes.py       # Destination management
+```
+
+### Route Modules
+
+**1. File Organizer Routes** (`file_organizer_routes.py`)
+- `/api/file-organizer/organize` - Analyze and organize files
+- `/api/file-organizer/execute` - Execute approved operations
+- `/api/file-organizer/add-granularity` - Add one level of folder granularity
+
+**2. Analysis Routes** (`analysis_routes.py`)
+- `/api/file-organizer/analyze-content` - Analyze single file
+- `/api/file-organizer/analyze-content-batch` - Batch analyze multiple files
+- `/api/file-organizer/analyze-archive` - Analyze archive contents
+- `/api/file-organizer/scan-duplicates` - Find duplicate files
+
+**3. Operation Routes** (`operation_routes.py`)
+- `/api/file-organizer/get-analyses` - Get user's analysis sessions
+- `/api/file-organizer/update-operation-status` - Update single operation
+- `/api/file-organizer/batch-update-status` - Batch update operations
+
+**4. AI Routes** (`ai_routes.py`)
+- `/api/file-organizer/suggest-destination` - AI destination suggestion
+- `/api/file-organizer/explain-operation` - On-demand explanation (Why?)
+- `/api/file-organizer/suggest-alternatives` - Alternative suggestions when user disagrees
+
+**5. Destination Routes** (`destination_routes.py`)
+- `/api/file-organizer/get-drives` - Get available drives/mount points
+- `/api/file-organizer/get-destinations` - Get saved destinations
+- `/api/file-organizer/delete-destination` - Remove saved destination
+
+### Shared Helper Methods
+
+To eliminate code duplication, the `WebServer` class provides:
+
+1. **`_get_file_organizer_db_connection()`** - Single source of truth for database connections
+2. **`_call_ai_with_recovery(prompt)`** - Centralized AI calls with automatic model recovery
+3. **`_batch_analyze_files(file_paths, use_ai)`** - Batch file analysis (used by multiple endpoints)
+
+### Key Features
+
+- **Modular Design:** Routes are organized by functionality, making the codebase maintainable
+- **No Code Duplication:** Shared logic is centralized in helper methods
+- **AI Model Recovery:** Automatic fallback when AI models are deprecated
+- **Batch Processing:** Efficient AI calls for multiple files
+- **WebSocket Support:** Real-time communication for live updates
+
+## Code Quality Improvements
+
+## Code Quality Improvements (Recent Refactoring)
+
+### Eliminated Code Duplication
+
+**Problem:** Multiple endpoints had duplicate logic for:
+1. Database connections (6 duplicates)
+2. AI calls with recovery (4 duplicates)
+3. Batch file analysis (2 duplicates)
+
+**Solution:** Created shared helper methods:
+
+#### `_get_file_organizer_db_connection()`
+- **Location:** `WebServer` class
+- **Purpose:** Single source of truth for database connections
+- **Impact:** Changed 6 duplicate `db_path` definitions to 1 method
+
+#### `_call_ai_with_recovery(prompt)`
+- **Location:** `WebServer` and `AIContentAnalyzer` classes
+- **Purpose:** Single source of truth for AI calls with automatic model recovery
+- **Impact:** Changed 4 duplicate try-except-recovery blocks to 2 methods
+
+#### `_batch_analyze_files(file_paths, use_ai)`
+- **Location:** `WebServer` class
+- **Purpose:** Single source of truth for batch file analysis
+- **Impact:** Both `/organize` and `/analyze-content-batch` now call this method
+
+**Benefits:**
+- Easier maintenance (change logic in ONE place)
+- No more "fix one, forget the other" bugs
+- Cleaner, more readable code
+
+### Known Technical Debt
+
+**Issue:** `web_server.py` is becoming too large (1384+ lines)
+
+**Recommended Refactoring:**
+- Split into separate route modules:
+  - `routes/file_organizer_routes.py` - File organization endpoints
+  - `routes/analysis_routes.py` - Analysis and content endpoints
+  - `routes/operation_routes.py` - Operation management endpoints
+- Keep `web_server.py` as the main orchestrator
+- Use Flask Blueprints for route organization
+
+
 ## AI Service Resilience
 
 ## AI Service Resilience
@@ -498,4 +612,6 @@ Each module can be:
 
 
 
-<!-- Last updated: 2025-10-15 06:47 - Reason: Documented the new AI service resilience and runtime recovery system -->
+
+
+<!-- Last updated: 2025-10-15 19:33 - Reason: Documented the new modular route structure after refactoring web_server.py -->

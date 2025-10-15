@@ -1,5 +1,72 @@
 # Development Guide
 
+## Adding New Endpoints
+
+## Adding New Endpoints
+
+### Route Organization
+
+Routes are organized into modules by functionality:
+
+```
+backend/core/routes/
+├── file_organizer_routes.py    # Core file organization
+├── analysis_routes.py          # Content analysis
+├── operation_routes.py         # Operation management
+├── ai_routes.py                # AI-powered features
+└── destination_routes.py       # Destination management
+```
+
+### How to Add a New Endpoint
+
+1. **Choose the appropriate route module** based on functionality
+2. **Add your route function** inside the `register_*_routes()` function
+3. **Use shared helper methods** from `web_server` to avoid duplication:
+   - `web_server._get_file_organizer_db_connection()` - Database access
+   - `web_server._call_ai_with_recovery(prompt)` - AI calls with recovery
+   - `web_server._batch_analyze_files(paths, use_ai)` - Batch file analysis
+
+### Example: Adding a New Endpoint
+
+```python
+# In backend/core/routes/analysis_routes.py
+
+def register_analysis_routes(app, web_server):
+    """Register analysis routes with the Flask app"""
+    
+    @app.route('/api/file-organizer/my-new-endpoint', methods=['POST'])
+    def my_new_endpoint():
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            
+            # Use shared database connection
+            conn = web_server._get_file_organizer_db_connection()
+            
+            try:
+                # Your logic here
+                result = do_something()
+                conn.commit()
+                return jsonify({'success': True, 'result': result})
+            except Exception as e:
+                conn.rollback()
+                raise e
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            logger.error(f"/my-new-endpoint error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+### Best Practices
+
+1. **Always use shared helper methods** - Don't duplicate database or AI logic
+2. **Handle errors gracefully** - Return proper HTTP status codes
+3. **Log errors** - Use `logger.error()` for debugging
+4. **Return consistent JSON** - Always include `success` field
+5. **Close database connections** - Use try/finally blocks
+6. **Validate input** - Check required parameters early
+
 ## Console Logging
 
 The project uses the **Serilog** library for structured logging. All log output is directed to the console where the application was launched.
@@ -497,4 +564,5 @@ flutter run -d chrome
 3. **Documentation**: Check this file and architecture docs
 4. **Git history**: Look at recent changes for issues
 
-<!-- Last updated: 2025-10-07 22:13 - Reason: Added Known Issues section documenting the Linux drag-and-drop limitation -->
+
+<!-- Last updated: 2025-10-15 19:33 - Reason: Added documentation for the new modular route structure and how to add endpoints -->

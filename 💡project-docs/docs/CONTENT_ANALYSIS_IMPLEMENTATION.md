@@ -1,5 +1,175 @@
 # Content Analysis Implementation Guide
 
+## API Endpoints
+
+## API Endpoints
+
+### Core Organization Endpoints
+
+#### `POST /api/file-organizer/organize`
+**Purpose:** Initial file organization with AI analysis (single-level folder depth)
+
+**Request:**
+```json
+{
+  "source_path": "/path/to/source",
+  "destination_path": "/path/to/destination",
+  "organization_style": "by_type"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "analysis_id": "uuid",
+  "operations": [
+    {
+      "operation_id": "uuid_op_0",
+      "type": "move",
+      "source": "/source/file.pdf",
+      "destination": "/destination/Documents/file.pdf",
+      "status": "pending"
+    }
+  ]
+}
+```
+
+**Key Features:**
+- Batch AI analysis (ONE API call for all files)
+- Single-level folder depth only
+- No reasons generated upfront (on-demand via `/explain-operation`)
+
+---
+
+#### `POST /api/file-organizer/add-granularity`
+**Purpose:** Add ONE level of subfolder organization to an existing folder
+
+**Request:**
+```json
+{
+  "folder_path": "/destination/Documents",
+  "analysis_id": "optional-uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "operations": [
+    {
+      "type": "move",
+      "source": "/Documents/contract1.pdf",
+      "destination": "/Documents/Contracts/contract1.pdf"
+    }
+  ],
+  "folder": "/destination/Documents",
+  "items_analyzed": 10,
+  "items_to_organize": 2
+}
+```
+
+**Key Features:**
+- AI analyzes all items in the folder
+- Only creates subfolders where it makes sense
+- Items that don't need subcategorization stay in place
+- Can be called repeatedly for deeper organization
+
+---
+
+#### `POST /api/file-organizer/explain-operation`
+**Purpose:** Get AI-generated explanation for why a file should be organized a certain way
+
+**Request:**
+```json
+{
+  "source": "/source/file.pdf",
+  "destination": "/destination/Documents/file.pdf",
+  "operation_type": "move"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "reason": "This is a PDF document that appears to be a contract based on the filename. It should be organized in the Documents folder for easy access to important paperwork."
+}
+```
+
+**Key Features:**
+- On-demand generation (not upfront)
+- 2-3 sentence human-readable explanation
+- Includes AI model recovery logic
+
+---
+
+#### `POST /api/file-organizer/suggest-alternatives`
+**Purpose:** Generate alternative organization suggestions when user disagrees
+
+**Request:**
+```json
+{
+  "analysis_id": "uuid",
+  "rejected_operation": {
+    "source": "/source/file.pdf",
+    "destination": "/destination/Documents/file.pdf",
+    "type": "move"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "suggestions": [
+    {
+      "source": "/source/file.pdf",
+      "destination": "/destination/Contracts/file.pdf",
+      "type": "move",
+      "reason": "Could be a contract"
+    },
+    {
+      "source": "/source/file.pdf",
+      "destination": "/destination/Legal/file.pdf",
+      "type": "move",
+      "reason": "Could be legal document"
+    }
+  ]
+}
+```
+
+---
+
+#### `POST /api/file-organizer/analyze-content-batch`
+**Purpose:** Batch analyze multiple files for content type
+
+**Request:**
+```json
+{
+  "files": ["/path/file1.pdf", "/path/file2.jpg"],
+  "use_ai": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "ai_enabled": true,
+  "results": {
+    "/path/file1.pdf": {
+      "success": true,
+      "content_type": "Document",
+      "suggested_folder": "Documents"
+    }
+  }
+}
+```
+
+
 ## Overview
 
 The File Organizer module now includes a powerful **AI-powered content analysis system** that intelligently categorizes and extracts rich metadata from files without requiring manual categorization. The system uses **Google Gemini AI** for dynamic categorization with regex-based fallbacks for speed and reliability.
@@ -536,7 +706,8 @@ When the frontend user clicks the "Disagree" button on a file's suggested organi
 If the AI service is unavailable, the endpoint falls back to a rule-based system that generates suggestions based on the file's content type, extension, and modification date.
 
 
-<!-- Last updated: 2025-10-14 20:58 - Reason: Added comprehensive error handling with detailed messages and batch operation resilience -->
+
+<!-- Last updated: 2025-10-15 19:07 - Reason: Added documentation for new endpoints: add-granularity, explain-operation, and updated organize endpoint behavior -->
 
 ## ## Endpoint: `POST /api/file-organizer/suggest-alternatives`
 
