@@ -137,8 +137,8 @@ def register_file_organizer_routes(app, web_server):
                     conn.execute("""
                         INSERT INTO analysis_operations
                         (operation_id, analysis_id, operation_type, source_path, destination_path,
-                         file_name, operation_status, created_at, metadata)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         file_name, operation_status, metadata)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         operation_id,
                         analysis_id,
@@ -147,7 +147,6 @@ def register_file_organizer_routes(app, web_server):
                         op['destination'],
                         Path(op['source']).name,
                         'pending',
-                        now,
                         json.dumps({})
                     ))
                     # Add operation_id to response
