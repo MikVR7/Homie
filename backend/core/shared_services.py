@@ -6,6 +6,7 @@ Provides AI API key management and other shared functionality
 
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
@@ -31,9 +32,13 @@ class SharedServices:
         self._config: Dict[str, Any] = {}
         self._current_model_name: Optional[str] = None
         self._model_discovery_attempted: bool = False
+        self._config_file: Optional[Path] = None
         
         # Load environment variables
         self._load_environment()
+        
+        # Setup persistent config
+        self._setup_config_file()
         
         # Initialize AI service (lightweight at startup)
         self._initialize_ai()
@@ -76,6 +81,53 @@ class SharedServices:
             logger.error(f"❌ Error loading environment: {e}")
             raise
     
+    def _setup_config_file(self):
+        """Setup persistent configuration file for runtime state"""
+        try:
+            # Use backend/data directory for persistent config
+            data_dir = os.getenv("HOMIE_DATA_DIR", str(Path(__file__).resolve().parents[1] / "data"))
+            config_dir = Path(data_dir) / "config"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            self._config_file = config_dir / "ai_service.json"
+            logger.info(f"📋 AI config file: {self._config_file}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not setup config file: {e}")
+            self._config_file = None
+    
+    def _load_last_working_model(self) -> Optional[str]:
+        """Load the last working model name from persistent config"""
+        if not self._config_file or not self._config_file.exists():
+            return None
+        
+        try:
+            import json
+            with open(self._config_file, 'r') as f:
+                config = json.load(f)
+                model_name = config.get('last_working_model')
+                if model_name:
+                    logger.info(f"📖 Loaded last working model: {model_name}")
+                return model_name
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load model config: {e}")
+            return None
+    
+    def _save_working_model(self, model_name: str):
+        """Save the working model name to persistent config"""
+        if not self._config_file:
+            return
+        
+        try:
+            import json
+            config = {
+                'last_working_model': model_name,
+                'last_updated': datetime.now().isoformat()
+            }
+            with open(self._config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            logger.info(f"💾 Saved working model: {model_name}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not save model config: {e}")
+    
     def _initialize_ai(self):
         """Initialize Google Gemini AI service (fast startup, lazy discovery)"""
         try:
@@ -86,7 +138,7 @@ class SharedServices:
             # Configure Gemini
             genai.configure(api_key=self._ai_api_key)
             
-            # Check for user-specified model
+            # Priority 1: User-specified model (highest priority)
             user_model = os.getenv('GEMINI_MODEL')
             if user_model:
                 logger.info(f"🎯 Using user-specified model: {user_model}")
@@ -95,12 +147,22 @@ class SharedServices:
                 logger.info(f"🤖 AI service configured with {user_model}")
                 return
             
-            # Fast startup: Try a known good default first (no API call)
-            # This will be validated on first actual use
+            # Priority 2: Last working model from persistent config
+            last_model = self._load_last_working_model()
+            if last_model:
+                try:
+                    self._ai_model = genai.GenerativeModel(last_model)
+                    self._current_model_name = last_model
+                    logger.info(f"🤖 AI service configured with last working model: {last_model}")
+                    return
+                except Exception as e:
+                    logger.warning(f"⚠️ Last working model '{last_model}' failed: {e}")
+            
+            # Priority 3: Known good default (fallback)
             try:
                 self._ai_model = genai.GenerativeModel('gemini-flash-latest')
                 self._current_model_name = 'gemini-flash-latest'
-                logger.info("🤖 AI service configured with gemini-flash-latest (will validate on first use)")
+                logger.info("🤖 AI service configured with default: gemini-flash-latest")
             except Exception as e:
                 logger.warning(f"⚠️ Default model setup failed: {e}")
                 self._ai_model = None
@@ -175,6 +237,7 @@ class SharedServices:
                     if test_response and test_response.text:
                         self._ai_model = test_model
                         self._current_model_name = model_name
+                        self._save_working_model(model_name)  # Persist the working model
                         logger.info(f"✅ AI service recovered with {model_name}")
                         return
                 except Exception as e:
