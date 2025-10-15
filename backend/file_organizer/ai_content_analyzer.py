@@ -260,6 +260,90 @@ Be fast and efficient - just single-level folder names and types, no detailed ex
             logger.error(error_msg)
             return {'success': False, 'error': error_msg}
     
+    def add_granularity(self, folder_path: str, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Add ONE level of granularity to items in a folder.
+        AI decides which items should go into subfolders and which should stay.
+        
+        Args:
+            folder_path: The folder being organized (e.g., "/Destination/Documents")
+            items: List of items with 'path', 'name', 'is_file', 'is_dir', 'extension'
+            
+        Returns:
+            {
+                'success': True/False,
+                'suggestions': {
+                    'item_path': {'subfolder': 'SubfolderName' or None},
+                    ...
+                }
+            }
+        """
+        if not self.shared_services or not self.shared_services.is_ai_available():
+            return {'success': False, 'error': 'AI service is not available or configured.'}
+        
+        try:
+            folder_name = Path(folder_path).name
+            
+            prompt = f"""You are organizing the "{folder_name}" folder. Add ONE level of granularity.
+
+CRITICAL RULES:
+1. You can create subfolders, but ONLY ONE LEVEL deep
+2. NOT ALL items need to go into subfolders - only organize items where it makes sense
+3. Items that don't need subcategorization should stay in the current folder (return null for subfolder)
+
+Current folder: {folder_name}
+Items to analyze:
+{json.dumps(items, indent=2)}
+
+Examples of good decisions:
+- If you see 10 contracts and 2 random notes → move contracts to "Contracts/" subfolder, leave notes in "{folder_name}/"
+- If you see 5 photos from 2024 and 3 from 2025 → create "2024/" and "2025/" subfolders
+- If you see 3 random unrelated files → leave them all in "{folder_name}/" (no subfolder needed)
+
+Return ONLY valid JSON (no markdown):
+{{
+  "suggestions": {{
+    "full_item_path": {{
+      "subfolder": "SubfolderName"  // or null if item should stay in current folder
+    }},
+    ...
+  }}
+}}
+
+Be smart and practical. Only create subfolders when there's a clear benefit."""
+
+            # Call AI with recovery
+            try:
+                response = self._call_ai_with_recovery(prompt)
+            except Exception as e:
+                return {'success': False, 'error': f'AI analysis failed: {str(e)}'}
+            
+            if not response or not response.text:
+                return {'success': False, 'error': 'AI returned empty response'}
+            
+            # Parse response
+            response_text = response.text.strip()
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+            
+            result = json.loads(response_text)
+            return {
+                'success': True,
+                'suggestions': result.get('suggestions', {})
+            }
+            
+        except json.JSONDecodeError as e:
+            error_msg = f"AI returned invalid JSON: {str(e)}"
+            logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
+        except Exception as e:
+            error_msg = f"Add granularity error: {str(e)}"
+            logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
+    
     def _analyze_with_ai(self, file_path: str, file_name: str, file_ext: str, file_exists: bool) -> Dict[str, Any]:
         """
         Use AI (Gemini) to intelligently categorize and extract metadata from files.

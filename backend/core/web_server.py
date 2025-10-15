@@ -1031,6 +1031,87 @@ Be specific and helpful. Return ONLY the explanation text, no JSON, no formattin
             except Exception as e:
                 logger.error(f"/suggest-alternatives error: {e}", exc_info=True)
                 return jsonify({'success': False, 'error': str(e)}), 500
+        
+        @self.app.route('/api/file-organizer/add-granularity', methods=['POST'])
+        def fo_add_granularity():
+            """
+            Add ONE level of granularity to files in a specific folder.
+            AI decides which files should go into subfolders and which should stay.
+            """
+            try:
+                data = request.get_json(force=True, silent=True) or {}
+                folder_path = data.get('folder_path')
+                analysis_id = data.get('analysis_id')  # Optional: to track this as part of an analysis session
+                
+                if not folder_path:
+                    return jsonify({'success': False, 'error': 'folder_path is required'}), 400
+                
+                from pathlib import Path
+                import os
+                
+                folder = Path(folder_path)
+                if not folder.exists() or not folder.is_dir():
+                    return jsonify({'success': False, 'error': f'Folder does not exist: {folder_path}'}), 404
+                
+                # Get all items (files and subfolders) in this folder
+                items = []
+                for item in folder.iterdir():
+                    items.append({
+                        'path': str(item),
+                        'name': item.name,
+                        'is_file': item.is_file(),
+                        'is_dir': item.is_dir(),
+                        'extension': item.suffix.lower() if item.is_file() else None
+                    })
+                
+                if not items:
+                    return jsonify({
+                        'success': True,
+                        'operations': [],
+                        'message': 'Folder is empty'
+                    })
+                
+                # Call AI to add granularity
+                from file_organizer.ai_content_analyzer import AIContentAnalyzer
+                shared_services = self.components.get('shared_services')
+                analyzer = AIContentAnalyzer(shared_services=shared_services)
+                
+                result = analyzer.add_granularity(folder_path, items)
+                
+                if not result.get('success'):
+                    return jsonify(result), 503
+                
+                # Convert AI suggestions into FileOperation format
+                operations = []
+                for item_path, suggestion in result.get('suggestions', {}).items():
+                    subfolder = suggestion.get('subfolder')
+                    
+                    # If subfolder is None or empty, skip (file stays in current location)
+                    if not subfolder:
+                        continue
+                    
+                    # Create operation
+                    item_name = Path(item_path).name
+                    new_destination = str(folder / subfolder / item_name)
+                    
+                    operations.append({
+                        'type': 'move',
+                        'source': item_path,
+                        'destination': new_destination,
+                        # reason will be generated on-demand
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'operations': operations,
+                    'folder': folder_path,
+                    'items_analyzed': len(items),
+                    'items_to_organize': len(operations)
+                })
+                
+            except Exception as e:
+                logger.error(f"/add-granularity error: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': str(e)}), 500
 
     def _setup_websocket_handlers(self):
         """Setup WebSocket event handlers"""
