@@ -84,10 +84,10 @@ class SharedServices:
             # Configure Gemini
             genai.configure(api_key=self._ai_api_key)
             
-            # Initialize model
-            self._ai_model = genai.GenerativeModel('gemini-1.5-flash')
+            # Initialize model - use gemini-pro for v1beta API
+            self._ai_model = genai.GenerativeModel('gemini-pro')
             
-            logger.info("🤖 AI service initialized (Gemini 1.5 Flash)")
+            logger.info("🤖 AI service initialized (Gemini Pro)")
             
         except Exception as e:
             logger.error(f"❌ Error initializing AI service: {e}")

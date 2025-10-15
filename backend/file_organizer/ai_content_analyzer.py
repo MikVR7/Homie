@@ -5,6 +5,7 @@ Provides rich metadata extraction for various file types
 """
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -218,7 +219,6 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
                     response_text = response_text[4:]
                 response_text = response_text.strip()
             
-            import json
             result = json.loads(response_text)
             
             # Flatten metadata into main result
