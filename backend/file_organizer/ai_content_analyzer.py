@@ -53,6 +53,73 @@ class AIContentAnalyzer:
             'NodeJS': ['package.json', 'node_modules/', '.js'],
         }
     
+    def _quick_archive_peek(self, archive_path: str) -> Dict[str, Any]:
+        """
+        Quickly peek inside an archive to see what it contains.
+        Returns summary without extracting.
+        """
+        try:
+            if not os.path.exists(archive_path):
+                return {'error': 'File not found'}
+            
+            file_ext = Path(archive_path).suffix.lower()
+            file_list = []
+            
+            if file_ext == '.zip':
+                with zipfile.ZipFile(archive_path, 'r') as zf:
+                    file_list = [f for f in zf.namelist() if not f.endswith('/')]
+            elif file_ext == '.rar':
+                try:
+                    import rarfile
+                    with rarfile.RarFile(archive_path, 'r') as rf:
+                        file_list = [f for f in rf.namelist() if not f.endswith('/')]
+                except ImportError:
+                    return {'error': 'RAR support not available', 'file_count': '?'}
+            elif file_ext == '.7z':
+                try:
+                    import py7zr
+                    with py7zr.SevenZipFile(archive_path, 'r') as szf:
+                        file_list = [f for f in szf.getnames() if not f.endswith('/')]
+                except ImportError:
+                    return {'error': '7z support not available', 'file_count': '?'}
+            
+            # Analyze contents
+            if not file_list:
+                return {'file_count': 0, 'summary': 'Empty archive'}
+            
+            # Get file types
+            extensions = {}
+            for f in file_list:
+                ext = Path(f).suffix.lower()
+                extensions[ext] = extensions.get(ext, 0) + 1
+            
+            # Determine main content type
+            video_exts = {'.mkv', '.mp4', '.avi', '.mov', '.wmv'}
+            audio_exts = {'.mp3', '.flac', '.wav', '.m4a'}
+            image_exts = {'.jpg', '.jpeg', '.png', '.gif'}
+            
+            main_type = 'mixed'
+            if any(ext in video_exts for ext in extensions.keys()):
+                main_type = 'video'
+            elif any(ext in audio_exts for ext in extensions.keys()):
+                main_type = 'audio'
+            elif any(ext in image_exts for ext in extensions.keys()):
+                main_type = 'images'
+            
+            # Get sample filenames (first 3)
+            sample_files = [Path(f).name for f in file_list[:3]]
+            
+            return {
+                'file_count': len(file_list),
+                'main_type': main_type,
+                'extensions': dict(extensions),
+                'sample_files': sample_files
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error peeking into archive {archive_path}: {e}")
+            return {'error': str(e)}
+    
     def _call_ai_with_recovery(self, prompt):
         """
         SINGLE SOURCE OF TRUTH for AI calls with automatic model recovery.
@@ -167,19 +234,21 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
-    def analyze_files_batch(self, file_paths: List[str]) -> Dict[str, Any]:
+    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None) -> Dict[str, Any]:
         """
         Analyze multiple files in a single AI call (MUCH faster than individual calls).
         Returns only folder suggestions, no reasons (reasons generated on-demand).
+        Includes intelligent archive handling and duplicate detection.
         
         Args:
             file_paths: List of file paths to analyze
+            existing_folders: List of folder names that already exist in destination (for context-aware organization)
             
         Returns:
             {
                 'success': True/False,
                 'results': {
-                    'file_path': {'suggested_folder': 'path', 'content_type': 'type'},
+                    'file_path': {'suggested_folder': 'path', 'content_type': 'type', 'action': 'move/delete/unpack'},
                     ...
                 },
                 'error': 'error message if failed'
@@ -192,25 +261,101 @@ class AIContentAnalyzer:
             return {'success': True, 'results': {}}
         
         try:
-            # Build file list for AI
+            # STEP 1: Detect archives and analyze their contents
+            archives_info = {}
+            for fp in file_paths:
+                if Path(fp).suffix.lower() in ['.rar', '.zip', '.7z']:
+                    archive_content = self._quick_archive_peek(fp)
+                    archives_info[fp] = archive_content
+            
+            # STEP 2: Build file list for AI with archive context
             file_list = []
             for fp in file_paths:
-                file_list.append({
+                file_info = {
                     'path': fp,
                     'name': Path(fp).name,
                     'extension': Path(fp).suffix.lower()
-                })
+                }
+                
+                # Add archive content info if available
+                if fp in archives_info:
+                    file_info['is_archive'] = True
+                    file_info['archive_contents'] = archives_info[fp]
+                
+                file_list.append(file_info)
+            
+            # Build context-aware prompt based on file diversity and existing folders
+            existing_folders_context = ""
+            if existing_folders:
+                existing_folders_context = f"""
+EXISTING FOLDERS in destination:
+{json.dumps(existing_folders, indent=2)}
+
+IMPORTANT: Reuse these folder names when appropriate! If a file fits into an existing category, use that exact folder name.
+"""
+            
+            # Analyze file diversity to determine appropriate granularity
+            file_extensions = set(f['extension'] for f in file_list)
+            all_same_type = len(file_extensions) == 1
+            
+            granularity_rule = ""
+            if all_same_type and len(file_list) > 3:
+                # All files are same type (e.g., all PDFs) → Allow more specific categories
+                granularity_rule = """
+GRANULARITY RULE: All files are the SAME TYPE, so you can use MORE SPECIFIC categories.
+- For PDFs: Use categories like "Personal", "Health", "Finance", "Work", "Contracts", etc.
+- For images: Use categories like "Vacation", "Family", "Work", "Screenshots", etc.
+- For videos: Use categories like "Movies", "Tutorials", "Personal", etc.
+
+BUT still keep it to ONE level - no nested paths!
+"""
+            else:
+                # Mixed file types → Use broad generic categories
+                granularity_rule = """
+GRANULARITY RULE: Files are MIXED TYPES, so use BROAD, GENERIC categories.
+- Use simple categories: "Documents", "Images", "Photos", "Videos", "Software", "Media", "Music", "Books"
+- NO specific subcategories yet - the user will add those later with "Add Granularity"
+"""
+            
+            # Check if any archives exist
+            has_archives = any(f.get('is_archive') for f in file_list)
+            archive_handling_rules = ""
+            
+            if has_archives:
+                archive_handling_rules = """
+
+ARCHIVE HANDLING RULES:
+1. **Duplicate Detection**: If an archive filename matches an extracted file (e.g., "movie.rar" + "movie.mkv"):
+   - Set archive action to "delete" (it's redundant)
+   - Only organize the extracted file
+   
+2. **Unknown Archive Content**: If archive name doesn't reveal its content OR you're unsure:
+   - Set action to "unpack" (needs analysis)
+   - Put in a "ToReview" or "Archives" folder temporarily
+   
+3. **Known Archive Content**: If you know what's inside from the filename or content peek:
+   - Set action to "move" and organize by content type
+   - Example: "MovieName.rar" containing "MovieName.mkv" → suggest "delete" for .rar
+
+For archives, you MUST include an "action" field: "move", "delete", or "unpack"
+"""
             
             prompt = f"""Analyze these {len(file_list)} files and suggest the best folder structure for each.
 
-CRITICAL RULE: Use ONLY ONE LEVEL of folder depth. NO nested folders!
+{existing_folders_context}
 
-Examples:
-✅ GOOD: "Documents", "Images", "Software", "Media"
-❌ BAD: "Documents/Contracts/2024", "Images/Photos/Vacation"
+{granularity_rule}
 
-You have COMPLETE FREEDOM to choose the folder name, but keep it to ONE level only.
-Later, the user can request more granularity if needed.
+CRITICAL RULES FOR FOLDER NAMES:
+1. NO underscores, NO compound names like "Legal_Documents" or "Personal_Photos"
+2. NO nested paths like "Documents/Contracts" - just ONE level
+3. Keep names simple and clear
+
+✅ GOOD Examples (generic): "Documents", "Images", "Photos", "Videos", "Software", "Media"
+✅ GOOD Examples (specific, when all same type): "Finance", "Health", "Personal", "Vacation", "Movies"
+❌ BAD Examples: "Legal_Documents", "Personal_Photos", "Plans_Drawings", "Videos_Movies"
+
+{archive_handling_rules}
 
 Files to analyze:
 {json.dumps(file_list, indent=2)}
@@ -219,14 +364,16 @@ Return ONLY valid JSON (no markdown) with this structure:
 {{
   "results": {{
     "full_file_path": {{
-      "suggested_folder": "SingleFolderName",
-      "content_type": "brief_type_description"
+      "suggested_folder": "FolderName",
+      "content_type": "brief_type_description",
+      "action": "move"  // or "delete" or "unpack" (for archives only)
     }},
     ...
   }}
 }}
 
-Be fast and efficient - just single-level folder names and types, no detailed explanations needed."""
+Remember: If folders exist, REUSE them. If files are mixed, use GENERIC categories. If all same type, use SPECIFIC categories.
+For archives: detect duplicates and suggest deletion OR suggest unpacking if content is unknown."""
 
             # Call AI with recovery (using shared method)
             try:
@@ -901,6 +1048,7 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
             file_name = Path(file_path).name
             base_path = Path(rejected_operation['destination']).parent.parent
 
+            # json is already imported at the top of the file
             prompt = f"""
             The user rejected an automatic file organization suggestion. Your task is to provide 2-4 diverse and intelligent alternative destinations.
 
@@ -952,7 +1100,6 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
                     response_text = response_text[4:]
                 response_text = response_text.strip()
 
-            import json
             result = json.loads(response_text)
             
             # Convert to FileOperation format

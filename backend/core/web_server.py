@@ -128,10 +128,15 @@ class WebServer:
                     'error': f'AI call failed after recovery: {str(retry_error)}'
                 }
     
-    def _batch_analyze_files(self, file_paths, use_ai=True):
+    def _batch_analyze_files(self, file_paths, use_ai=True, existing_folders=None):
         """
         SINGLE SOURCE OF TRUTH for batch file analysis.
         Both /organize and /analyze-content-batch call this method.
+        
+        Args:
+            file_paths: List of file paths to analyze
+            use_ai: Whether to use AI for analysis
+            existing_folders: List of folder names that already exist in destination (for context-aware organization)
         
         Returns: dict with 'success', 'results', 'ai_enabled', 'error' (if failed)
         """
@@ -142,7 +147,7 @@ class WebServer:
         
         if use_ai:
             # Use batch analysis for AI (ONE call for all files!)
-            batch_result = analyzer.analyze_files_batch(file_paths)
+            batch_result = analyzer.analyze_files_batch(file_paths, existing_folders=existing_folders)
             
             if not batch_result.get('success'):
                 logger.warning(f"Batch AI analysis failed: {batch_result.get('error')}")

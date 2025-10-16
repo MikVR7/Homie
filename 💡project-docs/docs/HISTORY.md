@@ -1,5 +1,14 @@
 # Project History
 
+## 2025-10-16
+
+- Implemented context-aware AI file organization
+- Added intelligent archive handling (detect duplicates, auto-delete redundant archives, unpack unknown archives)
+- Fixed on-demand explanation system (Why? button)
+- Fixed alternative suggestions system (Disagree button)
+- Refactored batch file analysis - single AI call for massive performance improvement
+- AI now adapts granularity based on file diversity and existing folders
+- Eliminated code duplication with shared helper methods
 ## 2025-10-15
 
 - Implemented /api/file-organizer/explain-operation endpoint for on-demand 'Why?' explanations

@@ -51,8 +51,13 @@ def register_file_organizer_routes(app, web_server):
             files = [p for p in src_path.iterdir() if p.is_file()]
             file_paths = [str(f) for f in files]
             
+            # Get existing folders in destination for context-aware organization
+            existing_folders = []
+            if dest_root.exists():
+                existing_folders = [d.name for d in dest_root.iterdir() if d.is_dir()]
+            
             # Use shared batch analysis method (SINGLE SOURCE OF TRUTH)
-            batch_result = web_server._batch_analyze_files(file_paths, use_ai=True)
+            batch_result = web_server._batch_analyze_files(file_paths, use_ai=True, existing_folders=existing_folders)
             
             if not batch_result.get('success'):
                 return jsonify({
@@ -77,16 +82,35 @@ def register_file_organizer_routes(app, web_server):
                     })
                     continue
                 
+                # Get AI suggested action (move/delete/unpack)
+                action = file_result.get('action', 'move')
                 suggested_folder = file_result.get('suggested_folder', 'Other')
-                # NO REASON - will be generated on-demand when user asks "why?"
                 
-                dest_path = dest_root / suggested_folder / f.name
-                operations.append({
-                    'type': 'move',
-                    'source': file_path,
-                    'destination': str(dest_path),
-                    # reason will be generated on-demand via /explain endpoint
-                })
+                if action == 'delete':
+                    # Archive is redundant (extracted file exists)
+                    operations.append({
+                        'type': 'delete',
+                        'source': file_path,
+                        'destination': None,
+                        'reason_hint': 'Redundant archive - content already extracted'
+                    })
+                elif action == 'unpack':
+                    # Archive needs to be unpacked for analysis
+                    operations.append({
+                        'type': 'unpack',
+                        'source': file_path,
+                        'destination': str(dest_root / 'ToReview' / f.stem),  # Extract to ToReview folder
+                        'reason_hint': 'Archive content unknown - unpack to analyze'
+                    })
+                else:
+                    # Regular move operation
+                    dest_path = dest_root / suggested_folder / f.name
+                    operations.append({
+                        'type': 'move',
+                        'source': file_path,
+                        'destination': str(dest_path),
+                        # reason will be generated on-demand via /explain endpoint
+                    })
             
             # If ALL files failed, return error
             if not operations and errors:
@@ -214,13 +238,47 @@ def register_file_organizer_routes(app, web_server):
                     import os
                     
                     try:
-                        # Create destination directory if needed
-                        dest_dir = Path(dest).parent
-                        dest_dir.mkdir(parents=True, exist_ok=True)
-                        
-                        if op_type == 'move':
+                        if op_type == 'delete':
+                            # Delete the file (redundant archive)
+                            os.remove(source)
+                            logger.info(f"Deleted redundant archive: {source}")
+                        elif op_type == 'unpack':
+                            # Unpack archive to destination
+                            dest_dir = Path(dest)
+                            dest_dir.mkdir(parents=True, exist_ok=True)
+                            
+                            file_ext = Path(source).suffix.lower()
+                            if file_ext == '.zip':
+                                import zipfile
+                                with zipfile.ZipFile(source, 'r') as zf:
+                                    zf.extractall(dest_dir)
+                            elif file_ext == '.rar':
+                                try:
+                                    import rarfile
+                                    with rarfile.RarFile(source, 'r') as rf:
+                                        rf.extractall(dest_dir)
+                                except ImportError:
+                                    raise Exception("RAR support not available")
+                            elif file_ext == '.7z':
+                                try:
+                                    import py7zr
+                                    with py7zr.SevenZipFile(source, 'r') as szf:
+                                        szf.extractall(dest_dir)
+                                except ImportError:
+                                    raise Exception("7z support not available")
+                            else:
+                                raise Exception(f"Unsupported archive format: {file_ext}")
+                            
+                            logger.info(f"Unpacked archive {source} to {dest_dir}")
+                        elif op_type == 'move':
+                            # Create destination directory if needed
+                            dest_dir = Path(dest).parent
+                            dest_dir.mkdir(parents=True, exist_ok=True)
                             shutil.move(source, dest)
                         elif op_type == 'copy':
+                            # Create destination directory if needed
+                            dest_dir = Path(dest).parent
+                            dest_dir.mkdir(parents=True, exist_ok=True)
                             shutil.copy2(source, dest)
                         
                         # Update operation status

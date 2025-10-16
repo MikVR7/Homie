@@ -1,5 +1,43 @@
 # Homie Architecture
 
+## File Organizer AI Features
+
+## File Organizer AI Features
+
+### Context-Aware Organization
+The AI analyzes files in batches and adapts granularity based on:
+
+1. **Existing Folders**: Reuses existing folder names when appropriate
+2. **File Diversity**: 
+   - Mixed file types → Generic categories (Documents, Images, Videos)
+   - Same file type → Specific categories (Finance, Personal, Health)
+3. **Batch Processing**: Single AI call for all files (massive performance improvement)
+
+### Intelligent Archive Handling
+The system automatically handles archives with three strategies:
+
+1. **Redundant Archives → DELETE**
+   - Detects when archive matches extracted content
+   - Example: `movie.rar` + `movie.mkv` → deletes `.rar`, keeps `.mkv`
+   
+2. **Unknown Content → UNPACK**
+   - If archive name doesn't reveal content
+   - Extracts to `ToReview/` folder for analysis
+   
+3. **Known Content → MOVE**
+   - Organizes by detected content type
+   - Example: Project archives → `Projects/`
+
+### On-Demand Explanations
+- "Why?" button generates AI explanations for file operations
+- Explanations generated only when requested (not upfront)
+- Supports move, delete, and unpack operations
+
+### Alternative Suggestions
+- "Disagree" button provides 2-4 alternative folder suggestions
+- AI considers file content and context for alternatives
+- Respects base path and provides diverse organizational strategies
+
 ## Web Server Component
 
 ## Web Server Component
@@ -614,4 +652,5 @@ Each module can be:
 
 
 
-<!-- Last updated: 2025-10-15 19:33 - Reason: Documented the new modular route structure after refactoring web_server.py -->
+
+<!-- Last updated: 2025-10-16 21:15 - Reason: Documented new context-aware AI features and intelligent archive handling -->

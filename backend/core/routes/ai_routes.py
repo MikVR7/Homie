@@ -55,31 +55,47 @@ def register_ai_routes(app, web_server):
             destination = data.get('destination')
             operation_type = data.get('operation_type', 'move')
             
-            if not source or not destination:
-                return jsonify({'success': False, 'error': 'source and destination required'}), 400
+            if not source:
+                return jsonify({'success': False, 'error': 'source required'}), 400
             
-            # Call AI to generate explanation
-            result = web_server._call_ai_with_recovery(
-                prompt=f"""Explain in 2-3 sentences why this file organization makes sense:
+            # Build explanation prompt based on operation type
+            if operation_type == 'delete':
+                prompt = f"""Explain in 1-2 sentences why this file should be deleted:
+
+File: {Path(source).name}
+Reason: This is a redundant archive file - the content has already been extracted.
+
+Return ONLY valid JSON with this structure:
+{{"reason": "your friendly explanation here"}}"""
+            else:
+                if not destination:
+                    return jsonify({'success': False, 'error': 'destination required for move/copy operations'}), 400
                 
+                prompt = f"""Explain in 2-3 sentences why this file organization makes sense:
+
 File: {Path(source).name}
 Action: {operation_type}
 Destination: {destination}
 
 Provide a friendly, human-readable explanation that helps the user understand the reasoning.
-Return ONLY a JSON object with this structure:
-{{"explanation": "your explanation here"}}""",
-                expected_format="JSON with 'explanation' field"
-            )
+Return ONLY valid JSON with this structure:
+{{"reason": "your explanation here"}}"""
+            
+            # Call AI to generate explanation
+            result = web_server._call_ai_with_recovery(prompt)
             
             if not result.get('success'):
                 return jsonify(result), 503
             
-            explanation = result.get('data', {}).get('explanation', 'File categorized for organization.')
+            # Extract reason from JSON response
+            reason = result.get('data', {}).get('reason', '').strip()
+            
+            if not reason:
+                reason = "This file has been categorized based on its content and metadata."
             
             return jsonify({
                 'success': True,
-                'explanation': explanation
+                'reason': reason
             })
             
         except Exception as e:
