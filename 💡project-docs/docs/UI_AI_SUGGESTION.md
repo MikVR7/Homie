@@ -4,6 +4,26 @@
 > Category: guide  
 > Reason: To store the UI suggestion provided by the external AI for future reference, as requested by the user.
 
+## User Interaction and Workflow
+
+The AI Suggestions View is the primary interface for user interaction with the file organization proposals. It is composed of `CategoryCard` components, each representing a proposed destination folder.
+
+## Key Features
+
+### Per-File Actions
+Each file "pill" within a category card has three action buttons:
+- **Apply (✓):** Executes the suggested operation for that single file.
+- **Why (?):** Opens a dialog displaying the AI's reasoning for the suggestion, fetched on-demand from the `/api/file-organizer/explain-operation` endpoint.
+- **Disagree (X):** Fetches alternative suggestions from the `/api/file-organizer/suggest-alternatives` endpoint and displays them in a context menu. Selecting an alternative updates the file's destination and moves it to the new category.
+
+### Dynamic Granularity
+- **User Action:** The user clicks the "Add Granularity" button on a category card (e.g., "Documents").
+- **Backend Call:** The frontend sends a request to the `/api/file-organizer/add-granularity` endpoint.
+- **UI Update:**
+    - The backend responds with more specific sub-folder suggestions.
+    - The UI creates new `CategoryCard` instances that are visually nested *inside* the parent card.
+    - Files are moved from the parent card into the appropriate new sub-category card, creating a clear visual hierarchy. This can be done recursively.
+
 ## File Analysis and AI Sorting Screens
 
 ## File Analysis and AI Sorting Screens (User-Provided Mockups)
@@ -513,7 +533,8 @@ _To be expanded as the feature develops._
 _Additional notes and considerations will be added here._
 
 
-<!-- Last updated: 2025-10-07 22:27 - Reason: Added user-provided mockup specifications for file analysis and AI sorting screens for tomorrow's implementation -->
+
+<!-- Last updated: 2025-10-16 21:14 - Reason: Documenting the new frontend interactions for the 'Add Granularity' and 'Disagree' features. -->
 
 ---
 

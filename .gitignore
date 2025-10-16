@@ -170,6 +170,17 @@ logs/
 *.bak
 *.tmp
 
+# Runtime data files (database, AI config)
+backend/data/modules/*.db
+backend/data/config/
+
+# IDE/Editor configs
+.cursor/
+
+# Separate MCP projects
+python-tools-mcp/
+homie-*-mcp/
+
 # OS specific
 .DS_Store
 Thumbs.db
