@@ -313,10 +313,15 @@ def register_file_organizer_routes(app, web_server):
         """
         Add ONE level of granularity to files in a specific folder.
         AI decides which files should go into subfolders and which should stay.
+        
+        Supports two modes:
+        1. Existing folder: Reads files from the folder on disk
+        2. Proposed folder: Uses file_paths array for not-yet-moved files
         """
         try:
             data = request.get_json(force=True, silent=True) or {}
             folder_path = data.get('folder_path')
+            file_paths = data.get('file_paths')  # Optional: for proposed folders
             analysis_id = data.get('analysis_id')  # Optional: to track this as part of an analysis session
             
             if not folder_path:
@@ -325,25 +330,43 @@ def register_file_organizer_routes(app, web_server):
             import os
             
             folder = Path(folder_path)
-            if not folder.exists() or not folder.is_dir():
-                return jsonify({'success': False, 'error': f'Folder does not exist: {folder_path}'}), 404
-            
-            # Get all items (files and subfolders) in this folder
             items = []
-            for item in folder.iterdir():
-                items.append({
-                    'path': str(item),
-                    'name': item.name,
-                    'is_file': item.is_file(),
-                    'is_dir': item.is_dir(),
-                    'extension': item.suffix.lower() if item.is_file() else None
-                })
+            
+            # MODE 1: Proposed folder with explicit file_paths (files haven't been moved yet)
+            if file_paths:
+                logger.info(f"Add granularity in PROPOSED mode: {len(file_paths)} files provided")
+                for file_path in file_paths:
+                    file_obj = Path(file_path)
+                    if file_obj.exists():
+                        items.append({
+                            'path': str(file_obj),
+                            'name': file_obj.name,
+                            'is_file': file_obj.is_file(),
+                            'is_dir': file_obj.is_dir(),
+                            'extension': file_obj.suffix.lower() if file_obj.is_file() else None
+                        })
+            
+            # MODE 2: Existing folder (read files from disk)
+            else:
+                if not folder.exists() or not folder.is_dir():
+                    return jsonify({'success': False, 'error': f'Folder does not exist: {folder_path}'}), 404
+                
+                logger.info(f"Add granularity in EXISTING mode: analyzing folder {folder_path}")
+                # Get all items (files and subfolders) in this folder
+                for item in folder.iterdir():
+                    items.append({
+                        'path': str(item),
+                        'name': item.name,
+                        'is_file': item.is_file(),
+                        'is_dir': item.is_dir(),
+                        'extension': item.suffix.lower() if item.is_file() else None
+                    })
             
             if not items:
                 return jsonify({
                     'success': True,
                     'operations': [],
-                    'message': 'Folder is empty'
+                    'message': 'No files to analyze'
                 })
             
             # Call AI to add granularity
