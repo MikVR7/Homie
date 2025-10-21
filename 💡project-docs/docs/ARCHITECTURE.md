@@ -2,8 +2,6 @@
 
 ## File Organizer AI Features
 
-## File Organizer AI Features
-
 ### Context-Aware Organization
 The AI analyzes files in batches and adapts granularity based on:
 
@@ -40,8 +38,6 @@ The system automatically handles archives with three strategies:
 
 ## Web Server Component
 
-## Web Server Component
-
 **Location:** `backend/core/web_server.py`
 
 **Purpose:** Flask + SocketIO server that handles HTTP API and WebSocket connections.
@@ -67,7 +63,9 @@ backend/core/
 **1. File Organizer Routes** (`file_organizer_routes.py`)
 - `/api/file-organizer/organize` - Analyze and organize files
 - `/api/file-organizer/execute` - Execute approved operations
-- `/api/file-organizer/add-granularity` - Add one level of folder granularity
+- `/api/file-organizer/add-granularity` - Add one level of folder granularity. Supports two modes:
+    1. **Existing folder:** Analyzes contents of a folder on disk.
+    2. **Proposed folder:** Analyzes a provided list of `file_paths` for a folder that does not yet exist.
 
 **2. Analysis Routes** (`analysis_routes.py`)
 - `/api/file-organizer/analyze-content` - Analyze single file
@@ -105,54 +103,6 @@ To eliminate code duplication, the `WebServer` class provides:
 - **AI Model Recovery:** Automatic fallback when AI models are deprecated
 - **Batch Processing:** Efficient AI calls for multiple files
 - **WebSocket Support:** Real-time communication for live updates
-
-## Code Quality Improvements
-
-## Code Quality Improvements (Recent Refactoring)
-
-### Eliminated Code Duplication
-
-**Problem:** Multiple endpoints had duplicate logic for:
-1. Database connections (6 duplicates)
-2. AI calls with recovery (4 duplicates)
-3. Batch file analysis (2 duplicates)
-
-**Solution:** Created shared helper methods:
-
-#### `_get_file_organizer_db_connection()`
-- **Location:** `WebServer` class
-- **Purpose:** Single source of truth for database connections
-- **Impact:** Changed 6 duplicate `db_path` definitions to 1 method
-
-#### `_call_ai_with_recovery(prompt)`
-- **Location:** `WebServer` and `AIContentAnalyzer` classes
-- **Purpose:** Single source of truth for AI calls with automatic model recovery
-- **Impact:** Changed 4 duplicate try-except-recovery blocks to 2 methods
-
-#### `_batch_analyze_files(file_paths, use_ai)`
-- **Location:** `WebServer` class
-- **Purpose:** Single source of truth for batch file analysis
-- **Impact:** Both `/organize` and `/analyze-content-batch` now call this method
-
-**Benefits:**
-- Easier maintenance (change logic in ONE place)
-- No more "fix one, forget the other" bugs
-- Cleaner, more readable code
-
-### Known Technical Debt
-
-**Issue:** `web_server.py` is becoming too large (1384+ lines)
-
-**Recommended Refactoring:**
-- Split into separate route modules:
-  - `routes/file_organizer_routes.py` - File organization endpoints
-  - `routes/analysis_routes.py` - Analysis and content endpoints
-  - `routes/operation_routes.py` - Operation management endpoints
-- Keep `web_server.py` as the main orchestrator
-- Use Flask Blueprints for route organization
-
-
-## AI Service Resilience
 
 ## AI Service Resilience
 
@@ -192,8 +142,6 @@ If an AI model fails during runtime (e.g., Google deprecates it after months/yea
 ## Phase 6: Granular Control (Completed)
 
 - **Outcome:** Selecting an alternative updates the file's proposed destination and reason in the UI. The file view model is then visually moved to the appropriate category card, creating a new category on the fly if one does not already exist. The actual file operation is not executed until the user clicks one of the "Apply" buttons.
-
-## File Organizer - Phase 5: Advanced AI Features
 
 ## File Organizer - Phase 5: Advanced AI Features
 
@@ -653,4 +601,28 @@ Each module can be:
 
 
 
-<!-- Last updated: 2025-10-16 21:15 - Reason: Documented new context-aware AI features and intelligent archive handling -->
+
+<!-- Last updated: 2025-10-21 18:48 - Reason: Added new features for 'Add Granularity' and 'Disagree with Alternatives', requiring an update to the project's architectural documentation to reflect these changes. -->
+
+## ### Phase 7: Granular & Alternative Suggestions (Complete)
+
+This phase introduced more nuanced user interaction with the AI's suggestions.
+
+- **Add Granularity:**
+  - A button (`+`) was added to each category card.
+  - When clicked, the frontend sends the list of source files proposed for that category back to the backend (`/api/file-organizer/add-granularity`).
+  - The backend analyzes these files and suggests sub-directories to further organize them.
+  - The new sub-categories are displayed as nested cards within the parent category in the UI, allowing the user to approve these more detailed moves.
+  - This feature works on "proposed" directories that do not yet exist on disk.
+
+- **"Disagree" with Alternatives:**
+  - The "Disagree" button (`X`) on each file item is now fully functional.
+  - When clicked, it sends the rejected `FileOperation` to the backend (`/api/file-organizer/suggest-alternatives`).
+  - The backend returns a list of alternative destination folders.
+  - The frontend displays these alternatives in a context menu, allowing the user to select a different destination.
+  - Selecting an alternative updates the file's destination in the UI and moves it to the corresponding category card.
+
+- **"Why?" Button:**
+  - The "Why?" button (`?`) fetches an on-demand explanation for a file's suggested location from the `/api/file-organizer/explain-operation` endpoint.
+  - The explanation is displayed in a custom dialog window.
+  - The fetched reason is cached on the `FileViewModel` to avoid redundant API calls.

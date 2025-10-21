@@ -4,6 +4,45 @@
 > Category: guide  
 > Reason: To store the UI suggestion provided by the external AI for future reference, as requested by the user.
 
+## 'Disagree' Button API
+
+When a user clicks the 'Disagree' button for a specific file suggestion, the frontend must make a POST request to the `/api/file-organizer/suggest-alternatives` endpoint to fetch alternative suggestions.
+
+### Request Format
+
+The backend expects a JSON payload with the `analysis_id` and a nested `rejected_operation` object.
+
+**Example Request Body:**
+```json
+{
+  "analysis_id": "unique-analysis-session-id-string",
+  "rejected_operation": {
+    "source": "/full/path/to/source/file.ext",
+    "destination": "/full/path/to/destination/folder/file.ext",
+    "type": "move"
+  }
+}
+```
+
+### Success Response
+
+A successful response will return a list of alternative `FileOperation` objects.
+
+**Example Success Body:**
+```json
+{
+  "success": true,
+  "alternatives": [
+    {
+      "source": "/path/to/file",
+      "destination": "/alternative/path/file",
+      "reason": "Explanation for this alternative",
+      "type": "move"
+    }
+  ]
+}
+```
+
 ## User Interaction and Workflow
 
 The AI Suggestions View is the primary interface for user interaction with the file organization proposals. It is composed of `CategoryCard` components, each representing a proposed destination folder.
@@ -18,7 +57,9 @@ Each file "pill" within a category card has three action buttons:
 
 ### Dynamic Granularity
 - **User Action:** The user clicks the "Add Granularity" button on a category card (e.g., "Documents").
-- **Backend Call:** The frontend sends a request to the `/api/file-organizer/add-granularity` endpoint.
+- **Backend Call:** The frontend sends a request to `/api/file-organizer/add-granularity`. This endpoint supports two modes:
+    1.  **Proposed Folder:** If the files for the "Documents" category have *not* yet been moved, the request **must** include the `file_paths` array containing the source paths of all files destined for that category. The `folder_path` will be the proposed destination (e.g., `.../Destination/Documents`).
+    2.  **Existing Folder:** If the files have already been moved, the request only needs the `folder_path`. The backend will read the contents from disk.
 - **UI Update:**
     - The backend responds with more specific sub-folder suggestions.
     - The UI creates new `CategoryCard` instances that are visually nested *inside* the parent card.
@@ -534,7 +575,8 @@ _Additional notes and considerations will be added here._
 
 
 
-<!-- Last updated: 2025-10-16 21:14 - Reason: Documenting the new frontend interactions for the 'Add Granularity' and 'Disagree' features. -->
+
+<!-- Last updated: 2025-10-16 21:20 - Reason: Documenting the final API structure for the 'Disagree' button functionality, which was recently implemented and required a specific nested request format. -->
 
 ---
 
