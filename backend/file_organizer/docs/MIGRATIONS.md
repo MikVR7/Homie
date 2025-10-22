@@ -87,6 +87,23 @@ Creates the destination memory system tables:
 - `idx_drives_user_available` - Find available drives
 - `idx_usage_destination` - Usage analytics
 
+### 002_drive_client_mounts.py
+
+Adds per-client mount point tracking:
+
+**Tables:**
+- `drive_client_mounts` - Tracks mount points per client/laptop
+
+**Indexes:**
+- `idx_drive_mounts_drive` - Fast lookups by drive
+- `idx_drive_mounts_client` - Fast lookups by client
+
+**Data Migration:**
+- Migrates existing `mount_point` data from `drives` table
+- Uses `'legacy_client'` as default client_id
+
+**See**: [DRIVE_CLIENT_MOUNTS.md](DRIVE_CLIENT_MOUNTS.md) for detailed documentation
+
 ## Creating New Migrations
 
 1. Create a new file: `{next_version}_{description}.py`
