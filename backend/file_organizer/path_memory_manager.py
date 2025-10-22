@@ -48,6 +48,8 @@ class PathMemoryManager:
         self.shared_services = shared_services
         self._db_path: Optional[Path] = None
         self._drives_manager = None  # Lazy import to avoid circulars
+        self._destination_manager = None  # DestinationMemoryManager
+        self._drive_manager = None  # DriveManager (new multi-client version)
         self._started = False
         self._subscriptions: List[str] = []
         self._db_lock = threading.Lock() # Add a lock for thread safety
@@ -61,6 +63,15 @@ class PathMemoryManager:
         self._create_tables_if_not_exist() # Ensure tables are created on start
         self._run_migrations() # Apply any pending migrations
 
+        # Initialize new managers
+        from .destination_memory_manager import DestinationMemoryManager
+        from .drive_manager import DriveManager
+        
+        self._destination_manager = DestinationMemoryManager(self._db_path)
+        self._drive_manager = DriveManager(self._db_path)
+        logger.info("✅ DestinationMemoryManager and DriveManager initialized")
+
+        # Legacy DrivesManager (for backward compatibility)
         from .drives_manager import DrivesManager
 
         self._drives_manager = DrivesManager(event_bus=self.event_bus)

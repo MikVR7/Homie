@@ -4,6 +4,7 @@ Destination Routes - Destination management endpoints
 """
 
 import logging
+import os
 from flask import request, jsonify
 import platform
 import subprocess
@@ -14,27 +15,159 @@ logger = logging.getLogger('DestinationRoutes')
 def register_destination_routes(app, web_server):
     """Register destination management routes with the Flask app"""
 
-    @app.route('/api/file-organizer/destinations', methods=['GET'])
-    def fo_get_destinations():
-        """Get saved destination folders for the user"""
+    def _get_destination_manager():
+        """Get DestinationMemoryManager instance"""
+        try:
+            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
+                path_mgr = file_organizer_app.path_memory_manager
+                if hasattr(path_mgr, '_destination_manager'):
+                    return path_mgr._destination_manager
+        except Exception as e:
+            logger.warning(f"Could not get DestinationMemoryManager: {e}")
+        return None
+
+    def _get_drive_manager():
+        """Get DriveManager instance"""
+        try:
+            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
+                path_mgr = file_organizer_app.path_memory_manager
+                if hasattr(path_mgr, '_drive_manager'):
+                    return path_mgr._drive_manager
+        except Exception as e:
+            logger.warning(f"Could not get DriveManager: {e}")
+        return None
+
+    @app.route('/api/file-organizer/destinations', methods=['GET', 'POST'])
+    def fo_destinations():
+        """Get or add destinations"""
+        if request.method == 'GET':
+            return _get_destinations()
+        else:
+            return _add_destination()
+
+    def _get_destinations():
+        """Get all active destinations for current user"""
         try:
             user_id = request.args.get('user_id', 'dev_user')
-            conn = web_server._get_file_organizer_db_connection()
-            try:
-                cursor = conn.execute("""
-                    SELECT id, destination_path, file_category
-                    FROM destination_mappings
-                    WHERE user_id = ?
-                    ORDER BY file_category ASC
-                """, (user_id,))
+            client_id = request.args.get('client_id', 'default_client')
+            
+            dest_manager = _get_destination_manager()
+            drive_manager = _get_drive_manager()
+            
+            if not dest_manager:
+                # Fallback to legacy method
+                logger.warning("Using legacy destination retrieval")
+                conn = web_server._get_file_organizer_db_connection()
+                try:
+                    cursor = conn.execute("""
+                        SELECT id, destination_path, file_category
+                        FROM destination_mappings
+                        WHERE user_id = ?
+                        ORDER BY file_category ASC
+                    """, (user_id,))
+                    
+                    rows = cursor.fetchall()
+                    destinations = [{'id': row[0], 'path': row[1], 'name': row[2]} for row in rows]
+                    return jsonify({'success': True, 'destinations': destinations})
+                finally:
+                    conn.close()
+            
+            # Use new DestinationMemoryManager
+            destinations = dest_manager.get_destinations_for_client(user_id, client_id)
+            
+            # Format response
+            result = []
+            for dest in destinations:
+                dest_dict = {
+                    'id': dest.id,
+                    'path': dest.path,
+                    'category': dest.category,
+                    'drive_id': dest.drive_id,
+                    'usage_count': dest.usage_count,
+                    'last_used_at': dest.last_used_at.isoformat() if dest.last_used_at else None,
+                    'created_at': dest.created_at.isoformat() if dest.created_at else None,
+                    'is_active': dest.is_active
+                }
                 
-                rows = cursor.fetchall()
-                destinations = [{'id': row[0], 'path': row[1], 'name': row[2]} for row in rows]
-                return jsonify({'success': True, 'destinations': destinations})
-            finally:
-                conn.close()
+                # Add drive information if available
+                if drive_manager and dest.drive_id:
+                    try:
+                        # Get drive info from client drives
+                        client_drives = drive_manager.get_client_drives(user_id, client_id)
+                        drive = next((d for d in client_drives if d.id == dest.drive_id), None)
+                        if drive:
+                            dest_dict['drive_type'] = drive.drive_type
+                            dest_dict['drive_label'] = drive.volume_label
+                            dest_dict['cloud_provider'] = drive.cloud_provider
+                    except Exception as e:
+                        logger.debug(f"Could not get drive info: {e}")
+                
+                result.append(dest_dict)
+            
+            return jsonify({'success': True, 'destinations': result})
+            
         except Exception as e:
-            logger.error(f"/destinations error: {e}", exc_info=True)
+            logger.error(f"GET /destinations error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    def _add_destination():
+        """Manually add a new destination"""
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            user_id = data.get('user_id', 'dev_user')
+            client_id = data.get('client_id', 'default_client')
+            path = data.get('path')
+            category = data.get('category')
+            
+            # Validate required fields
+            if not path:
+                return jsonify({'success': False, 'error': 'path is required'}), 400
+            if not category:
+                return jsonify({'success': False, 'error': 'category is required'}), 400
+            
+            # Validate path exists
+            if not os.path.exists(path):
+                return jsonify({'success': False, 'error': f'Path does not exist: {path}'}), 400
+            
+            dest_manager = _get_destination_manager()
+            drive_manager = _get_drive_manager()
+            
+            if not dest_manager:
+                return jsonify({'success': False, 'error': 'DestinationMemoryManager not available'}), 500
+            
+            # Determine drive_id
+            drive_id = None
+            if drive_manager:
+                try:
+                    drive = drive_manager.get_drive_for_path(user_id, path, client_id)
+                    if drive:
+                        drive_id = drive.id
+                except Exception as e:
+                    logger.warning(f"Could not determine drive_id: {e}")
+            
+            # Add destination
+            destination = dest_manager.add_destination(user_id, path, category, client_id, drive_id)
+            
+            if not destination:
+                return jsonify({'success': False, 'error': 'Failed to add destination'}), 500
+            
+            # Format response
+            result = {
+                'id': destination.id,
+                'path': destination.path,
+                'category': destination.category,
+                'drive_id': destination.drive_id,
+                'usage_count': destination.usage_count,
+                'created_at': destination.created_at.isoformat() if destination.created_at else None,
+                'is_active': destination.is_active
+            }
+            
+            return jsonify({'success': True, 'destination': result}), 201
+            
+        except Exception as e:
+            logger.error(f"POST /destinations error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/file-organizer/get-drives', methods=['GET'])
@@ -72,23 +205,70 @@ def register_destination_routes(app, web_server):
             logger.error(f"/get-drives error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/api/file-organizer/delete-destination', methods=['POST'])
-    def fo_delete_destination():
-        """Delete a saved destination"""
+    @app.route('/api/file-organizer/destinations/<destination_id>', methods=['DELETE'])
+    def fo_delete_destination(destination_id):
+        """Remove a destination (soft delete)"""
         try:
-            data = request.get_json(force=True, silent=True) or {}
-            destination_id = data.get('destination_id')
+            user_id = request.args.get('user_id', 'dev_user')
             
             if not destination_id:
                 return jsonify({'success': False, 'error': 'destination_id required'}), 400
             
-            conn = web_server._get_file_organizer_db_connection()
-            try:
-                conn.execute("DELETE FROM destination_mappings WHERE id = ?", (destination_id,))
-                conn.commit()
+            dest_manager = _get_destination_manager()
+            
+            if not dest_manager:
+                # Fallback to legacy method
+                logger.warning("Using legacy destination deletion")
+                conn = web_server._get_file_organizer_db_connection()
+                try:
+                    conn.execute("DELETE FROM destination_mappings WHERE id = ?", (destination_id,))
+                    conn.commit()
+                    return jsonify({'success': True, 'message': 'Destination removed successfully'})
+                finally:
+                    conn.close()
+            
+            # Use new DestinationMemoryManager (soft delete)
+            success = dest_manager.remove_destination(user_id, destination_id)
+            
+            if success:
+                return jsonify({'success': True, 'message': 'Destination removed successfully'})
+            else:
+                return jsonify({'success': False, 'error': 'Destination not found'}), 404
+                
+        except Exception as e:
+            logger.error(f"DELETE /destinations/{destination_id} error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # Legacy endpoint for backward compatibility
+    @app.route('/api/file-organizer/delete-destination', methods=['POST'])
+    def fo_delete_destination_legacy():
+        """Delete a saved destination (legacy endpoint)"""
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            destination_id = data.get('destination_id')
+            user_id = data.get('user_id', 'dev_user')
+            
+            if not destination_id:
+                return jsonify({'success': False, 'error': 'destination_id required'}), 400
+            
+            dest_manager = _get_destination_manager()
+            
+            if not dest_manager:
+                conn = web_server._get_file_organizer_db_connection()
+                try:
+                    conn.execute("DELETE FROM destination_mappings WHERE id = ?", (destination_id,))
+                    conn.commit()
+                    return jsonify({'success': True})
+                finally:
+                    conn.close()
+            
+            success = dest_manager.remove_destination(user_id, destination_id)
+            
+            if success:
                 return jsonify({'success': True})
-            finally:
-                conn.close()
+            else:
+                return jsonify({'success': False, 'error': 'Destination not found'}), 404
+                
         except Exception as e:
             logger.error(f"/delete-destination error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
