@@ -466,6 +466,152 @@ Get available drives/mount points.
 
 ---
 
+## File Organization
+
+### POST /api/file-organizer/organize
+
+Analyze files and suggest organization operations.
+
+**Request Body**:
+```json
+{
+  "user_id": "user123",
+  "client_id": "laptop1",
+  "source_path": "/home/user/Downloads",
+  "destination_path": "/home/user/Documents",
+  "organization_style": "by_type"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "analysis_id": "analysis-uuid-123",
+  "operations": [
+    {
+      "operation_id": "analysis-uuid-123_op_0",
+      "type": "move",
+      "source": "/home/user/Downloads/movie.mp4",
+      "destination": "/home/user/Documents/Movies/movie.mp4",
+      "status": "pending"
+    }
+  ]
+}
+```
+
+**Features**:
+- Includes AI context with known destinations
+- AI prefers known destinations when appropriate
+- Considers drive availability and space
+- Returns analysis_id for tracking
+
+**AI Context Integration**:
+The endpoint automatically builds context including:
+- Known destinations grouped by category
+- Drive information and available space
+- Usage statistics for each destination
+- Instructions for AI to prefer known destinations
+
+**Example**:
+```javascript
+fetch('/api/file-organizer/organize', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_id: 'user123',
+    client_id: 'laptop1',
+    source_path: '/home/user/Downloads',
+    destination_path: '/home/user/Documents',
+    organization_style: 'by_type'
+  })
+})
+  .then(res => res.json())
+  .then(data => {
+    console.log(`Analysis ID: ${data.analysis_id}`);
+    console.log(`${data.operations.length} operations suggested`);
+  });
+```
+
+---
+
+### POST /api/file-organizer/execute
+
+Execute approved file operations.
+
+**Request Body**:
+```json
+{
+  "user_id": "user123",
+  "client_id": "laptop1",
+  "analysis_id": "analysis-uuid-123",
+  "operation_ids": [
+    "analysis-uuid-123_op_0",
+    "analysis-uuid-123_op_1"
+  ]
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "operation_id": "analysis-uuid-123_op_0",
+      "success": true
+    },
+    {
+      "operation_id": "analysis-uuid-123_op_1",
+      "success": true
+    }
+  ],
+  "new_destinations_captured": [
+    {
+      "id": "dest-uuid-456",
+      "path": "/home/user/Documents/Movies",
+      "category": "Movies"
+    }
+  ]
+}
+```
+
+**Features**:
+- Executes file operations (move, copy, delete, unpack)
+- Auto-captures new destinations
+- Updates usage statistics for destinations
+- Returns newly captured destinations
+
+**Auto-Capture Behavior**:
+After successful operations:
+1. Extracts destination folders from operations
+2. Checks if destinations already exist
+3. Creates new destination records for unknown folders
+4. Updates usage count for all affected destinations
+5. Returns list of newly captured destinations
+
+**Example**:
+```javascript
+fetch('/api/file-organizer/execute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_id: 'user123',
+    client_id: 'laptop1',
+    analysis_id: 'analysis-uuid-123',
+    operation_ids: ['analysis-uuid-123_op_0', 'analysis-uuid-123_op_1']
+  })
+})
+  .then(res => res.json())
+  .then(data => {
+    if (data.new_destinations_captured) {
+      console.log(`Learned ${data.new_destinations_captured.length} new destinations`);
+    }
+  });
+```
+
+---
+
 ## Multi-Client Considerations
 
 ### Client ID

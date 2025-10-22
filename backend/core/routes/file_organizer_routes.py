@@ -14,6 +14,31 @@ logger = logging.getLogger('FileOrganizerRoutes')
 def register_file_organizer_routes(app, web_server):
     """Register file organizer routes with the Flask app"""
     
+    def _get_ai_context_builder():
+        """Get AIContextBuilder instance"""
+        try:
+            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
+                path_mgr = file_organizer_app.path_memory_manager
+                if hasattr(path_mgr, '_destination_manager') and hasattr(path_mgr, '_drive_manager'):
+                    from file_organizer.ai_context_builder import AIContextBuilder
+                    return AIContextBuilder(path_mgr._destination_manager, path_mgr._drive_manager)
+        except Exception as e:
+            logger.warning(f"Could not get AIContextBuilder: {e}")
+        return None
+
+    def _get_destination_manager():
+        """Get DestinationMemoryManager instance"""
+        try:
+            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
+                path_mgr = file_organizer_app.path_memory_manager
+                if hasattr(path_mgr, '_destination_manager'):
+                    return path_mgr._destination_manager
+        except Exception as e:
+            logger.warning(f"Could not get DestinationMemoryManager: {e}")
+        return None
+
     @app.route('/api/file-organizer/organize', methods=['POST'])
     def fo_organize():
         try:
@@ -21,15 +46,13 @@ def register_file_organizer_routes(app, web_server):
             source_folder = data.get('source_path')
             destination_folder = data.get('destination_path')
             organization_style = data.get('organization_style', 'by_type')
+            user_id = data.get('user_id', 'dev_user')
+            client_id = data.get('client_id', 'default_client')
 
             if not source_folder:
                 return jsonify({'success': False, 'error': 'source_path required'}), 400
             if not destination_folder:
                 return jsonify({'success': False, 'error': 'destination_path required'}), 400
-
-            # Note: The user_id would typically come from an auth system.
-            # For now, we'll use a hardcoded developer ID.
-            user_id = "dev_user"
 
             # Get the File Organizer App instance
             app_manager = web_server.components.get('app_manager')
@@ -56,8 +79,26 @@ def register_file_organizer_routes(app, web_server):
             if dest_root.exists():
                 existing_folders = [d.name for d in dest_root.iterdir() if d.is_dir()]
             
+            # Build AI context with known destinations and drives
+            ai_context_text = None
+            context_builder = _get_ai_context_builder()
+            if context_builder:
+                try:
+                    context = context_builder.build_context(user_id, client_id)
+                    ai_context_text = context_builder.format_for_ai_prompt(context)
+                    logger.info(f"Built AI context: {context_builder.build_context_summary(user_id, client_id)}")
+                except Exception as e:
+                    logger.warning(f"Could not build AI context: {e}")
+            
             # Use shared batch analysis method (SINGLE SOURCE OF TRUTH)
-            batch_result = web_server._batch_analyze_files(file_paths, use_ai=True, existing_folders=existing_folders)
+            # Note: The batch analysis method would need to be updated to accept ai_context_text
+            # For now, we'll pass it through existing_folders parameter
+            batch_result = web_server._batch_analyze_files(
+                file_paths, 
+                use_ai=True, 
+                existing_folders=existing_folders,
+                ai_context=ai_context_text  # Pass context if method supports it
+            )
             
             if not batch_result.get('success'):
                 return jsonify({
@@ -296,7 +337,65 @@ def register_file_organizer_routes(app, web_server):
                         results.append({'operation_id': op_id, 'success': False, 'error': str(exec_error)})
                 
                 conn.commit()
-                return jsonify({'success': True, 'results': results})
+                
+                # Auto-capture destinations from successful operations
+                new_destinations = []
+                dest_manager = _get_destination_manager()
+                if dest_manager:
+                    try:
+                        # Get user_id and client_id from request
+                        user_id = data.get('user_id', 'dev_user')
+                        client_id = data.get('client_id', 'default_client')
+                        
+                        # Build operations list for auto-capture
+                        successful_ops = []
+                        for result in results:
+                            if result.get('success'):
+                                op_id = result['operation_id']
+                                # Get operation details
+                                cursor = conn.execute("""
+                                    SELECT operation_type, destination_path
+                                    FROM analysis_operations
+                                    WHERE operation_id = ?
+                                """, (op_id,))
+                                row = cursor.fetchone()
+                                if row and row[1]:  # Has destination
+                                    successful_ops.append({
+                                        'type': row[0],
+                                        'dest': row[1]
+                                    })
+                        
+                        # Auto-capture new destinations
+                        if successful_ops:
+                            captured = dest_manager.auto_capture_destinations(
+                                user_id, successful_ops, client_id
+                            )
+                            
+                            # Update usage for captured destinations
+                            for dest in captured:
+                                dest_manager.update_usage(dest.id, file_count=1, operation_type='move')
+                            
+                            # Format for response
+                            new_destinations = [
+                                {
+                                    'path': dest.path,
+                                    'category': dest.category,
+                                    'id': dest.id
+                                }
+                                for dest in captured
+                            ]
+                            
+                            if new_destinations:
+                                logger.info(f"Auto-captured {len(new_destinations)} new destination(s)")
+                    
+                    except Exception as capture_error:
+                        logger.warning(f"Could not auto-capture destinations: {capture_error}")
+                
+                response = {'success': True, 'results': results}
+                if new_destinations:
+                    response['new_destinations_captured'] = new_destinations
+                
+                return jsonify(response)
                 
             except Exception as e:
                 conn.rollback()
