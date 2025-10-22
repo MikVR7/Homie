@@ -302,6 +302,7 @@ class WebServer:
         # ===== FILE ORGANIZER ROUTES (MODULAR) =====
         # Import and register all file organizer routes from separate modules
         from core.routes.destination_routes import register_destination_routes
+        from core.routes.drive_routes import register_drive_routes
         from core.routes.file_organizer_routes import register_file_organizer_routes
         from core.routes.analysis_routes import register_analysis_routes
         from core.routes.operation_routes import register_operation_routes
@@ -309,6 +310,7 @@ class WebServer:
         
         # Register all route modules
         register_destination_routes(self.app, self)
+        register_drive_routes(self.app, self)
         register_file_organizer_routes(self.app, self)
         register_analysis_routes(self.app, self)
         register_operation_routes(self.app, self)

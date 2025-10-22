@@ -203,7 +203,248 @@ Delete a saved destination (legacy endpoint for backward compatibility).
 
 ## Drive Management
 
-### GET /api/file-organizer/get-drives
+### GET /api/file-organizer/drives
+
+Retrieve all known drives for the current user.
+
+**Query Parameters**:
+- `user_id` (optional): User identifier (default: 'dev_user')
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "drives": [
+    {
+      "id": "drive-uuid-123",
+      "unique_identifier": "USB-SERIAL-12345",
+      "mount_point": "/",
+      "volume_label": "System",
+      "drive_type": "internal",
+      "cloud_provider": null,
+      "is_available": true,
+      "available_space_gb": 500.5,
+      "last_seen_at": "2025-10-22T10:00:00Z",
+      "created_at": "2025-09-01T08:00:00Z",
+      "client_mounts": [
+        {
+          "client_id": "laptop1",
+          "mount_point": "/",
+          "is_available": true,
+          "available_space_gb": 500.5,
+          "last_seen_at": "2025-10-22T10:00:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Features**:
+- Returns all drives across all clients
+- Includes real-time available space
+- Shows client-specific mount points
+- Includes cloud provider information
+
+**Example**:
+```javascript
+fetch('/api/file-organizer/drives?user_id=user123')
+  .then(res => res.json())
+  .then(data => {
+    console.log(`Found ${data.drives.length} drives`);
+  });
+```
+
+---
+
+### POST /api/file-organizer/drives
+
+Register a new drive detected by frontend.
+
+**Request Body**:
+```json
+{
+  "user_id": "user123",
+  "client_id": "laptop1",
+  "unique_identifier": "USB-SERIAL-67890",
+  "mount_point": "/media/usb",
+  "volume_label": "MyUSB",
+  "drive_type": "usb",
+  "cloud_provider": null
+}
+```
+
+**Response** (201 Created):
+```json
+{
+  "success": true,
+  "drive": {
+    "id": "drive-uuid-456",
+    "unique_identifier": "USB-SERIAL-67890",
+    "mount_point": "/media/usb",
+    "volume_label": "MyUSB",
+    "drive_type": "usb",
+    "cloud_provider": null,
+    "is_available": true,
+    "available_space_gb": 50.0,
+    "last_seen_at": "2025-10-22T10:00:00Z",
+    "created_at": "2025-10-22T10:00:00Z",
+    "client_mounts": [
+      {
+        "client_id": "laptop1",
+        "mount_point": "/media/usb",
+        "is_available": true,
+        "last_seen_at": "2025-10-22T10:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+**Validation**:
+- `unique_identifier` is required
+- `mount_point` is required
+- `drive_type` is required
+- Handles duplicate registration gracefully (updates existing drive)
+
+**Drive Types**:
+- `internal` - Internal hard drive
+- `usb` - USB drive
+- `cloud` - Cloud storage (OneDrive, Dropbox, etc.)
+
+**Error Responses**:
+
+400 Bad Request - Missing required fields:
+```json
+{
+  "success": false,
+  "error": "unique_identifier is required"
+}
+```
+
+500 Internal Server Error:
+```json
+{
+  "success": false,
+  "error": "DriveManager not available"
+}
+```
+
+**Example**:
+```javascript
+fetch('/api/file-organizer/drives', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_id: 'user123',
+    client_id: 'laptop1',
+    unique_identifier: 'USB-SERIAL-67890',
+    mount_point: '/media/usb',
+    volume_label: 'MyUSB',
+    drive_type: 'usb'
+  })
+})
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      console.log('Drive registered:', data.drive.id);
+    }
+  });
+```
+
+---
+
+### GET /api/file-organizer/drives/:drive_id
+
+Get a specific drive by ID.
+
+**URL Parameters**:
+- `drive_id`: Drive UUID
+
+**Query Parameters**:
+- `user_id` (optional): User identifier (default: 'dev_user')
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "drive": {
+    "id": "drive-uuid-123",
+    "unique_identifier": "USB-SERIAL-12345",
+    "mount_point": "/media/usb",
+    "volume_label": "MyUSB",
+    "drive_type": "usb",
+    "is_available": true,
+    "available_space_gb": 50.0,
+    "client_mounts": [...]
+  }
+}
+```
+
+**Error Responses**:
+
+404 Not Found:
+```json
+{
+  "success": false,
+  "error": "Drive not found"
+}
+```
+
+---
+
+### PUT /api/file-organizer/drives/availability
+
+Update drive availability status.
+
+**Request Body**:
+```json
+{
+  "user_id": "user123",
+  "client_id": "laptop1",
+  "unique_identifier": "USB-SERIAL-12345",
+  "is_available": false
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Drive availability updated"
+}
+```
+
+**Use Case**: Frontend reports when a drive is unplugged or becomes unavailable.
+
+**Error Responses**:
+
+404 Not Found:
+```json
+{
+  "success": false,
+  "error": "Drive not found"
+}
+```
+
+**Example**:
+```javascript
+// USB drive unplugged
+fetch('/api/file-organizer/drives/availability', {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_id: 'user123',
+    client_id: 'laptop1',
+    unique_identifier: 'USB-SERIAL-12345',
+    is_available: false
+  })
+});
+```
+
+---
+
+### GET /api/file-organizer/get-drives (Legacy)
 
 Get available drives/mount points.
 
@@ -216,17 +457,12 @@ Get available drives/mount points.
       "path": "/",
       "name": "/",
       "type": "local"
-    },
-    {
-      "path": "/media/usb",
-      "name": "/media/usb",
-      "type": "local"
     }
   ]
 }
 ```
 
-**Note**: This is a legacy endpoint. Consider using DriveManager for more detailed drive information.
+**Note**: This is a legacy endpoint. Use `GET /api/file-organizer/drives` for more detailed information.
 
 ---
 
