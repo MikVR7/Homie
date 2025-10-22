@@ -163,8 +163,9 @@ manager = PathMemoryManager(event_bus, shared_services)
 await manager.start()  # ← Migrations applied here
 ```
 
-## 🎨 Models
+## 🎨 Models & Manager
 
+### Models
 Three dataclasses with full type hints:
 
 ```python
@@ -199,6 +200,34 @@ destination = Destination(
     is_active=True
 )
 ```
+
+### DestinationMemoryManager
+High-level API for managing destinations:
+
+```python
+from backend.file_organizer.destination_memory_manager import DestinationMemoryManager
+from pathlib import Path
+
+manager = DestinationMemoryManager(Path("backend/data/modules/homie_file_organizer.db"))
+
+# Add a destination
+dest = manager.add_destination("user123", "/home/user/Documents/Invoices", "invoice")
+
+# Get all destinations
+destinations = manager.get_destinations("user123")
+
+# Auto-capture from operations
+operations = [{"type": "move", "dest": "/home/user/Documents/file.pdf"}]
+captured = manager.auto_capture_destinations("user123", operations)
+
+# Update usage
+manager.update_usage(dest.id, file_count=5, operation_type="move")
+
+# Get analytics
+analytics = manager.get_usage_analytics("user123")
+```
+
+See [DESTINATION_MEMORY_MANAGER.md](DESTINATION_MEMORY_MANAGER.md) for complete API documentation.
 
 ## 🔄 Migration System
 
