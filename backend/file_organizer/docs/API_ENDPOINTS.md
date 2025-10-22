@@ -689,6 +689,90 @@ def add_destination():
 
 ---
 
+## AI-Powered Features
+
+### POST /api/file-organizer/suggest-alternatives
+
+Suggest alternative destinations when user disagrees with a suggestion.
+
+**Request Body**:
+```json
+{
+  "user_id": "user123",
+  "client_id": "laptop1",
+  "rejected_operation": {
+    "source": "/home/user/Downloads/movie.mp4",
+    "destination": "/home/user/Documents/Movies/movie.mp4",
+    "type": "move"
+  }
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "source": "known_destinations",
+  "alternatives": [
+    {
+      "operation_id": "alt_a1b2c3d4",
+      "type": "move",
+      "source": "/home/user/Downloads/movie.mp4",
+      "destination": "/media/usb/Movies/movie.mp4",
+      "reason": "Alternative: Movies folder - used 3 times previously",
+      "status": "pending"
+    },
+    {
+      "operation_id": "alt_e5f6g7h8",
+      "type": "move",
+      "source": "/home/user/Downloads/movie.mp4",
+      "destination": "/home/user/OneDrive/Movies/movie.mp4",
+      "reason": "Alternative: Movies folder - used 1 time previously",
+      "status": "pending"
+    }
+  ]
+}
+```
+
+**Features**:
+- First tries to suggest other known destinations in same category
+- Excludes the rejected destination
+- Orders by usage count (most used first)
+- Falls back to AI-generated alternatives if no known destinations
+- Includes source indicator ('known_destinations' or 'ai_generated')
+
+**Algorithm**:
+1. Extract category from rejected destination path
+2. Find other destinations in same category
+3. Exclude the rejected destination
+4. Order by usage_count DESC
+5. Create alternative operations with new destination paths
+6. If no alternatives found, use AI to generate new suggestions
+
+**Example**:
+```javascript
+fetch('/api/file-organizer/suggest-alternatives', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_id: 'user123',
+    client_id: 'laptop1',
+    rejected_operation: {
+      source: '/home/user/Downloads/movie.mp4',
+      destination: '/home/user/Documents/Movies/movie.mp4',
+      type: 'move'
+    }
+  })
+})
+  .then(res => res.json())
+  .then(data => {
+    console.log(`Found ${data.alternatives.length} alternatives`);
+    console.log(`Source: ${data.source}`);
+  });
+```
+
+---
+
 ## Testing
 
 ### Using curl
