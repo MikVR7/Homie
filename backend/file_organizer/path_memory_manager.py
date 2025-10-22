@@ -59,6 +59,7 @@ class PathMemoryManager:
         logger.info("🧠 Starting PathMemoryManager…")
         self._setup_database_path() # Renamed to avoid creating connection
         self._create_tables_if_not_exist() # Ensure tables are created on start
+        self._run_migrations() # Apply any pending migrations
 
         from .drives_manager import DrivesManager
 
@@ -118,6 +119,17 @@ class PathMemoryManager:
         self._db_path = modules_dir / "homie_file_organizer.db"
         logger.info(f"📦 PathMemoryManager DB path set to {self._db_path}")
 
+    def _run_migrations(self) -> None:
+        """Run database migrations"""
+        try:
+            from .migration_runner import run_migrations
+            applied = run_migrations(self._db_path)
+            if applied > 0:
+                logger.info(f"✅ Applied {applied} database migration(s)")
+        except Exception as e:
+            logger.error(f"❌ Migration error: {e}")
+            # Don't fail startup on migration errors for now
+    
     def _create_tables_if_not_exist(self) -> None:
         """Connects to the database and creates tables if they don't exist."""
         with self._get_db_connection() as conn:
