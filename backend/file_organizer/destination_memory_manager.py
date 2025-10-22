@@ -84,6 +84,7 @@ class DestinationMemoryManager:
         user_id: str, 
         path: str, 
         category: str, 
+        client_id: str,
         drive_id: Optional[str] = None
     ) -> Optional[Destination]:
         """
@@ -93,7 +94,8 @@ class DestinationMemoryManager:
             user_id: User identifier
             path: Destination folder path
             category: File category for this destination
-            drive_id: Optional drive identifier
+            client_id: Client/laptop identifier reporting this destination
+            drive_id: Optional drive identifier (auto-detected if None)
             
         Returns:
             Created or existing Destination object, None on error
@@ -120,6 +122,10 @@ class DestinationMemoryManager:
                 if existing:
                     logger.info(f"Destination already exists: {normalized_path}")
                     return Destination.from_db_row(existing)
+                
+                # Auto-detect drive_id if not provided
+                if drive_id is None:
+                    drive_id = self.get_drive_for_path(user_id, client_id, normalized_path)
                 
                 # Create new destination
                 destination_id = str(uuid.uuid4())
@@ -183,6 +189,50 @@ class DestinationMemoryManager:
             logger.error(f"Error removing destination {destination_id}: {e}")
             return False
 
+    def get_destinations_for_client(self, user_id: str, client_id: str) -> List[Destination]:
+        """
+        Get destinations that are accessible from a specific client.
+        
+        Filters destinations based on drive availability for that client.
+        Cloud storage destinations are accessible from all clients.
+        
+        Args:
+            user_id: User identifier
+            client_id: Client/laptop identifier
+            
+        Returns:
+            List of Destination objects accessible from this client
+        """
+        try:
+            with self._get_db_connection() as conn:
+                cursor = conn.execute("""
+                    SELECT DISTINCT
+                        d.id, d.user_id, d.path, d.category, d.drive_id,
+                        d.created_at, d.last_used_at, d.usage_count, d.is_active
+                    FROM destinations d
+                    LEFT JOIN drives dr ON d.drive_id = dr.id
+                    LEFT JOIN drive_client_mounts m ON dr.id = m.drive_id AND m.client_id = ?
+                    WHERE d.user_id = ? 
+                      AND d.is_active = 1
+                      AND (
+                          d.drive_id IS NULL  -- No drive (local paths)
+                          OR dr.drive_type = 'cloud'  -- Cloud drives accessible from all clients
+                          OR m.is_available = 1  -- Drive has mount on this client
+                      )
+                    ORDER BY d.usage_count DESC, d.last_used_at DESC
+                """, (client_id, user_id))
+                
+                destinations = []
+                for row in cursor.fetchall():
+                    destinations.append(Destination.from_db_row(row))
+                
+                logger.debug(f"Retrieved {len(destinations)} destinations for client {client_id}")
+                return destinations
+                
+        except Exception as e:
+            logger.error(f"Error retrieving destinations for client {client_id}: {e}")
+            return []
+
     def get_destinations_by_category(self, user_id: str, category: str) -> List[Destination]:
         """
         Get all active destinations for a specific category.
@@ -219,7 +269,8 @@ class DestinationMemoryManager:
     def auto_capture_destinations(
         self, 
         user_id: str, 
-        operations: List[Dict[str, Any]]
+        operations: List[Dict[str, Any]],
+        client_id: str
     ) -> List[Destination]:
         """
         Extract and capture destination paths from file operations.
@@ -227,6 +278,7 @@ class DestinationMemoryManager:
         Args:
             user_id: User identifier
             operations: List of file operation dictionaries with 'dest' or 'destination' keys
+            client_id: Client/laptop identifier reporting these operations
             
         Returns:
             List of newly captured Destination objects
@@ -263,11 +315,11 @@ class DestinationMemoryManager:
                     # Extract category from path
                     category = self.extract_category_from_path(path)
                     
-                    # Determine drive_id (placeholder for now - would integrate with DrivesManager)
-                    drive_id = self.get_drive_for_path(path)
+                    # Determine drive_id using client-specific mount points
+                    drive_id = self.get_drive_for_path(user_id, client_id, path)
                     
                     # Add the destination
-                    destination = self.add_destination(user_id, path, category, drive_id)
+                    destination = self.add_destination(user_id, path, category, client_id, drive_id)
                     if destination:
                         newly_captured.append(destination)
                         
@@ -319,46 +371,49 @@ class DestinationMemoryManager:
             logger.warning(f"Could not extract category from path {path}: {e}")
             return "Uncategorized"
 
-    def get_drive_for_path(self, path: str) -> Optional[str]:
+    def get_drive_for_path(self, user_id: str, client_id: str, path: str) -> Optional[str]:
         """
-        Determine the drive_id for a given path.
+        Determine the drive_id for a given path on a specific client.
         
-        This is a placeholder that would integrate with DrivesManager.
-        For now, returns None (internal drive).
+        Checks client-specific mount points to find which drive contains the path.
         
         Args:
+            user_id: User identifier
+            client_id: Client/laptop identifier
             path: File system path
             
         Returns:
-            Drive UUID or None
+            Drive UUID or None if no matching drive found
         """
-        # TODO: Integrate with DrivesManager to detect:
-        # - USB drives (paths starting with /media, /mnt)
-        # - Cloud drives (OneDrive, Dropbox, Google Drive paths)
-        # - Network drives (SMB, NFS mounts)
-        
         try:
-            path_obj = Path(path)
-            path_str = str(path_obj.resolve())
+            path_str = str(Path(path).resolve())
             
-            # Simple heuristics for common mount points
-            if '/media/' in path_str or '/mnt/' in path_str:
-                logger.debug(f"Path appears to be on external drive: {path_str}")
-                # Would query drives table here
+            with self._get_db_connection() as conn:
+                # Find drive with longest matching mount point for this client
+                cursor = conn.execute("""
+                    SELECT d.id, m.mount_point
+                    FROM drives d
+                    JOIN drive_client_mounts m ON d.id = m.drive_id
+                    WHERE d.user_id = ?
+                      AND m.client_id = ?
+                      AND m.is_available = 1
+                      AND ? LIKE m.mount_point || '%'
+                    ORDER BY LENGTH(m.mount_point) DESC
+                    LIMIT 1
+                """, (user_id, client_id, path_str))
+                
+                row = cursor.fetchone()
+                if row:
+                    drive_id = row['id']
+                    mount_point = row['mount_point']
+                    logger.debug(f"Path {path_str} matched to drive {drive_id} (mount: {mount_point})")
+                    return drive_id
+                
+                logger.debug(f"No drive found for path {path_str} on client {client_id}")
                 return None
             
-            # Check for common cloud drive paths
-            cloud_indicators = ['Dropbox', 'OneDrive', 'Google Drive', 'iCloud']
-            for indicator in cloud_indicators:
-                if indicator in path_str:
-                    logger.debug(f"Path appears to be on cloud drive: {path_str}")
-                    # Would query drives table here
-                    return None
-            
-            return None  # Internal/default drive
-            
         except Exception as e:
-            logger.warning(f"Error determining drive for path {path}: {e}")
+            logger.error(f"Error determining drive for path {path}: {e}")
             return None
 
     def update_usage(

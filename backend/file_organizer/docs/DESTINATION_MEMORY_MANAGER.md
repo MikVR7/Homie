@@ -44,7 +44,7 @@ for dest in destinations:
 
 ---
 
-### add_destination(user_id: str, path: str, category: str, drive_id: Optional[str] = None) -> Optional[Destination]
+### add_destination(user_id: str, path: str, category: str, client_id: str, drive_id: Optional[str] = None) -> Optional[Destination]
 
 Manually add a new destination or return existing one.
 
@@ -52,7 +52,8 @@ Manually add a new destination or return existing one.
 - `user_id` (str): User identifier
 - `path` (str): Destination folder path
 - `category` (str): File category for this destination
-- `drive_id` (Optional[str]): Drive identifier (optional)
+- `client_id` (str): Client/laptop identifier reporting this destination
+- `drive_id` (Optional[str]): Drive identifier (auto-detected if None)
 
 **Returns:**
 - `Destination` object if successful, `None` on error
@@ -118,13 +119,14 @@ print(f"Found {len(invoices)} invoice destinations")
 
 ---
 
-### auto_capture_destinations(user_id: str, operations: List[Dict[str, Any]]) -> List[Destination]
+### auto_capture_destinations(user_id: str, operations: List[Dict[str, Any]], client_id: str) -> List[Destination]
 
 Automatically extract and capture destination paths from file operations.
 
 **Parameters:**
 - `user_id` (str): User identifier
 - `operations` (List[Dict]): File operations with 'dest' or 'destination' keys
+- `client_id` (str): Client/laptop identifier reporting these operations
 
 **Returns:**
 - List of newly captured `Destination` objects
@@ -176,25 +178,57 @@ manager.extract_category_from_path("")
 
 ---
 
-### get_drive_for_path(path: str) -> Optional[str]
+### get_drive_for_path(user_id: str, client_id: str, path: str) -> Optional[str]
 
-Determine the drive_id for a given path.
+Determine the drive_id for a given path on a specific client.
 
 **Parameters:**
+- `user_id` (str): User identifier
+- `client_id` (str): Client/laptop identifier
 - `path` (str): File system path
 
 **Returns:**
-- Drive UUID or `None` (internal drive)
+- Drive UUID or `None` if no matching drive found
 
-**Note:** Currently a placeholder that returns `None`. Future integration with `DrivesManager` will detect:
-- USB drives (paths in /media, /mnt)
-- Cloud drives (OneDrive, Dropbox, Google Drive)
-- Network drives (SMB, NFS mounts)
+**Features:**
+- Checks client-specific mount points from `drive_client_mounts` table
+- Returns drive with longest matching mount point
+- Ensures accurate path-to-drive matching per client
 
 **Example:**
 ```python
 drive_id = manager.get_drive_for_path("/media/usb/Documents")
 # Returns: drive UUID or None
+```
+
+---
+
+### get_destinations_for_client(user_id: str, client_id: str) -> List[Destination]
+
+Get destinations that are accessible from a specific client.
+
+**Parameters:**
+- `user_id` (str): User identifier
+- `client_id` (str): Client/laptop identifier
+
+**Returns:**
+- List of `Destination` objects accessible from this client
+
+**Filtering Logic:**
+- Returns destinations where:
+  - `drive_id` is NULL (local paths, no drive tracking)
+  - Drive type is 'cloud' (accessible from all clients)
+  - Drive has an available mount on this client
+
+**Example:**
+```python
+# Get destinations accessible from laptop1
+destinations = manager.get_destinations_for_client("user123", "laptop1")
+
+# Only shows:
+# - Destinations on drives mounted on laptop1
+# - Cloud storage destinations (accessible from all)
+# - Local destinations (no drive tracking)
 ```
 
 ---

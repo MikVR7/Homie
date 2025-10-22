@@ -8,6 +8,7 @@ Run with: python3 backend/file_organizer/test_destination_memory_manager.py
 import sys
 import tempfile
 import os
+import uuid
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -41,7 +42,8 @@ def test_add_destination():
         dest = manager.add_destination(
             user_id="test_user",
             path="/home/user/Documents/Invoices",
-            category="invoice"
+            category="invoice",
+            client_id="test_client"
         )
         
         assert dest is not None, "Destination should be created"
@@ -55,7 +57,8 @@ def test_add_destination():
         dest2 = manager.add_destination(
             user_id="test_user",
             path="/home/user/Documents/Invoices",
-            category="invoice"
+            category="invoice",
+            client_id="test_client"
         )
         
         assert dest2.id == dest.id, "Should return existing destination"
@@ -76,9 +79,9 @@ def test_get_destinations():
     
     try:
         # Add multiple destinations
-        manager.add_destination("test_user", "/home/user/Documents/Invoices", "invoice")
-        manager.add_destination("test_user", "/home/user/Documents/Receipts", "receipt")
-        manager.add_destination("test_user", "/home/user/Videos/Movies", "movie")
+        manager.add_destination("test_user", "/home/user/Documents/Invoices", "invoice", "test_client")
+        manager.add_destination("test_user", "/home/user/Documents/Receipts", "receipt", "test_client")
+        manager.add_destination("test_user", "/home/user/Videos/Movies", "movie", "test_client")
         
         # Get all destinations
         destinations = manager.get_destinations("test_user")
@@ -106,7 +109,7 @@ def test_remove_destination():
     
     try:
         # Add a destination
-        dest = manager.add_destination("test_user", "/home/user/Documents/Test", "test")
+        dest = manager.add_destination("test_user", "/home/user/Documents/Test", "test", "test_client")
         
         # Remove it
         result = manager.remove_destination("test_user", dest.id)
@@ -138,9 +141,9 @@ def test_get_destinations_by_category():
     
     try:
         # Add destinations with different categories
-        manager.add_destination("test_user", "/home/user/Documents/Invoices", "invoice")
-        manager.add_destination("test_user", "/home/user/Documents/Invoices/2024", "invoice")
-        manager.add_destination("test_user", "/home/user/Documents/Receipts", "receipt")
+        manager.add_destination("test_user", "/home/user/Documents/Invoices", "invoice", "test_client")
+        manager.add_destination("test_user", "/home/user/Documents/Invoices/2024", "invoice", "test_client")
+        manager.add_destination("test_user", "/home/user/Documents/Receipts", "receipt", "test_client")
         
         # Get invoices
         invoices = manager.get_destinations_by_category("test_user", "invoice")
@@ -202,7 +205,7 @@ def test_auto_capture_destinations():
         ]
         
         # Auto-capture
-        captured = manager.auto_capture_destinations("test_user", operations)
+        captured = manager.auto_capture_destinations("test_user", operations, "test_client")
         
         assert len(captured) == 2, f"Expected 2 unique destinations, got {len(captured)}"
         print(f"✅ Captured {len(captured)} destinations")
@@ -216,7 +219,7 @@ def test_auto_capture_destinations():
         print(f"✅ Destinations saved to database")
         
         # Run again with same operations (should not create duplicates)
-        captured2 = manager.auto_capture_destinations("test_user", operations)
+        captured2 = manager.auto_capture_destinations("test_user", operations, "test_client")
         assert len(captured2) == 0, "Should not capture duplicates"
         print(f"✅ Duplicate prevention works")
         
@@ -235,7 +238,7 @@ def test_update_usage():
     
     try:
         # Add a destination
-        dest = manager.add_destination("test_user", "/home/user/Documents/Test", "test")
+        dest = manager.add_destination("test_user", "/home/user/Documents/Test", "test", "test_client")
         assert dest.usage_count == 0
         print(f"✅ Initial usage_count: {dest.usage_count}")
         
@@ -274,14 +277,14 @@ def test_get_usage_analytics():
     
     try:
         # Add destinations and update usage
-        dest1 = manager.add_destination("test_user", "/home/user/Documents/Invoices", "invoice")
+        dest1 = manager.add_destination("test_user", "/home/user/Documents/Invoices", "invoice", "test_client")
         manager.update_usage(dest1.id, 5, "move")
         manager.update_usage(dest1.id, 3, "move")
         
-        dest2 = manager.add_destination("test_user", "/home/user/Documents/Receipts", "receipt")
+        dest2 = manager.add_destination("test_user", "/home/user/Documents/Receipts", "receipt", "test_client")
         manager.update_usage(dest2.id, 10, "copy")
         
-        dest3 = manager.add_destination("test_user", "/home/user/Videos/Movies", "movie")
+        dest3 = manager.add_destination("test_user", "/home/user/Videos/Movies", "movie", "test_client")
         manager.update_usage(dest3.id, 2, "move")
         
         # Get analytics
@@ -312,6 +315,56 @@ def test_get_usage_analytics():
         os.unlink(db_path)
 
 
+def test_get_destinations_for_client():
+    """Test filtering destinations by client"""
+    print("\n=== Test: get_destinations_for_client ===")
+    
+    db_path = setup_test_db()
+    manager = DestinationMemoryManager(db_path)
+    
+    try:
+        import sqlite3
+        
+        # Create a drive and mount it on client1
+        with sqlite3.connect(str(db_path)) as conn:
+            drive_id = str(uuid.uuid4())
+            conn.execute("""
+                INSERT INTO drives (id, user_id, unique_identifier, mount_point, volume_label, drive_type, is_available, last_seen_at, created_at)
+                VALUES (?, 'test_user', 'USB-123', '/media/usb', 'USB Drive', 'usb', 1, datetime('now'), datetime('now'))
+            """, (drive_id,))
+            
+            # Mount on client1
+            mount_id = str(uuid.uuid4())
+            conn.execute("""
+                INSERT INTO drive_client_mounts (id, drive_id, client_id, mount_point, last_seen_at, is_available)
+                VALUES (?, ?, 'client1', '/media/usb', datetime('now'), 1)
+            """, (mount_id, drive_id))
+            
+            conn.commit()
+        
+        # Add destination on the USB drive
+        dest1 = manager.add_destination("test_user", "/media/usb/Documents", "document", "client1", drive_id)
+        
+        # Add destination on local drive (no drive_id)
+        dest2 = manager.add_destination("test_user", "/home/user/Downloads", "download", "client1", None)
+        
+        # Get destinations for client1 (should see both)
+        client1_dests = manager.get_destinations_for_client("test_user", "client1")
+        assert len(client1_dests) == 2, f"Client1 should see 2 destinations, got {len(client1_dests)}"
+        print(f"✅ Client1 sees {len(client1_dests)} destinations")
+        
+        # Get destinations for client2 (should only see local, not USB)
+        client2_dests = manager.get_destinations_for_client("test_user", "client2")
+        assert len(client2_dests) == 1, f"Client2 should see 1 destination, got {len(client2_dests)}"
+        assert client2_dests[0].path == str(Path("/home/user/Downloads").resolve())
+        print(f"✅ Client2 sees {len(client2_dests)} destination (local only)")
+        
+        print("✅ test_get_destinations_for_client passed")
+        
+    finally:
+        os.unlink(db_path)
+
+
 def run_all_tests():
     """Run all tests"""
     print("=" * 60)
@@ -327,6 +380,7 @@ def run_all_tests():
         test_auto_capture_destinations,
         test_update_usage,
         test_get_usage_analytics,
+        test_get_destinations_for_client,
     ]
     
     passed = 0
