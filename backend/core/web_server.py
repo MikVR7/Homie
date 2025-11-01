@@ -31,6 +31,9 @@ class WebServer:
     def __init__(self, components):
         self.components = components
         
+        # Expose app_manager for easy access in routes
+        self.app_manager = components.get('app_manager')
+        
         # Web server configuration - modify these values here
         self.host = '0.0.0.0'
         self.port = 8000

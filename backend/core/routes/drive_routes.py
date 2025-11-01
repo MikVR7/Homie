@@ -115,19 +115,27 @@ def register_drive_routes(app, web_server):
             client_id = data.get('client_id', 'default_client')
             
             # Extract drive info
+            unique_id = data.get('unique_identifier')
+            mount_point = data.get('mount_point')
+            
+            # If unique_identifier is empty or same as mount_point, use mount_point as identifier
+            # This is common for internal drives where we don't have a hardware UUID
+            if not unique_id or unique_id == mount_point:
+                unique_id = f"mount:{mount_point}"  # Prefix to make it clear it's a mount-based ID
+            
             drive_info = {
-                'unique_identifier': data.get('unique_identifier'),
-                'mount_point': data.get('mount_point'),
-                'volume_label': data.get('volume_label'),
+                'unique_identifier': unique_id,
+                'mount_point': mount_point,
+                'volume_label': data.get('volume_label') or mount_point,  # Use mount_point as fallback label
                 'drive_type': data.get('drive_type'),
                 'cloud_provider': data.get('cloud_provider')
             }
             
             # Validate required fields
-            if not drive_info['unique_identifier']:
+            if not drive_info['mount_point']:
                 return jsonify({
                     'success': False,
-                    'error': 'unique_identifier is required'
+                    'error': 'mount_point is required'
                 }), 400
             
             if not drive_info['mount_point']:
