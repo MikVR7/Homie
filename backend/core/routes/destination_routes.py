@@ -18,7 +18,7 @@ def register_destination_routes(app, web_server):
     def _get_destination_manager():
         """Get DestinationMemoryManager instance"""
         try:
-            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            file_organizer_app = web_server.app_manager.get_module('file_organizer')
             if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
                 path_mgr = file_organizer_app.path_memory_manager
                 if hasattr(path_mgr, '_destination_manager'):
@@ -30,7 +30,7 @@ def register_destination_routes(app, web_server):
     def _get_drive_manager():
         """Get DriveManager instance"""
         try:
-            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            file_organizer_app = web_server.app_manager.get_module('file_organizer')
             if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
                 path_mgr = file_organizer_app.path_memory_manager
                 if hasattr(path_mgr, '_drive_manager'):

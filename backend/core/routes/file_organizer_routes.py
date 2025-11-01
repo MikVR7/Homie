@@ -17,7 +17,7 @@ def register_file_organizer_routes(app, web_server):
     def _get_ai_context_builder():
         """Get AIContextBuilder instance"""
         try:
-            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            file_organizer_app = web_server.app_manager.get_module('file_organizer')
             if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
                 path_mgr = file_organizer_app.path_memory_manager
                 if hasattr(path_mgr, '_destination_manager') and hasattr(path_mgr, '_drive_manager'):
@@ -30,7 +30,7 @@ def register_file_organizer_routes(app, web_server):
     def _get_destination_manager():
         """Get DestinationMemoryManager instance"""
         try:
-            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            file_organizer_app = web_server.app_manager.get_module('file_organizer')
             if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
                 path_mgr = file_organizer_app.path_memory_manager
                 if hasattr(path_mgr, '_destination_manager'):
@@ -91,13 +91,13 @@ def register_file_organizer_routes(app, web_server):
                     logger.warning(f"Could not build AI context: {e}")
             
             # Use shared batch analysis method (SINGLE SOURCE OF TRUTH)
-            # Note: The batch analysis method would need to be updated to accept ai_context_text
-            # For now, we'll pass it through existing_folders parameter
+            # Note: ai_context is not yet supported by _batch_analyze_files
+            # TODO: Update _batch_analyze_files to accept and use ai_context
             batch_result = web_server._batch_analyze_files(
                 file_paths, 
                 use_ai=True, 
-                existing_folders=existing_folders,
-                ai_context=ai_context_text  # Pass context if method supports it
+                existing_folders=existing_folders
+                # ai_context will be added in future update
             )
             
             if not batch_result.get('success'):

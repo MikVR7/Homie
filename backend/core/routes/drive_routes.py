@@ -16,7 +16,7 @@ def register_drive_routes(app, web_server):
     def _get_drive_manager():
         """Get DriveManager instance"""
         try:
-            file_organizer_app = web_server.app_manager.get_module_app('file_organizer')
+            file_organizer_app = web_server.app_manager.get_module('file_organizer')
             if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
                 path_mgr = file_organizer_app.path_memory_manager
                 if hasattr(path_mgr, '_drive_manager'):
@@ -114,9 +114,20 @@ def register_drive_routes(app, web_server):
             user_id = data.get('user_id', 'dev_user')
             client_id = data.get('client_id', 'default_client')
             
+            # Log what we received for debugging
+            logger.debug(f"Drive registration request: {data}")
+            
             # Extract drive info
             unique_id = data.get('unique_identifier')
             mount_point = data.get('mount_point')
+            
+            # Validate mount_point first
+            if not mount_point:
+                logger.warning(f"Drive registration missing mount_point: {data}")
+                return jsonify({
+                    'success': False,
+                    'error': 'mount_point is required'
+                }), 400
             
             # If unique_identifier is empty or same as mount_point, use mount_point as identifier
             # This is common for internal drives where we don't have a hardware UUID
@@ -130,19 +141,6 @@ def register_drive_routes(app, web_server):
                 'drive_type': data.get('drive_type'),
                 'cloud_provider': data.get('cloud_provider')
             }
-            
-            # Validate required fields
-            if not drive_info['mount_point']:
-                return jsonify({
-                    'success': False,
-                    'error': 'mount_point is required'
-                }), 400
-            
-            if not drive_info['mount_point']:
-                return jsonify({
-                    'success': False,
-                    'error': 'mount_point is required'
-                }), 400
             
             if not drive_info['drive_type']:
                 return jsonify({
