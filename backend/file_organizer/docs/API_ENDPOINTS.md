@@ -261,6 +261,8 @@ fetch('/api/file-organizer/drives?user_id=user123')
 
 Register a new drive detected by frontend.
 
+**⚠️ DEPRECATED**: Use `POST /api/file-organizer/drives/batch` for better performance.
+
 **Request Body**:
 ```json
 {
@@ -350,6 +352,243 @@ fetch('/api/file-organizer/drives', {
       console.log('Drive registered:', data.drive.id);
     }
   });
+```
+
+---
+
+### POST /api/file-organizer/drives/batch
+
+Register multiple drives in a single request (RECOMMENDED).
+
+**Benefits**:
+- Reduces 5+ HTTP requests to 1
+- Faster initialization
+- Better database performance (single transaction)
+- Cleaner logs
+- Atomic operation (all succeed or all fail)
+
+**Request Body**:
+```json
+{
+  "user_id": "user123",
+  "client_id": "laptop1",
+  "drives": [
+    {
+      "mount_point": "/",
+      "drive_type": "fixed",
+      "volume_label": "System",
+      "unique_identifier": "mount:/",
+      "total_space": 1000000000000,
+      "available_space": 500000000000,
+      "is_available": true
+    },
+    {
+      "mount_point": "/home",
+      "drive_type": "fixed",
+      "volume_label": "Home",
+      "unique_identifier": "mount:/home",
+      "total_space": 2000000000000,
+      "available_space": 1000000000000,
+      "is_available": true
+    },
+    {
+      "mount_point": "/home/user/OneDrive",
+      "drive_type": "cloud",
+      "volume_label": "OneDrive",
+      "cloud_provider": "onedrive",
+      "unique_identifier": "onedrive:user@example.com",
+      "is_available": true
+    }
+  ]
+}
+```
+
+**Response** (201 Created):
+```json
+{
+  "success": true,
+  "drives": [
+    {
+      "id": "drive-uuid-123",
+      "unique_identifier": "mount:/",
+      "mount_point": "/",
+      "volume_label": "System",
+      "drive_type": "fixed",
+      "cloud_provider": null,
+      "is_available": true,
+      "available_space_gb": 465.7,
+      "last_seen_at": "2025-11-10T10:00:00Z",
+      "created_at": "2025-11-10T10:00:00Z",
+      "client_mounts": [
+        {
+          "client_id": "laptop1",
+          "mount_point": "/",
+          "is_available": true,
+          "last_seen_at": "2025-11-10T10:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "drive-uuid-456",
+      "unique_identifier": "mount:/home",
+      "mount_point": "/home",
+      "volume_label": "Home",
+      "drive_type": "fixed",
+      "cloud_provider": null,
+      "is_available": true,
+      "available_space_gb": 931.3,
+      "last_seen_at": "2025-11-10T10:00:00Z",
+      "created_at": "2025-11-10T10:00:00Z",
+      "client_mounts": [
+        {
+          "client_id": "laptop1",
+          "mount_point": "/home",
+          "is_available": true,
+          "last_seen_at": "2025-11-10T10:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "drive-uuid-789",
+      "unique_identifier": "onedrive:user@example.com",
+      "mount_point": "/home/user/OneDrive",
+      "volume_label": "OneDrive",
+      "drive_type": "cloud",
+      "cloud_provider": "onedrive",
+      "is_available": true,
+      "last_seen_at": "2025-11-10T10:00:00Z",
+      "created_at": "2025-11-10T10:00:00Z",
+      "client_mounts": [
+        {
+          "client_id": "laptop1",
+          "mount_point": "/home/user/OneDrive",
+          "is_available": true,
+          "last_seen_at": "2025-11-10T10:00:00Z"
+        }
+      ]
+    }
+  ],
+  "count": 3
+}
+```
+
+**Validation**:
+- `drives` must be an array
+- `drives` array cannot be empty
+- Each drive must have `mount_point` (required)
+- Each drive must have `drive_type` (required)
+- `unique_identifier` is optional (auto-generated from mount_point if missing)
+- `volume_label` is optional (defaults to mount_point)
+
+**Drive Object Structure**:
+```typescript
+interface Drive {
+  mount_point: string;           // Required: e.g., "/", "/home", "/media/usb"
+  drive_type: string;             // Required: "fixed", "usb", "cloud"
+  volume_label?: string;          // Optional: Human-readable name
+  unique_identifier?: string;     // Optional: Auto-generated if missing
+  cloud_provider?: string;        // Optional: "onedrive", "dropbox", "google_drive"
+  total_space?: number;           // Optional: Total space in bytes
+  available_space?: number;       // Optional: Available space in bytes
+  is_available?: boolean;         // Optional: Defaults to true
+}
+```
+
+**Behavior**:
+- For each drive: checks if it exists (by unique_identifier)
+- If exists: updates the drive record
+- If new: creates a new drive record
+- All operations happen in a single database transaction
+- If any drive fails validation, entire batch fails (atomic)
+
+**Error Responses**:
+
+400 Bad Request - Invalid input:
+```json
+{
+  "success": false,
+  "error": "drives must be an array"
+}
+```
+
+400 Bad Request - Empty array:
+```json
+{
+  "success": false,
+  "error": "drives array cannot be empty"
+}
+```
+
+500 Internal Server Error:
+```json
+{
+  "success": false,
+  "error": "DriveManager not available"
+}
+```
+
+**Example**:
+```javascript
+// Frontend initialization - register all detected drives at once
+const detectedDrives = [
+  { mount_point: '/', drive_type: 'fixed', volume_label: 'System' },
+  { mount_point: '/home', drive_type: 'fixed', volume_label: 'Home' },
+  { mount_point: '/media/usb', drive_type: 'usb', volume_label: 'MyUSB' },
+  { mount_point: '/home/user/OneDrive', drive_type: 'cloud', cloud_provider: 'onedrive' }
+];
+
+fetch('/api/file-organizer/drives/batch', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_id: 'user123',
+    client_id: 'laptop1',
+    drives: detectedDrives
+  })
+})
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      console.log(`Registered ${data.count} drives in one request`);
+      console.log('Drives:', data.drives);
+    }
+  });
+```
+
+**Performance Comparison**:
+
+Old approach (5 drives):
+```
+5 HTTP requests × ~50ms = ~250ms
+5 database transactions
+5 log entries
+```
+
+New approach (5 drives):
+```
+1 HTTP request × ~50ms = ~50ms
+1 database transaction
+1 log entry
+```
+
+**Migration Guide**:
+
+Before (multiple requests):
+```javascript
+for (const drive of detectedDrives) {
+  await fetch('/api/file-organizer/drives', {
+    method: 'POST',
+    body: JSON.stringify({ ...drive, user_id, client_id })
+  });
+}
+```
+
+After (single batch request):
+```javascript
+await fetch('/api/file-organizer/drives/batch', {
+  method: 'POST',
+  body: JSON.stringify({ user_id, client_id, drives: detectedDrives })
+});
 ```
 
 ---

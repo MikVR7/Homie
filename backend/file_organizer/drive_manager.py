@@ -225,6 +225,155 @@ class DriveManager:
             logger.error(f"Error registering drive: {e}")
             return None
 
+    def register_drives_batch(
+        self,
+        user_id: str,
+        drives_data: List[Dict[str, Any]],
+        client_id: str
+    ) -> Optional[List[Drive]]:
+        """
+        Register or update multiple drives in a single transaction.
+        
+        This is the PREFERRED method for bulk drive registration from frontends.
+        All drives are processed atomically - either all succeed or all fail.
+        
+        Args:
+            user_id: User identifier
+            drives_data: List of drive info dictionaries, each containing:
+                - unique_identifier: Hardware/cloud identifier (optional, will be generated)
+                - mount_point: Local mount path on this client (REQUIRED)
+                - volume_label: Human-readable label (optional)
+                - drive_type: 'internal', 'usb', 'cloud' (REQUIRED)
+                - cloud_provider: 'onedrive', 'dropbox', etc. (optional)
+            client_id: Client/laptop identifier reporting these drives
+            
+        Returns:
+            List of Drive objects if successful, None on error
+            
+        Benefits:
+        - Single database transaction (atomic)
+        - Better performance than multiple individual calls
+        - Reduced network overhead
+        - Cleaner logs
+        """
+        try:
+            now = datetime.now().isoformat()
+            registered_drives = []
+            
+            # Validate all drives first
+            for idx, drive_data in enumerate(drives_data):
+                mount_point = drive_data.get('mount_point')
+                drive_type = drive_data.get('drive_type')
+                
+                if not mount_point:
+                    logger.error(f"Drive {idx} missing mount_point: {drive_data}")
+                    return None
+                
+                if not drive_type:
+                    logger.error(f"Drive {idx} missing drive_type: {drive_data}")
+                    return None
+            
+            # Process all drives in a single transaction
+            with self._get_db_connection() as conn:
+                for drive_data in drives_data:
+                    # Extract and normalize drive info
+                    unique_id = drive_data.get('unique_identifier')
+                    mount_point = drive_data.get('mount_point')
+                    drive_type = drive_data.get('drive_type')
+                    volume_label = drive_data.get('volume_label') or mount_point
+                    cloud_provider = drive_data.get('cloud_provider')
+                    
+                    # Generate unique_identifier if not provided
+                    if not unique_id or unique_id == mount_point:
+                        unique_id = f"mount:{mount_point}"
+                    
+                    # Check if drive exists
+                    cursor = conn.execute("""
+                        SELECT id, user_id, unique_identifier, mount_point, volume_label,
+                               drive_type, cloud_provider, is_available, last_seen_at, created_at
+                        FROM drives
+                        WHERE user_id = ? AND unique_identifier = ?
+                    """, (user_id, unique_id))
+                    
+                    existing_row = cursor.fetchone()
+                    
+                    if existing_row:
+                        # Drive exists - update it
+                        drive_id = existing_row['id']
+                        
+                        conn.execute("""
+                            UPDATE drives
+                            SET mount_point = ?,
+                                volume_label = ?,
+                                is_available = 1,
+                                last_seen_at = ?
+                            WHERE id = ?
+                        """, (mount_point, volume_label, now, drive_id))
+                        
+                        logger.debug(f"Updated drive {drive_id} ({unique_id})")
+                        
+                    else:
+                        # New drive - create it
+                        drive_id = str(uuid.uuid4())
+                        
+                        conn.execute("""
+                            INSERT INTO drives 
+                            (id, user_id, unique_identifier, mount_point, volume_label, 
+                             drive_type, cloud_provider, is_available, last_seen_at, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                        """, (drive_id, user_id, unique_id, mount_point, volume_label,
+                              drive_type, cloud_provider, now, now))
+                        
+                        logger.debug(f"Created drive {drive_id} ({unique_id})")
+                    
+                    # Update or create client mount
+                    mount_id = str(uuid.uuid4())
+                    conn.execute("""
+                        INSERT INTO drive_client_mounts 
+                        (id, drive_id, client_id, mount_point, last_seen_at, is_available)
+                        VALUES (?, ?, ?, ?, ?, 1)
+                        ON CONFLICT(drive_id, client_id) DO UPDATE SET
+                            mount_point = excluded.mount_point,
+                            last_seen_at = excluded.last_seen_at,
+                            is_available = 1
+                    """, (mount_id, drive_id, client_id, mount_point, now))
+                    
+                    # Retrieve the drive with mounts
+                    cursor = conn.execute("""
+                        SELECT id, user_id, unique_identifier, mount_point, volume_label,
+                               drive_type, cloud_provider, is_available, last_seen_at, created_at
+                        FROM drives
+                        WHERE id = ?
+                    """, (drive_id,))
+                    
+                    row = cursor.fetchone()
+                    if row:
+                        drive = Drive.from_db_row(row)
+                        
+                        # Load client mounts
+                        mount_cursor = conn.execute("""
+                            SELECT id, drive_id, client_id, mount_point, last_seen_at, is_available
+                            FROM drive_client_mounts
+                            WHERE drive_id = ?
+                        """, (drive_id,))
+                        
+                        drive.client_mounts = []
+                        for mount_row in mount_cursor.fetchall():
+                            mount = DriveClientMount.from_db_row(mount_row)
+                            drive.client_mounts.append(mount)
+                        
+                        registered_drives.append(drive)
+                
+                # Commit all changes atomically
+                conn.commit()
+                
+                logger.info(f"Batch registered {len(registered_drives)} drives for user {user_id} from client {client_id}")
+                return registered_drives
+                
+        except Exception as e:
+            logger.error(f"Error in batch drive registration: {e}", exc_info=True)
+            return None
+
     def update_drive_availability(
         self, 
         user_id: str, 

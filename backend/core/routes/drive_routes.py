@@ -17,12 +17,26 @@ def register_drive_routes(app, web_server):
         """Get DriveManager instance"""
         try:
             file_organizer_app = web_server.app_manager.get_module('file_organizer')
-            if file_organizer_app and hasattr(file_organizer_app, 'path_memory_manager'):
+            if not file_organizer_app:
+                logger.warning("FileOrganizerApp not found")
+                return None
+                
+            # Check if module is started
+            module_info = web_server.app_manager.registered_modules.get('file_organizer', {})
+            if not module_info.get('started', False):
+                logger.warning("FileOrganizerApp not started - module needs to be started first")
+                return None
+            
+            if hasattr(file_organizer_app, 'path_memory_manager'):
                 path_mgr = file_organizer_app.path_memory_manager
                 if hasattr(path_mgr, '_drive_manager'):
                     return path_mgr._drive_manager
+                else:
+                    logger.warning("PathMemoryManager has no _drive_manager attribute")
+            else:
+                logger.warning("FileOrganizerApp has no path_memory_manager attribute")
         except Exception as e:
-            logger.warning(f"Could not get DriveManager: {e}")
+            logger.error(f"Could not get DriveManager: {e}", exc_info=True)
         return None
 
     def _get_available_space(mount_point: str) -> float:
@@ -41,11 +55,16 @@ def register_drive_routes(app, web_server):
 
     @app.route('/api/file-organizer/drives', methods=['GET', 'POST'])
     def fo_drives():
-        """Get or register drives"""
+        """Get or register drives (deprecated for POST - use /drives/batch instead)"""
         if request.method == 'GET':
             return _get_drives()
         else:
             return _register_drive()
+
+    @app.route('/api/file-organizer/drives/batch', methods=['POST'])
+    def fo_drives_batch():
+        """Register multiple drives in a single request"""
+        return _register_drives_batch()
 
     def _get_drives():
         """Retrieve all known drives for current user"""
@@ -108,7 +127,7 @@ def register_drive_routes(app, web_server):
             return jsonify({'success': False, 'error': str(e)}), 500
 
     def _register_drive():
-        """Register a new drive detected by frontend"""
+        """Register a new drive detected by frontend (deprecated - use batch endpoint)"""
         try:
             data = request.get_json(force=True, silent=True) or {}
             user_id = data.get('user_id', 'dev_user')
@@ -198,6 +217,89 @@ def register_drive_routes(app, web_server):
             
         except Exception as e:
             logger.error(f"POST /drives error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    def _register_drives_batch():
+        """Register multiple drives in a single request with transaction support"""
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            user_id = data.get('user_id', 'dev_user')
+            client_id = data.get('client_id', 'default_client')
+            drives_data = data.get('drives', [])
+            
+            # Validate input
+            if not isinstance(drives_data, list):
+                return jsonify({
+                    'success': False,
+                    'error': 'drives must be an array'
+                }), 400
+            
+            if not drives_data:
+                return jsonify({
+                    'success': False,
+                    'error': 'drives array cannot be empty'
+                }), 400
+            
+            logger.info(f"Batch drive registration: {len(drives_data)} drives from client {client_id}")
+            
+            drive_manager = _get_drive_manager()
+            
+            if not drive_manager:
+                return jsonify({
+                    'success': False,
+                    'error': 'DriveManager not available'
+                }), 500
+            
+            # Process all drives in a batch
+            registered_drives = drive_manager.register_drives_batch(user_id, drives_data, client_id)
+            
+            if registered_drives is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to register drives'
+                }), 500
+            
+            # Format response
+            result = []
+            for drive in registered_drives:
+                drive_dict = {
+                    'id': drive.id,
+                    'unique_identifier': drive.unique_identifier,
+                    'mount_point': drive.mount_point,
+                    'volume_label': drive.volume_label,
+                    'drive_type': drive.drive_type,
+                    'cloud_provider': drive.cloud_provider,
+                    'is_available': drive.is_available,
+                    'last_seen_at': drive.last_seen_at.isoformat() if drive.last_seen_at else None,
+                    'created_at': drive.created_at.isoformat() if drive.created_at else None
+                }
+                
+                # Add available space
+                available_space = _get_available_space(drive.mount_point)
+                if available_space is not None:
+                    drive_dict['available_space_gb'] = available_space
+                
+                # Add client mounts
+                if drive.client_mounts:
+                    drive_dict['client_mounts'] = []
+                    for mount in drive.client_mounts:
+                        drive_dict['client_mounts'].append({
+                            'client_id': mount.client_id,
+                            'mount_point': mount.mount_point,
+                            'is_available': mount.is_available,
+                            'last_seen_at': mount.last_seen_at.isoformat() if mount.last_seen_at else None
+                        })
+                
+                result.append(drive_dict)
+            
+            return jsonify({
+                'success': True,
+                'drives': result,
+                'count': len(result)
+            }), 201
+            
+        except Exception as e:
+            logger.error(f"POST /drives/batch error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/file-organizer/drives/<drive_id>', methods=['GET'])
