@@ -239,6 +239,83 @@ def register_destination_routes(app, web_server):
             logger.error(f"DELETE /destinations/{destination_id} error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
+    @app.route('/api/file-organizer/destinations/capture', methods=['POST'])
+    def fo_capture_destinations():
+        """Auto-capture destinations from file operations"""
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            user_id = data.get('user_id', 'dev_user')
+            client_id = data.get('client_id', 'default_client')
+            operations = data.get('operations', [])
+            
+            if not operations:
+                return jsonify({'success': True, 'destinations': []})
+            
+            logger.info(f"📸 Capture request received: {len(operations)} operations")
+            
+            dest_manager = _get_destination_manager()
+            drive_manager = _get_drive_manager()
+            
+            if not dest_manager:
+                logger.error("DestinationMemoryManager not available")
+                return jsonify({'success': False, 'error': 'DestinationMemoryManager not available'}), 500
+            
+            # Convert operations to the format expected by auto_capture
+            formatted_ops = []
+            for op in operations:
+                formatted_ops.append({
+                    'source': op.get('source'),
+                    'destination': op.get('destination'),
+                    'type': op.get('type', 'move')
+                })
+            
+            logger.info(f"🔍 Formatted operations: {formatted_ops}")
+            
+            # Auto-capture destinations
+            captured_destinations = dest_manager.auto_capture_destinations(
+                user_id=user_id,
+                operations=formatted_ops,
+                client_id=client_id
+            )
+            
+            logger.info(f"✅ Captured {len(captured_destinations)} destinations")
+            
+            # Format response
+            result = []
+            for dest in captured_destinations:
+                dest_dict = {
+                    'id': dest.id,
+                    'path': dest.path,
+                    'category': dest.category,
+                    'drive_id': dest.drive_id,
+                    'usage_count': dest.usage_count,
+                    'last_used_at': dest.last_used_at.isoformat() if dest.last_used_at else None,
+                    'created_at': dest.created_at.isoformat() if dest.created_at else None,
+                    'is_active': dest.is_active
+                }
+                
+                # Add drive information if available
+                if drive_manager and dest.drive_id:
+                    try:
+                        client_drives = drive_manager.get_client_drives(user_id, client_id)
+                        drive = next((d for d in client_drives if d.id == dest.drive_id), None)
+                        if drive:
+                            dest_dict['drive_type'] = drive.drive_type
+                            dest_dict['drive_label'] = drive.volume_label
+                            dest_dict['cloud_provider'] = drive.cloud_provider
+                            dest_dict['is_available'] = drive.is_available
+                    except Exception as e:
+                        logger.debug(f"Could not get drive info: {e}")
+                
+                result.append(dest_dict)
+            
+            return jsonify({'success': True, 'destinations': result})
+            
+        except Exception as e:
+            logger.error(f"POST /destinations/capture error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
     # Legacy endpoint for backward compatibility
     @app.route('/api/file-organizer/delete-destination', methods=['POST'])
     def fo_delete_destination_legacy():

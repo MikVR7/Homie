@@ -108,6 +108,11 @@ class HomieOrchestrator:
         await app_manager.register_all_modules()
         
         logger.info("✅ AppManager ready; modules registered (not started)")
+        
+        # Start file_organizer module immediately for API access
+        logger.info("🚀 Starting file_organizer module...")
+        await app_manager.start_module('file_organizer')
+        logger.info("✅ file_organizer module started")
     
     async def _start_web_server(self):
         """Start the web server"""
