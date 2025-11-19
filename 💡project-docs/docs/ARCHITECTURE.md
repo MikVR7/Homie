@@ -1,5 +1,13 @@
 # Homie Architecture
 
+## Review
+
+Let's review the architecture documentation for any outdated information.
+
+## Event System Architecture
+
+Let me check the event system architecture to understand the centralized event handling pattern.
+
 ## File Organizer AI Features
 
 ### Context-Aware Organization
@@ -602,7 +610,12 @@ Each module can be:
 
 
 
-<!-- Last updated: 2025-10-21 18:48 - Reason: Added new features for 'Add Granularity' and 'Disagree with Alternatives', requiring an update to the project's architectural documentation to reflect these changes. -->
+
+
+
+
+
+<!-- Last updated: 2025-11-17 07:03 - Reason: Updating the documentation to reflect the 'Orchestrator Window' pattern, which is a more accurate description of the architecture we have implemented. -->
 
 ## ### Phase 7: Granular & Alternative Suggestions (Complete)
 
@@ -626,3 +639,37 @@ This phase introduced more nuanced user interaction with the AI's suggestions.
   - The "Why?" button (`?`) fetches an on-demand explanation for a file's suggested location from the `/api/file-organizer/explain-operation` endpoint.
   - The explanation is displayed in a custom dialog window.
   - The fetched reason is cached on the `FileViewModel` to avoid redundant API calls.
+
+## 
+## Event System: The Instance-Based Event Aggregator Pattern
+
+
+## Event System: The "Orchestrator Window" Pattern
+
+For creating major views and workflows, this module uses the "Orchestrator Window" pattern. The `FileOrganizerWindow` acts as the central orchestrator, while UI components (like buttons in `AreaTop`) act as simple triggers.
+
+### How It Works
+
+1.  **Central Orchestrator**: The `FileOrganizerWindow` is responsible for initializing and owning all major services (e.g., `DestinationsService`, `DestinationMemoryService`). It is the single source of truth for these dependencies.
+
+2.  **Static "In_" Events**: The `FileOrganizerWindow` defines and owns public `static readonly` `In_` events for major actions (e.g., `In_StartNewAnalysis`, `In_OpenDestinationManagement`). These events serve as the public API for the orchestrator.
+
+3.  **Direct Invocation from UI**: Any component, no matter how deeply nested, can request a major action by directly invoking the static event on the orchestrator. For example, a button in `AreaTop` makes a direct call:
+    ```csharp
+    // In AreaTop.axaml.cs
+    letsSortButton.Click += (_, _) => FileOrganizerWindow.In_StartNewAnalysis.Invoke();
+    ```
+
+4.  **Orchestrator Listens to Itself**: The `FileOrganizerWindow` instance subscribes to its *own* static events in its constructor.
+
+5.  **Creation and Placement**: The event handler within `FileOrganizerWindow` is responsible for:
+    *   Creating the new workflow or view (e.g., `new FolderAnalysisSession(...)`).
+    *   Injecting the necessary service dependencies that it owns.
+    *   Telling a layout manager (like `AreasHandler`) to display the newly created view.
+
+### Benefits
+
+-   **Clear Responsibility**: `FileOrganizerWindow` is the single place where complex object creation occurs.
+-   **Extreme Decoupling**: UI components like `AreaTop` and `AreasHandler` are completely decoupled. They don't need to know about services or complex workflows; they only need to know how to signal an intent to the orchestrator.
+-   **No Event Bubbling**: This pattern avoids complex and brittle event bubbling chains (e.g., `AreaTop` -> `AreasHandler` -> `Window`).
+
