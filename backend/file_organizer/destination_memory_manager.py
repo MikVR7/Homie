@@ -160,6 +160,7 @@ class DestinationMemoryManager:
     def remove_destination(self, user_id: str, destination_id: str) -> bool:
         """
         Mark a destination as inactive (soft delete).
+        Also cascades to deactivate any child destinations under the same path.
         
         Args:
             user_id: User identifier
@@ -170,20 +171,49 @@ class DestinationMemoryManager:
         """
         try:
             with self._get_db_connection() as conn:
+                # First, get the path of the destination being deleted
+                cursor = conn.execute("""
+                    SELECT path FROM destinations
+                    WHERE id = ? AND user_id = ?
+                """, (destination_id, user_id))
+                
+                row = cursor.fetchone()
+                if not row:
+                    logger.warning(f"Destination not found: {destination_id}")
+                    return False
+                
+                destination_path = row['path']
+                
+                # Normalize path to ensure consistent matching
+                normalized_path = str(Path(destination_path).resolve())
+                
+                # Deactivate the destination itself
                 cursor = conn.execute("""
                     UPDATE destinations
                     SET is_active = 0
                     WHERE id = ? AND user_id = ?
                 """, (destination_id, user_id))
                 
+                # Cascade: deactivate all child destinations (paths that start with this path)
+                # Use LIKE with trailing slash to match children only
+                cascade_cursor = conn.execute("""
+                    UPDATE destinations
+                    SET is_active = 0
+                    WHERE user_id = ? 
+                      AND is_active = 1
+                      AND (path LIKE ? OR path LIKE ?)
+                """, (user_id, f"{normalized_path}/%", f"{destination_path}/%"))
+                
+                cascaded_count = cascade_cursor.rowcount
+                
                 conn.commit()
                 
-                if cursor.rowcount > 0:
-                    logger.info(f"Removed destination: {destination_id}")
-                    return True
+                if cascaded_count > 0:
+                    logger.info(f"Removed destination {destination_id} and cascaded to {cascaded_count} child destination(s)")
                 else:
-                    logger.warning(f"Destination not found: {destination_id}")
-                    return False
+                    logger.info(f"Removed destination: {destination_id}")
+                
+                return True
                     
         except Exception as e:
             logger.error(f"Error removing destination {destination_id}: {e}")
