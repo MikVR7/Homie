@@ -48,6 +48,9 @@ def register_file_organizer_routes(app, web_server):
             organization_style = data.get('organization_style', 'by_type')
             user_id = data.get('user_id', 'dev_user')
             client_id = data.get('client_id', 'default_client')
+            
+            # Frontend can optionally provide explicit file list (including nested files)
+            provided_file_paths = data.get('file_paths', [])
 
             if not source_folder:
                 return jsonify({'success': False, 'error': 'source_path required'}), 400
@@ -71,8 +74,18 @@ def register_file_organizer_routes(app, web_server):
             if not src_path.exists() or not src_path.is_dir():
                 return jsonify({'success': False, 'error': f'source_folder not found: {source_folder}'}), 400
 
-            files = [p for p in src_path.iterdir() if p.is_file()]
-            file_paths = [str(f) for f in files]
+            # Use provided file paths if available (includes nested files from frontend)
+            # Otherwise, scan only root-level files (legacy behavior)
+            if provided_file_paths:
+                logger.info(f"Using {len(provided_file_paths)} file paths provided by frontend")
+                file_paths = provided_file_paths
+                files = [Path(fp) for fp in file_paths if Path(fp).exists() and Path(fp).is_file()]
+            else:
+                logger.info(f"Scanning root-level files in {source_folder}")
+                files = [p for p in src_path.iterdir() if p.is_file()]
+                file_paths = [str(f) for f in files]
+            
+            logger.info(f"Processing {len(file_paths)} files for organization")
             
             # Get existing folders in destination for context-aware organization
             existing_folders = []
@@ -110,6 +123,8 @@ def register_file_organizer_routes(app, web_server):
             errors = []
             results = batch_result.get('results', {})
             
+            logger.info(f"Batch analysis returned {len(results)} results for {len(files)} files")
+            
             for f in files:
                 file_path = str(f)
                 file_result = results.get(file_path)
@@ -117,9 +132,20 @@ def register_file_organizer_routes(app, web_server):
                 if not file_result:
                     error_msg = f"No analysis result for {f.name}"
                     logger.warning(error_msg)
+                    
+                    # FALLBACK: Create an "Uncategorized" operation instead of skipping
+                    # This ensures every file gets an operation
+                    dest_path = dest_root / 'Uncategorized' / f.name
+                    operations.append({
+                        'type': 'move',
+                        'source': file_path,
+                        'destination': str(dest_path),
+                        'reason_hint': 'No AI analysis result - defaulting to Uncategorized'
+                    })
+                    
                     errors.append({
                         'file': file_path,
-                        'error': 'No analysis result returned'
+                        'error': 'No analysis result returned - using fallback'
                     })
                     continue
                 
@@ -145,13 +171,33 @@ def register_file_organizer_routes(app, web_server):
                     })
                 else:
                     # Regular move operation
-                    dest_path = dest_root / suggested_folder / f.name
+                    # Preserve relative subfolder structure for nested files
+                    try:
+                        # Get relative path from source folder
+                        relative_path = f.relative_to(src_path)
+                        # If file is nested, preserve the subfolder structure
+                        if len(relative_path.parts) > 1:
+                            # File is in a subfolder - preserve the structure
+                            dest_path = dest_root / suggested_folder / relative_path
+                        else:
+                            # File is at root level
+                            dest_path = dest_root / suggested_folder / f.name
+                    except ValueError:
+                        # File is not relative to source path (shouldn't happen)
+                        dest_path = dest_root / suggested_folder / f.name
+                    
                     operations.append({
                         'type': 'move',
                         'source': file_path,
                         'destination': str(dest_path),
                         # reason will be generated on-demand via /explain endpoint
                     })
+            
+            # Validate: operations count should match input files count
+            logger.info(f"Generated {len(operations)} operations for {len(files)} input files")
+            if len(operations) != len(files):
+                logger.warning(f"MISMATCH: Expected {len(files)} operations but got {len(operations)}")
+                logger.warning(f"Missing files: {set(str(f) for f in files) - set(op['source'] for op in operations)}")
             
             # If ALL files failed, return error
             if not operations and errors:
