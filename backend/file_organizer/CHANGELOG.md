@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added - 2025-11-19
+
+#### Multi-Step File Plans
+- New `file_plans` array in `/api/file-organizer/organize` response
+- Supports multi-step workflows per file (move → rename → tag)
+- Each file gets exactly one plan with ordered steps
+- Atomic execution: stops on first step failure per file
+- Backward compatible: legacy `operations` array still included
+- Per-step success/failure reporting in execution response
+- See `test_file_plans.py` for structure examples
+
 ### Added - 2025-11-10
 
 #### Batch Drive Registration

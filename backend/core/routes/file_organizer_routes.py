@@ -14,6 +14,389 @@ logger = logging.getLogger('FileOrganizerRoutes')
 def register_file_organizer_routes(app, web_server):
     """Register file organizer routes with the Flask app"""
     
+    def _execute_single_step(step, source_path):
+        """Execute a single step of a file plan. Returns (success, error_message)"""
+        import shutil
+        import os
+        
+        step_type = step['type']
+        target_path = step.get('target_path')
+        
+        try:
+            if step_type == 'delete':
+                os.remove(source_path)
+                logger.info(f"Deleted: {source_path}")
+                return True, None
+                
+            elif step_type == 'unpack':
+                dest_dir = Path(target_path)
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                
+                file_ext = Path(source_path).suffix.lower()
+                if file_ext == '.zip':
+                    import zipfile
+                    with zipfile.ZipFile(source_path, 'r') as zf:
+                        zf.extractall(dest_dir)
+                elif file_ext == '.rar':
+                    try:
+                        import rarfile
+                        with rarfile.RarFile(source_path, 'r') as rf:
+                            rf.extractall(dest_dir)
+                    except ImportError:
+                        return False, "RAR support not available"
+                elif file_ext == '.7z':
+                    try:
+                        import py7zr
+                        with py7zr.SevenZipFile(source_path, 'r') as szf:
+                            szf.extractall(dest_dir)
+                    except ImportError:
+                        return False, "7z support not available"
+                else:
+                    return False, f"Unsupported archive format: {file_ext}"
+                
+                logger.info(f"Unpacked {source_path} to {dest_dir}")
+                return True, None
+                
+            elif step_type == 'move':
+                dest_dir = Path(target_path).parent
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.move(source_path, target_path)
+                logger.info(f"Moved {source_path} to {target_path}")
+                return True, None
+                
+            elif step_type == 'copy':
+                dest_dir = Path(target_path).parent
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, target_path)
+                logger.info(f"Copied {source_path} to {target_path}")
+                return True, None
+                
+            elif step_type == 'rename':
+                dest_dir = Path(target_path).parent
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.move(source_path, target_path)
+                logger.info(f"Renamed {source_path} to {target_path}")
+                return True, None
+                
+            else:
+                return False, f"Unknown step type: {step_type}"
+                
+        except Exception as e:
+            logger.error(f"Step execution error: {e}")
+            return False, str(e)
+    
+    def _execute_file_plans(data, analysis_id, file_plans, web_server):
+        """Execute file plans with multi-step atomic operations per file"""
+        from datetime import datetime
+        import json
+        
+        user_id = data.get('user_id', 'dev_user')
+        client_id = data.get('client_id', 'default_client')
+        
+        plan_results = []
+        successful_files = 0
+        failed_files = 0
+        
+        for plan in file_plans:
+            source = plan['source']
+            steps = plan['steps']
+            
+            plan_result = {
+                'source': source,
+                'success': True,
+                'steps': []
+            }
+            
+            # Execute steps sequentially - stop on first failure
+            current_path = source
+            for step in sorted(steps, key=lambda s: s['order']):
+                step_result = {
+                    'operation_id': step['operation_id'],
+                    'type': step['type'],
+                    'order': step['order'],
+                    'success': False,
+                    'error': None
+                }
+                
+                success, error = _execute_single_step(step, current_path)
+                step_result['success'] = success
+                step_result['error'] = error
+                
+                plan_result['steps'].append(step_result)
+                
+                if not success:
+                    # Step failed - stop executing this plan
+                    plan_result['success'] = False
+                    plan_result['error'] = f"Step {step['order']} failed: {error}"
+                    logger.error(f"Plan failed for {source} at step {step['order']}: {error}")
+                    break
+                
+                # Update current path for next step (if file was moved/renamed)
+                if step['type'] in ['move', 'rename', 'copy']:
+                    current_path = step['target_path']
+            
+            plan_results.append(plan_result)
+            
+            if plan_result['success']:
+                successful_files += 1
+            else:
+                failed_files += 1
+        
+        # Auto-capture destinations from successful operations
+        new_destinations = []
+        dest_manager = _get_destination_manager()
+        if dest_manager and successful_files > 0:
+            try:
+                # Build operations list for auto-capture
+                successful_ops = []
+                for plan_result in plan_results:
+                    if plan_result['success']:
+                        for step_result in plan_result['steps']:
+                            if step_result['success'] and step_result['type'] in ['move', 'copy']:
+                                # Find the step details from original plan
+                                for plan in file_plans:
+                                    if plan['source'] == plan_result['source']:
+                                        for step in plan['steps']:
+                                            if step['operation_id'] == step_result['operation_id']:
+                                                successful_ops.append({
+                                                    'type': step['type'],
+                                                    'dest': step['target_path']
+                                                })
+                                                break
+                
+                if successful_ops:
+                    captured = dest_manager.auto_capture_destinations(
+                        user_id, successful_ops, client_id
+                    )
+                    
+                    for dest in captured:
+                        dest_manager.update_usage(dest.id, file_count=1, operation_type='move')
+                    
+                    new_destinations = [
+                        {
+                            'path': dest.path,
+                            'category': dest.category,
+                            'id': dest.id
+                        }
+                        for dest in captured
+                    ]
+                    
+                    if new_destinations:
+                        logger.info(f"Auto-captured {len(new_destinations)} new destination(s)")
+            
+            except Exception as capture_error:
+                logger.warning(f"Could not auto-capture destinations: {capture_error}")
+        
+        response = {
+            'success': True,
+            'analysis_id': analysis_id,
+            'plan_results': plan_results,
+            'summary': {
+                'total_files': len(file_plans),
+                'successful_files': successful_files,
+                'failed_files': failed_files
+            }
+        }
+        
+        if new_destinations:
+            response['new_destinations_captured'] = new_destinations
+        
+        return jsonify(response)
+    
+    def _execute_legacy_operations(data, analysis_id, operation_ids, web_server):
+        """Execute operations using legacy format (backward compatibility)"""
+        from datetime import datetime
+        
+        user_id = data.get('user_id', 'dev_user')
+        client_id = data.get('client_id', 'default_client')
+        
+        conn = web_server._get_file_organizer_db_connection()
+        
+        try:
+            results = []
+            for op_id in operation_ids:
+                # Get operation details
+                cursor = conn.execute("""
+                    SELECT operation_type, source_path, destination_path
+                    FROM analysis_operations
+                    WHERE operation_id = ? AND analysis_id = ?
+                """, (op_id, analysis_id))
+                
+                row = cursor.fetchone()
+                if not row:
+                    results.append({'operation_id': op_id, 'success': False, 'error': 'Operation not found'})
+                    continue
+                
+                op_type, source, dest = row
+                
+                # Create a step object for execution
+                step = {
+                    'type': op_type,
+                    'target_path': dest
+                }
+                
+                success, error = _execute_single_step(step, source)
+                
+                if success:
+                    # Update operation status
+                    conn.execute("""
+                        UPDATE analysis_operations
+                        SET operation_status = 'applied', applied_at = ?
+                        WHERE operation_id = ?
+                    """, (datetime.now().isoformat(), op_id))
+                    
+                    results.append({'operation_id': op_id, 'success': True})
+                else:
+                    results.append({'operation_id': op_id, 'success': False, 'error': error})
+            
+            conn.commit()
+            
+            # Auto-capture destinations from successful operations
+            new_destinations = []
+            dest_manager = _get_destination_manager()
+            if dest_manager:
+                try:
+                    # Build operations list for auto-capture
+                    successful_ops = []
+                    for result in results:
+                        if result.get('success'):
+                            op_id = result['operation_id']
+                            cursor = conn.execute("""
+                                SELECT operation_type, destination_path
+                                FROM analysis_operations
+                                WHERE operation_id = ?
+                            """, (op_id,))
+                            row = cursor.fetchone()
+                            if row and row[1]:
+                                successful_ops.append({
+                                    'type': row[0],
+                                    'dest': row[1]
+                                })
+                    
+                    if successful_ops:
+                        captured = dest_manager.auto_capture_destinations(
+                            user_id, successful_ops, client_id
+                        )
+                        
+                        for dest in captured:
+                            dest_manager.update_usage(dest.id, file_count=1, operation_type='move')
+                        
+                        new_destinations = [
+                            {
+                                'path': dest.path,
+                                'category': dest.category,
+                                'id': dest.id
+                            }
+                            for dest in captured
+                        ]
+                        
+                        if new_destinations:
+                            logger.info(f"Auto-captured {len(new_destinations)} new destination(s)")
+                
+                except Exception as capture_error:
+                    logger.warning(f"Could not auto-capture destinations: {capture_error}")
+            
+            response = {'success': True, 'results': results}
+            if new_destinations:
+                response['new_destinations_captured'] = new_destinations
+            
+            return jsonify(response)
+            
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def _build_file_plan(file_path, file_result, src_path, dest_root, analysis_id):
+        """
+        Build a multi-step file plan for a single file.
+        
+        Returns a dict with:
+        - source: absolute source path
+        - steps: ordered list of operations (move, rename, tag, etc.)
+        """
+        import uuid
+        
+        f = Path(file_path)
+        steps = []
+        
+        # Get AI suggested action and folder
+        action = file_result.get('action', 'move') if file_result else 'move'
+        suggested_folder = file_result.get('suggested_folder', 'Uncategorized') if file_result else 'Uncategorized'
+        confidence = file_result.get('confidence', 0.5) if file_result else 0.0
+        
+        # Determine if this is a fallback plan
+        is_fallback = not file_result or confidence < 0.3
+        
+        # Preserve relative subfolder structure for nested files
+        try:
+            relative_path = f.relative_to(src_path)
+            if len(relative_path.parts) > 1:
+                # File is in a subfolder - preserve the structure
+                dest_path = dest_root / suggested_folder / relative_path
+            else:
+                # File is at root level
+                dest_path = dest_root / suggested_folder / f.name
+        except ValueError:
+            # File is not relative to source path
+            dest_path = dest_root / suggested_folder / f.name
+        
+        # Step 1: Primary action (move/delete/unpack)
+        if action == 'delete':
+            steps.append({
+                'operation_id': f"{analysis_id}_op_{uuid.uuid4().hex[:8]}",
+                'type': 'delete',
+                'target_path': None,
+                'reason': file_result.get('reason', 'Redundant archive - content already extracted'),
+                'order': 1,
+                'metadata': {
+                    'confidence': str(confidence),
+                    'is_fallback': is_fallback
+                }
+            })
+        elif action == 'unpack':
+            unpack_dest = dest_root / 'ToReview' / f.stem
+            steps.append({
+                'operation_id': f"{analysis_id}_op_{uuid.uuid4().hex[:8]}",
+                'type': 'unpack',
+                'target_path': str(unpack_dest),
+                'reason': file_result.get('reason', 'Archive content unknown - unpack to analyze'),
+                'order': 1,
+                'metadata': {
+                    'confidence': str(confidence),
+                    'is_fallback': is_fallback
+                }
+            })
+        else:
+            # Regular move operation
+            reason = file_result.get('reason', f'Matches {suggested_folder} category') if file_result else 'No AI analysis - defaulting to Uncategorized'
+            if is_fallback:
+                reason = f'Low confidence categorization - {reason}'
+            
+            steps.append({
+                'operation_id': f"{analysis_id}_op_{uuid.uuid4().hex[:8]}",
+                'type': 'move',
+                'target_path': str(dest_path),
+                'reason': reason,
+                'order': 1,
+                'metadata': {
+                    'confidence': str(confidence),
+                    'suggested_folder': suggested_folder,
+                    'is_fallback': is_fallback
+                }
+            })
+            
+            # TODO: Future steps can be added here
+            # Step 2: Rename (if AI suggests normalization)
+            # Step 3: Tag (if metadata should be added)
+            # Step 4: Index (if file should be indexed for search)
+        
+        return {
+            'source': file_path,
+            'steps': steps
+        }
+    
     def _get_ai_context_builder():
         """Get AIContextBuilder instance"""
         try:
@@ -119,7 +502,12 @@ def register_file_organizer_routes(app, web_server):
                     'error': f"Batch analysis failed: {batch_result.get('error')}"
                 }), 503
             
-            operations = []
+            # Create analysis ID for this session
+            import uuid
+            analysis_id = str(uuid.uuid4())
+            
+            operations = []  # Legacy format (backward compatibility)
+            file_plans = []  # New multi-step format
             errors = []
             results = batch_result.get('results', {})
             
@@ -129,18 +517,24 @@ def register_file_organizer_routes(app, web_server):
                 file_path = str(f)
                 file_result = results.get(file_path)
                 
+                # Build file plan (new multi-step format)
+                file_plan = _build_file_plan(file_path, file_result, src_path, dest_root, analysis_id)
+                file_plans.append(file_plan)
+                
+                # Build legacy operation (backward compatibility)
                 if not file_result:
                     error_msg = f"No analysis result for {f.name}"
                     logger.warning(error_msg)
+                    logger.warning(f"Fallback plan created for: {file_path}")
                     
-                    # FALLBACK: Create an "Uncategorized" operation instead of skipping
-                    # This ensures every file gets an operation
+                    # FALLBACK: Create an "Uncategorized" operation
                     dest_path = dest_root / 'Uncategorized' / f.name
                     operations.append({
                         'type': 'move',
                         'source': file_path,
                         'destination': str(dest_path),
-                        'reason_hint': 'No AI analysis result - defaulting to Uncategorized'
+                        'reason_hint': 'No AI analysis result - defaulting to Uncategorized',
+                        'operation_id': file_plan['steps'][0]['operation_id']
                     })
                     
                     errors.append({
@@ -153,51 +547,49 @@ def register_file_organizer_routes(app, web_server):
                 action = file_result.get('action', 'move')
                 suggested_folder = file_result.get('suggested_folder', 'Other')
                 
+                # Extract first step from plan for legacy format
+                first_step = file_plan['steps'][0]
+                
                 if action == 'delete':
-                    # Archive is redundant (extracted file exists)
                     operations.append({
                         'type': 'delete',
                         'source': file_path,
                         'destination': None,
-                        'reason_hint': 'Redundant archive - content already extracted'
+                        'reason_hint': first_step['reason'],
+                        'operation_id': first_step['operation_id']
                     })
                 elif action == 'unpack':
-                    # Archive needs to be unpacked for analysis
                     operations.append({
                         'type': 'unpack',
                         'source': file_path,
-                        'destination': str(dest_root / 'ToReview' / f.stem),  # Extract to ToReview folder
-                        'reason_hint': 'Archive content unknown - unpack to analyze'
+                        'destination': first_step['target_path'],
+                        'reason_hint': first_step['reason'],
+                        'operation_id': first_step['operation_id']
                     })
                 else:
-                    # Regular move operation
-                    # Preserve relative subfolder structure for nested files
-                    try:
-                        # Get relative path from source folder
-                        relative_path = f.relative_to(src_path)
-                        # If file is nested, preserve the subfolder structure
-                        if len(relative_path.parts) > 1:
-                            # File is in a subfolder - preserve the structure
-                            dest_path = dest_root / suggested_folder / relative_path
-                        else:
-                            # File is at root level
-                            dest_path = dest_root / suggested_folder / f.name
-                    except ValueError:
-                        # File is not relative to source path (shouldn't happen)
-                        dest_path = dest_root / suggested_folder / f.name
-                    
                     operations.append({
                         'type': 'move',
                         'source': file_path,
-                        'destination': str(dest_path),
-                        # reason will be generated on-demand via /explain endpoint
+                        'destination': first_step['target_path'],
+                        'reason_hint': first_step['reason'],
+                        'operation_id': first_step['operation_id']
                     })
             
-            # Validate: operations count should match input files count
-            logger.info(f"Generated {len(operations)} operations for {len(files)} input files")
+            # Validate: counts should match
+            logger.info(f"Generated {len(operations)} operations and {len(file_plans)} file plans for {len(files)} input files")
+            
             if len(operations) != len(files):
-                logger.warning(f"MISMATCH: Expected {len(files)} operations but got {len(operations)}")
+                logger.warning(f"OPERATIONS MISMATCH: Expected {len(files)} operations but got {len(operations)}")
                 logger.warning(f"Missing files: {set(str(f) for f in files) - set(op['source'] for op in operations)}")
+            
+            if len(file_plans) != len(files):
+                logger.error(f"FILE PLANS MISMATCH: Expected {len(files)} file plans but got {len(file_plans)}")
+                logger.error(f"Missing files: {set(str(f) for f in files) - set(plan['source'] for plan in file_plans)}")
+            
+            # Count fallback plans
+            fallback_count = sum(1 for plan in file_plans if plan['steps'][0]['metadata'].get('is_fallback'))
+            if fallback_count > 0:
+                logger.warning(f"Generated {fallback_count} fallback 'Uncategorized' plans")
             
             # If ALL files failed, return error
             if not operations and errors:
@@ -208,11 +600,9 @@ def register_file_organizer_routes(app, web_server):
                 }), 503
 
             # Create a persistent analysis session directly in the database
-            import uuid
             import json
             from datetime import datetime
             
-            analysis_id = str(uuid.uuid4())
             now = datetime.now().isoformat()
             
             # Connect to the database using shared method
@@ -238,7 +628,9 @@ def register_file_organizer_routes(app, web_server):
                     json.dumps({
                         'total_files': len(files),
                         'successful_operations': len(operations),
-                        'failed_files': len(errors)
+                        'failed_files': len(errors),
+                        'file_plans_count': len(file_plans),
+                        'fallback_plans_count': fallback_count
                     })
                 ))
                 
@@ -269,7 +661,14 @@ def register_file_organizer_routes(app, web_server):
                 response = {
                     'success': True,
                     'analysis_id': analysis_id,
-                    'operations': operations
+                    'operations': operations,  # Legacy format (backward compatibility)
+                    'file_plans': file_plans,  # New multi-step format
+                    'counts': {
+                        'files_received': len(files),
+                        'operations_generated': len(operations),
+                        'file_plans_generated': len(file_plans),
+                        'fallback_plans': fallback_count
+                    }
                 }
                 
                 # Include errors if any (partial success)
@@ -291,163 +690,31 @@ def register_file_organizer_routes(app, web_server):
 
     @app.route('/api/file-organizer/execute', methods=['POST'])
     def fo_execute_ops():
-        """Execute approved file operations"""
+        """
+        Execute approved file operations.
+        
+        Supports two modes:
+        1. Legacy: operation_ids array (backward compatibility)
+        2. New: file_plans array with multi-step execution
+        """
         try:
             data = request.get_json(force=True, silent=True) or {}
             analysis_id = data.get('analysis_id')
             operation_ids = data.get('operation_ids', [])
+            file_plans = data.get('file_plans', [])
             
             if not analysis_id:
                 return jsonify({'success': False, 'error': 'analysis_id required'}), 400
             
-            # Direct database access
-            conn = web_server._get_file_organizer_db_connection()
+            # Determine execution mode
+            use_file_plans = len(file_plans) > 0
             
-            try:
-                results = []
-                for op_id in operation_ids:
-                    # Get operation details
-                    cursor = conn.execute("""
-                        SELECT operation_type, source_path, destination_path
-                        FROM analysis_operations
-                        WHERE operation_id = ? AND analysis_id = ?
-                    """, (op_id, analysis_id))
-                    
-                    row = cursor.fetchone()
-                    if not row:
-                        results.append({'operation_id': op_id, 'success': False, 'error': 'Operation not found'})
-                        continue
-                    
-                    op_type, source, dest = row
-                    
-                    # Execute the operation
-                    import shutil
-                    import os
-                    
-                    try:
-                        if op_type == 'delete':
-                            # Delete the file (redundant archive)
-                            os.remove(source)
-                            logger.info(f"Deleted redundant archive: {source}")
-                        elif op_type == 'unpack':
-                            # Unpack archive to destination
-                            dest_dir = Path(dest)
-                            dest_dir.mkdir(parents=True, exist_ok=True)
-                            
-                            file_ext = Path(source).suffix.lower()
-                            if file_ext == '.zip':
-                                import zipfile
-                                with zipfile.ZipFile(source, 'r') as zf:
-                                    zf.extractall(dest_dir)
-                            elif file_ext == '.rar':
-                                try:
-                                    import rarfile
-                                    with rarfile.RarFile(source, 'r') as rf:
-                                        rf.extractall(dest_dir)
-                                except ImportError:
-                                    raise Exception("RAR support not available")
-                            elif file_ext == '.7z':
-                                try:
-                                    import py7zr
-                                    with py7zr.SevenZipFile(source, 'r') as szf:
-                                        szf.extractall(dest_dir)
-                                except ImportError:
-                                    raise Exception("7z support not available")
-                            else:
-                                raise Exception(f"Unsupported archive format: {file_ext}")
-                            
-                            logger.info(f"Unpacked archive {source} to {dest_dir}")
-                        elif op_type == 'move':
-                            # Create destination directory if needed
-                            dest_dir = Path(dest).parent
-                            dest_dir.mkdir(parents=True, exist_ok=True)
-                            shutil.move(source, dest)
-                        elif op_type == 'copy':
-                            # Create destination directory if needed
-                            dest_dir = Path(dest).parent
-                            dest_dir.mkdir(parents=True, exist_ok=True)
-                            shutil.copy2(source, dest)
-                        
-                        # Update operation status
-                        from datetime import datetime
-                        conn.execute("""
-                            UPDATE analysis_operations
-                            SET operation_status = 'applied', applied_at = ?
-                            WHERE operation_id = ?
-                        """, (datetime.now().isoformat(), op_id))
-                        
-                        results.append({'operation_id': op_id, 'success': True})
-                        
-                    except Exception as exec_error:
-                        logger.error(f"Execution error for {op_id}: {exec_error}")
-                        results.append({'operation_id': op_id, 'success': False, 'error': str(exec_error)})
-                
-                conn.commit()
-                
-                # Auto-capture destinations from successful operations
-                new_destinations = []
-                dest_manager = _get_destination_manager()
-                if dest_manager:
-                    try:
-                        # Get user_id and client_id from request
-                        user_id = data.get('user_id', 'dev_user')
-                        client_id = data.get('client_id', 'default_client')
-                        
-                        # Build operations list for auto-capture
-                        successful_ops = []
-                        for result in results:
-                            if result.get('success'):
-                                op_id = result['operation_id']
-                                # Get operation details
-                                cursor = conn.execute("""
-                                    SELECT operation_type, destination_path
-                                    FROM analysis_operations
-                                    WHERE operation_id = ?
-                                """, (op_id,))
-                                row = cursor.fetchone()
-                                if row and row[1]:  # Has destination
-                                    successful_ops.append({
-                                        'type': row[0],
-                                        'dest': row[1]
-                                    })
-                        
-                        # Auto-capture new destinations
-                        if successful_ops:
-                            captured = dest_manager.auto_capture_destinations(
-                                user_id, successful_ops, client_id
-                            )
-                            
-                            # Update usage for captured destinations
-                            for dest in captured:
-                                dest_manager.update_usage(dest.id, file_count=1, operation_type='move')
-                            
-                            # Format for response
-                            new_destinations = [
-                                {
-                                    'path': dest.path,
-                                    'category': dest.category,
-                                    'id': dest.id
-                                }
-                                for dest in captured
-                            ]
-                            
-                            if new_destinations:
-                                logger.info(f"Auto-captured {len(new_destinations)} new destination(s)")
-                    
-                    except Exception as capture_error:
-                        logger.warning(f"Could not auto-capture destinations: {capture_error}")
-                
-                response = {'success': True, 'results': results}
-                if new_destinations:
-                    response['new_destinations_captured'] = new_destinations
-                
-                return jsonify(response)
-                
-            except Exception as e:
-                conn.rollback()
-                raise e
-            finally:
-                conn.close()
+            if use_file_plans:
+                logger.info(f"Executing {len(file_plans)} file plans (new multi-step mode)")
+                return _execute_file_plans(data, analysis_id, file_plans, web_server)
+            else:
+                logger.info(f"Executing {len(operation_ids)} operations (legacy mode)")
+                return _execute_legacy_operations(data, analysis_id, operation_ids, web_server)
                 
         except Exception as e:
             logger.error(f"/execute error: {e}", exc_info=True)
@@ -556,4 +823,4 @@ def register_file_organizer_routes(app, web_server):
             logger.error(f"/add-granularity error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
-
+# REMOVE OLD DUPLICATE CODE BELOW THIS LINE - IT SHOULD NOT EXIST
