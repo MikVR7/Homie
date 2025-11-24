@@ -308,7 +308,7 @@ def register_file_organizer_routes(app, web_server):
         finally:
             conn.close()
     
-    def _build_file_plan(file_path, file_result, src_path, dest_root, analysis_id):
+    def _build_file_plan(file_path, file_result, src_path, dest_root, analysis_id, user_id=None, client_id=None):
         """
         Build a multi-step file plan for a single file.
         
@@ -323,24 +323,36 @@ def register_file_organizer_routes(app, web_server):
         
         # Get AI suggested action and folder
         action = file_result.get('action', 'move') if file_result else 'move'
-        suggested_folder = file_result.get('suggested_folder', 'Uncategorized') if file_result else 'Uncategorized'
+        suggested_folder = file_result.get('suggested_folder') if file_result else None
         confidence = file_result.get('confidence', 0.5) if file_result else 0.0
+        
+        # Fallback to Uncategorized if AI didn't return a folder
+        if not suggested_folder:
+            suggested_folder = 'Uncategorized'
         
         # Determine if this is a fallback plan
         is_fallback = not file_result or confidence < 0.3
+        
+        # AI returns the folder/path - use it as-is
+        # If AI returns an absolute path, use it directly
+        # If AI returns a relative folder name, append to dest_root
+        if Path(suggested_folder).is_absolute():
+            dest_base = Path(suggested_folder)
+        else:
+            dest_base = dest_root / suggested_folder
         
         # Preserve relative subfolder structure for nested files
         try:
             relative_path = f.relative_to(src_path)
             if len(relative_path.parts) > 1:
                 # File is in a subfolder - preserve the structure
-                dest_path = dest_root / suggested_folder / relative_path
+                dest_path = dest_base / relative_path
             else:
                 # File is at root level
-                dest_path = dest_root / suggested_folder / f.name
+                dest_path = dest_base / f.name
         except ValueError:
             # File is not relative to source path
-            dest_path = dest_root / suggested_folder / f.name
+            dest_path = dest_base / f.name
         
         # Step 1: Primary action (move/delete/unpack)
         if action == 'delete':
@@ -481,19 +493,35 @@ def register_file_organizer_routes(app, web_server):
             if context_builder:
                 try:
                     context = context_builder.build_context(user_id, client_id)
+                    
+                    # If no destinations exist, add source folder as the only destination
+                    if not context.get('known_destinations'):
+                        logger.info("No saved destinations - using source folder as destination")
+                        context['known_destinations'] = [{
+                            'category': 'Source',
+                            'paths': [{
+                                'path': str(src_path),
+                                'drive_type': 'local',
+                                'drive_label': None,
+                                'available_space_gb': None,
+                                'is_available': True,
+                                'usage_count': 0,
+                                'last_used': None,
+                                'cloud_provider': None
+                            }]
+                        }]
+                    
                     ai_context_text = context_builder.format_for_ai_prompt(context)
                     logger.info(f"Built AI context: {context_builder.build_context_summary(user_id, client_id)}")
                 except Exception as e:
                     logger.warning(f"Could not build AI context: {e}")
             
             # Use shared batch analysis method (SINGLE SOURCE OF TRUTH)
-            # Note: ai_context is not yet supported by _batch_analyze_files
-            # TODO: Update _batch_analyze_files to accept and use ai_context
             batch_result = web_server._batch_analyze_files(
                 file_paths, 
                 use_ai=True, 
-                existing_folders=existing_folders
-                # ai_context will be added in future update
+                existing_folders=existing_folders,
+                ai_context=ai_context_text
             )
             
             if not batch_result.get('success'):

@@ -234,7 +234,7 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
-    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None) -> Dict[str, Any]:
+    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None) -> Dict[str, Any]:
         """
         Analyze multiple files in a single AI call (MUCH faster than individual calls).
         Returns only folder suggestions, no reasons (reasons generated on-demand).
@@ -243,6 +243,7 @@ class AIContentAnalyzer:
         Args:
             file_paths: List of file paths to analyze
             existing_folders: List of folder names that already exist in destination (for context-aware organization)
+            ai_context: Optional context string with known destinations and drives from AIContextBuilder
             
         Returns:
             {
@@ -284,11 +285,27 @@ class AIContentAnalyzer:
                 
                 file_list.append(file_info)
             
-            # Build context-aware prompt based on file diversity and existing folders
+            # Build context-aware prompt with known destinations and drives
+            context_section = ""
+            
+            # Add AI context (known destinations and drives) if provided
+            if ai_context:
+                context_section = f"""
+{ai_context}
+
+IMPORTANT: You have access to known destinations above!
+- When a file matches a known destination category, return the FULL PATH to that destination
+- Example: If "Images" destination is "/home/user/Pictures", return "/home/user/Pictures" not just "Images"
+- You can also create subfolders within known destinations if needed
+- Choose based on drive availability, space, and usage frequency
+- Only suggest new folders under the destination root if no suitable known destination exists
+"""
+            
+            # Add existing folders context (folders in the destination root)
             existing_folders_context = ""
             if existing_folders:
                 existing_folders_context = f"""
-EXISTING FOLDERS in destination:
+EXISTING FOLDERS in destination root:
 {json.dumps(existing_folders, indent=2)}
 
 IMPORTANT: Reuse these folder names when appropriate! If a file fits into an existing category, use that exact folder name.
@@ -342,6 +359,8 @@ For archives, you MUST include an "action" field: "move", "delete", or "unpack"
             
             prompt = f"""Analyze these {len(file_list)} files and suggest the best folder structure for each.
 
+{context_section}
+
 {existing_folders_context}
 
 {granularity_rule}
@@ -364,13 +383,18 @@ Return ONLY valid JSON (no markdown) with this structure:
 {{
   "results": {{
     "full_file_path": {{
-      "suggested_folder": "FolderName",
+      "suggested_folder": "FolderName or /full/path/to/known/destination",
       "content_type": "brief_type_description",
       "action": "move"  // or "delete" or "unpack" (for archives only)
     }},
     ...
   }}
 }}
+
+IMPORTANT for suggested_folder:
+- If using a known destination, return the FULL PATH (e.g., "/home/user/Pictures")
+- If creating a new folder, return just the folder name (e.g., "Images")
+- You can append subfolders to known destinations (e.g., "/home/user/Pictures/Vacation")
 
 Remember: If folders exist, REUSE them. If files are mixed, use GENERIC categories. If all same type, use SPECIFIC categories.
 For archives: detect duplicates and suggest deletion OR suggest unpacking if content is unknown."""
@@ -386,6 +410,8 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
             
             # Parse response
             response_text = response.text.strip()
+            logger.debug(f"Raw AI response (first 500 chars): {response_text[:500]}")
+            
             if response_text.startswith('```'):
                 response_text = response_text.split('```')[1]
                 if response_text.startswith('json'):
@@ -393,9 +419,26 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
                 response_text = response_text.strip()
             
             result = json.loads(response_text)
+            results = result.get('results', {})
+            
+            # Always log the raw AI response for debugging
+            logger.info(f"AI batch analysis response: {len(results)} results")
+            for file_path, file_result in results.items():
+                if file_result:
+                    suggested_folder = file_result.get('suggested_folder', 'MISSING')
+                    action = file_result.get('action', 'move')
+                    content_type = file_result.get('content_type', 'unknown')
+                    logger.debug(f"  {Path(file_path).name}: folder='{suggested_folder}', action='{action}', type='{content_type}'")
+                    
+                    # Warn about missing or null suggested_folder
+                    if 'suggested_folder' not in file_result:
+                        logger.warning(f"AI result missing 'suggested_folder' for {file_path}: {file_result}")
+                    elif file_result.get('suggested_folder') is None:
+                        logger.warning(f"AI returned None for 'suggested_folder' for {file_path}: {file_result}")
+            
             return {
                 'success': True,
-                'results': result.get('results', {})
+                'results': results
             }
             
         except json.JSONDecodeError as e:

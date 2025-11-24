@@ -120,7 +120,27 @@ class DestinationMemoryManager:
                 
                 existing = cursor.fetchone()
                 if existing:
-                    logger.info(f"Destination already exists: {normalized_path}")
+                    # If destination exists but is inactive, reactivate it
+                    if not existing['is_active']:
+                        logger.info(f"Reactivating inactive destination: {normalized_path}")
+                        conn.execute("""
+                            UPDATE destinations
+                            SET is_active = 1, last_used_at = ?
+                            WHERE id = ?
+                        """, (datetime.now().isoformat(), existing['id']))
+                        conn.commit()
+                        
+                        # Fetch the updated destination
+                        cursor = conn.execute("""
+                            SELECT id, user_id, path, category, drive_id,
+                                   created_at, last_used_at, usage_count, is_active
+                            FROM destinations
+                            WHERE id = ?
+                        """, (existing['id'],))
+                        existing = cursor.fetchone()
+                    else:
+                        logger.info(f"Destination already exists: {normalized_path}")
+                    
                     return Destination.from_db_row(existing)
                 
                 # Auto-detect drive_id if not provided

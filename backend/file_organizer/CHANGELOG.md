@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Added - 2025-11-24
+
+#### Automatic Destination Memory Integration with AI
+- AI now automatically receives ALL known destinations with full paths
+- Backend builds AI context from DestinationMemoryManager and DriveManager before each organize request
+- AI decides which destination to use and returns full paths (not just category names)
+- When no destinations exist, backend sends source folder as fallback destination
+- AI can organize files in-place when no saved destinations are available
+- Removed dependency on `destination_context` parameter from frontend
+- No CLI parameters needed - backend supplies all context automatically
+- Added comprehensive logging of AI responses for debugging
+- See `💡project-docs/docs/AI_CONTEXT_INTEGRATION.md` for details
+
+### Fixed - 2025-11-22
+
+#### Destination Persistence and Reactivation
+- Fixed issue where POST `/api/file-organizer/destinations` returned destinations with `is_active=false`
+- Fixed issue where GET `/api/file-organizer/destinations` returned empty list after POST
+- Destinations are now automatically reactivated when re-added after soft deletion
+- All destination fields (id, path, category, drive_id, etc.) are now properly populated in responses
+- Destinations now persist correctly across requests
+- See `destination_memory_manager.py` line 121-141 for implementation
+
 ### Added - 2025-11-19
 
 #### Multi-Step File Plans

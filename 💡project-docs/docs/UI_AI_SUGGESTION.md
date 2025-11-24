@@ -576,7 +576,8 @@ _Additional notes and considerations will be added here._
 
 
 
-<!-- Last updated: 2025-10-16 21:20 - Reason: Documenting the final API structure for the 'Disagree' button functionality, which was recently implemented and required a specific nested request format. -->
+
+<!-- Last updated: 2025-11-20 19:55 - Reason: Documented the newly implemented multi-step workflow support across suggestions, execution, and destination capturing so UI designers/devs know the expectations. -->
 
 ---
 
@@ -866,3 +867,11 @@ File Count Updates:
 (Update the number based on actual file count)
 -->
 ```
+
+## ## Multi-Step Execution Plans
+- Frontend now expects `file_plans` in the organize response and falls back to legacy `operations` only when the backend cannot supply plans.
+- Each plan contains ordered `steps`; the UI hydrates `FileOperationStepViewModel` entries so users can review the sequence per file.
+- `AISuggestionsView` surfaces step-aware confirmations (“run N steps”) and richer failure dialogs that list which step failed and why.
+- `FileOperationExecutor` understands mkdir/delete/no-op plus step metadata (e.g., `overwrite`) so execution mirrors backend expectations.
+- Destination Memory uses the final successful step of each plan to auto-capture destinations, keeping known roots in sync without polling.
+
