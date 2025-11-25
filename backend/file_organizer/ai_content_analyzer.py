@@ -13,8 +13,28 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
+from logging.handlers import RotatingFileHandler
 
 logger = logging.getLogger('AIContentAnalyzer')
+
+# Setup dedicated AI interactions logger
+ai_logger = logging.getLogger('AIInteractions')
+ai_logger.setLevel(logging.INFO)
+ai_logger.propagate = False  # Don't send to root logger
+
+# Create logs directory
+log_dir = Path(__file__).parent.parent / 'logs'
+log_dir.mkdir(exist_ok=True)
+
+# Add rotating file handler (max 10MB, keep 5 backups)
+ai_log_file = log_dir / 'ai_interactions.log'
+ai_handler = RotatingFileHandler(
+    ai_log_file,
+    maxBytes=10 * 1024 * 1024,  # 10MB
+    backupCount=5
+)
+ai_handler.setFormatter(logging.Formatter('%(message)s'))
+ai_logger.addHandler(ai_handler)
 
 
 class AIContentAnalyzer:
@@ -399,15 +419,21 @@ IMPORTANT for suggested_folder:
 Remember: If folders exist, REUSE them. If files are mixed, use GENERIC categories. If all same type, use SPECIFIC categories.
 For archives: detect duplicates and suggest deletion OR suggest unpacking if content is unknown."""
 
-            # Log the prompt being sent to AI (with color)
+            # Log to terminal (clean summary)
             CYAN = '\033[96m'
             RESET = '\033[0m'
-            logger.info(f"{CYAN}{'=' * 80}{RESET}")
-            logger.info(f"{CYAN}🤖 AI PROMPT: Analyzing {len(file_list)} files{RESET}")
-            logger.info(f"{CYAN}   Context: {len(ai_context) if ai_context else 0} chars, Existing folders: {len(existing_folders) if existing_folders else 0}{RESET}")
-            logger.info(f"{CYAN}{'=' * 80}{RESET}")
-            logger.debug(f"{CYAN}Full prompt ({len(prompt)} chars):\n{prompt}{RESET}")
-            logger.info(f"{CYAN}{'=' * 80}{RESET}")
+            logger.info(f"{CYAN}🤖 Analyzing {len(file_list)} files with AI{RESET}")
+            
+            # Log full prompt to AI log file
+            ai_logger.info("=" * 80)
+            ai_logger.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - AI PROMPT")
+            ai_logger.info("=" * 80)
+            ai_logger.info(f"Files: {len(file_list)}")
+            ai_logger.info(f"Context: {len(ai_context) if ai_context else 0} chars")
+            ai_logger.info(f"Existing folders: {len(existing_folders) if existing_folders else 0}")
+            ai_logger.info("")
+            ai_logger.info(prompt)
+            ai_logger.info("")
             
             # Call AI with recovery (using shared method)
             try:
@@ -421,13 +447,19 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
             # Parse response
             response_text = response.text.strip()
             
-            # Log the raw AI response (with color)
+            # Log to terminal (clean summary)
             GREEN = '\033[92m'
             RESET = '\033[0m'
-            logger.info(f"{GREEN}{'=' * 80}{RESET}")
-            logger.info(f"{GREEN}🤖 AI RESPONSE: {len(response_text)} characters{RESET}")
-            logger.info(f"{GREEN}{'=' * 80}{RESET}")
-            logger.debug(f"{GREEN}Full response:\n{response_text}{RESET}")
+            
+            # Log full response to AI log file
+            ai_logger.info("=" * 80)
+            ai_logger.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - AI RESPONSE")
+            ai_logger.info("=" * 80)
+            ai_logger.info(f"Length: {len(response_text)} characters")
+            ai_logger.info("")
+            ai_logger.info(response_text)
+            ai_logger.info("")
+            ai_logger.info("")
             
             if response_text.startswith('```'):
                 response_text = response_text.split('```')[1]
@@ -438,8 +470,8 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
             result = json.loads(response_text)
             results = result.get('results', {})
             
-            # Always log the raw AI response for debugging
-            logger.info(f"AI batch analysis response: {len(results)} results")
+            # Log success to terminal
+            logger.info(f"{GREEN}✅ AI analysis complete ({len(results)} results){RESET}")
             for file_path, file_result in results.items():
                 if file_result:
                     suggested_folder = file_result.get('suggested_folder', 'MISSING')
