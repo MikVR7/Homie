@@ -404,7 +404,7 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
             RESET = '\033[0m'
             logger.info(f"{CYAN}{'=' * 80}{RESET}")
             logger.info(f"{CYAN}🤖 AI PROMPT: Analyzing {len(file_list)} files{RESET}")
-            logger.info(f"{CYAN}   Context: {len(ai_context_text) if ai_context_text else 0} chars, Existing folders: {len(existing_folders) if existing_folders else 0}{RESET}")
+            logger.info(f"{CYAN}   Context: {len(ai_context) if ai_context else 0} chars, Existing folders: {len(existing_folders) if existing_folders else 0}{RESET}")
             logger.info(f"{CYAN}{'=' * 80}{RESET}")
             logger.debug(f"{CYAN}Full prompt ({len(prompt)} chars):\n{prompt}{RESET}")
             logger.info(f"{CYAN}{'=' * 80}{RESET}")
