@@ -287,7 +287,7 @@ class DriveManager:
                     if not unique_id or unique_id == mount_point:
                         unique_id = f"mount:{mount_point}"
                     
-                    # Check if drive exists
+                    # Check if drive exists by unique_identifier
                     cursor = conn.execute("""
                         SELECT id, user_id, unique_identifier, mount_point, volume_label,
                                drive_type, cloud_provider, is_available, last_seen_at, created_at
@@ -296,6 +296,34 @@ class DriveManager:
                     """, (user_id, unique_id))
                     
                     existing_row = cursor.fetchone()
+                    
+                    # If this is a cloud drive and no exact match, check for internal drive at same mount point
+                    if not existing_row and drive_type == 'cloud' and cloud_provider:
+                        cursor = conn.execute("""
+                            SELECT id, user_id, unique_identifier, mount_point, volume_label,
+                                   drive_type, cloud_provider, is_available, last_seen_at, created_at
+                            FROM drives
+                            WHERE user_id = ? AND mount_point = ? AND drive_type = 'internal'
+                        """, (user_id, mount_point))
+                        
+                        internal_drive = cursor.fetchone()
+                        if internal_drive:
+                            # Upgrade internal drive to cloud drive
+                            drive_id = internal_drive['id']
+                            logger.info(f"Upgrading internal drive {drive_id} at {mount_point} to cloud ({cloud_provider})")
+                            
+                            conn.execute("""
+                                UPDATE drives
+                                SET unique_identifier = ?,
+                                    drive_type = 'cloud',
+                                    cloud_provider = ?,
+                                    volume_label = ?,
+                                    is_available = 1,
+                                    last_seen_at = ?
+                                WHERE id = ?
+                            """, (unique_id, cloud_provider, volume_label, now, drive_id))
+                            
+                            existing_row = internal_drive  # Treat as existing for mount update
                     
                     if existing_row:
                         # Drive exists - update it
