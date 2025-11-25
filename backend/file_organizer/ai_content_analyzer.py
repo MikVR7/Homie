@@ -399,6 +399,16 @@ IMPORTANT for suggested_folder:
 Remember: If folders exist, REUSE them. If files are mixed, use GENERIC categories. If all same type, use SPECIFIC categories.
 For archives: detect duplicates and suggest deletion OR suggest unpacking if content is unknown."""
 
+            # Log the prompt being sent to AI (with color)
+            CYAN = '\033[96m'
+            RESET = '\033[0m'
+            logger.info(f"{CYAN}{'=' * 80}{RESET}")
+            logger.info(f"{CYAN}🤖 AI PROMPT: Analyzing {len(file_list)} files{RESET}")
+            logger.info(f"{CYAN}   Context: {len(ai_context_text) if ai_context_text else 0} chars, Existing folders: {len(existing_folders) if existing_folders else 0}{RESET}")
+            logger.info(f"{CYAN}{'=' * 80}{RESET}")
+            logger.debug(f"{CYAN}Full prompt ({len(prompt)} chars):\n{prompt}{RESET}")
+            logger.info(f"{CYAN}{'=' * 80}{RESET}")
+            
             # Call AI with recovery (using shared method)
             try:
                 response = self._call_ai_with_recovery(prompt)
@@ -410,7 +420,14 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
             
             # Parse response
             response_text = response.text.strip()
-            logger.debug(f"Raw AI response (first 500 chars): {response_text[:500]}")
+            
+            # Log the raw AI response (with color)
+            GREEN = '\033[92m'
+            RESET = '\033[0m'
+            logger.info(f"{GREEN}{'=' * 80}{RESET}")
+            logger.info(f"{GREEN}🤖 AI RESPONSE: {len(response_text)} characters{RESET}")
+            logger.info(f"{GREEN}{'=' * 80}{RESET}")
+            logger.debug(f"{GREEN}Full response:\n{response_text}{RESET}")
             
             if response_text.startswith('```'):
                 response_text = response_text.split('```')[1]
