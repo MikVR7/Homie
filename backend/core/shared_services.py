@@ -15,6 +15,35 @@ import google.generativeai as genai
 logger = logging.getLogger('SharedServices')
 
 
+class AIResponse:
+    """Unified response wrapper for different AI providers"""
+    def __init__(self, text: str):
+        self.text = text
+
+
+class AIModelWrapper:
+    """Wrapper to provide uniform interface for different AI providers"""
+    def __init__(self, provider: str, model, model_name: str):
+        self.provider = provider
+        self.model = model
+        self.model_name = model_name
+    
+    def generate_content(self, prompt: str) -> AIResponse:
+        """Generate content using the configured AI provider"""
+        if self.provider == 'kimi':
+            # Kimi uses OpenAI-compatible API
+            response = self.model.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            return AIResponse(response.choices[0].message.content)
+        else:
+            # Gemini
+            response = self.model.generate_content(prompt)
+            return AIResponse(response.text)
+
+
 class SharedServices:
     """
     Shared services and utilities used across all modules
@@ -67,15 +96,23 @@ class SharedServices:
                 'log_level': os.getenv('LOG_LEVEL', 'INFO'),
             }
             
-            # Get AI API key
-            self._ai_api_key = os.getenv('GEMINI_API_KEY')
+            # Get AI provider and API key
+            self._ai_provider = os.getenv('AI_PROVIDER', 'gemini').lower()  # 'gemini' or 'kimi'
             
-            if not self._ai_api_key:
-                logger.warning("⚠️ GEMINI_API_KEY not found in environment")
-            else:
-                # Mask the key for logging
-                masked_key = f"{self._ai_api_key[:8]}...{self._ai_api_key[-4:]}"
-                logger.info(f"🔑 AI API key loaded: {masked_key}")
+            if self._ai_provider == 'kimi':
+                self._ai_api_key = os.getenv('KIMI_API_KEY')
+                if not self._ai_api_key:
+                    logger.warning("⚠️ KIMI_API_KEY not found in environment")
+                else:
+                    masked_key = f"{self._ai_api_key[:8]}...{self._ai_api_key[-4:]}"
+                    logger.info(f"🔑 Kimi AI API key loaded: {masked_key}")
+            else:  # default to gemini
+                self._ai_api_key = os.getenv('GEMINI_API_KEY')
+                if not self._ai_api_key:
+                    logger.warning("⚠️ GEMINI_API_KEY not found in environment")
+                else:
+                    masked_key = f"{self._ai_api_key[:8]}...{self._ai_api_key[-4:]}"
+                    logger.info(f"🔑 Gemini AI API key loaded: {masked_key}")
             
         except Exception as e:
             logger.error(f"❌ Error loading environment: {e}")
@@ -129,46 +166,80 @@ class SharedServices:
             logger.warning(f"⚠️ Could not save model config: {e}")
     
     def _initialize_ai(self):
-        """Initialize Google Gemini AI service (fast startup, lazy discovery)"""
+        """Initialize AI service (Gemini or Kimi K2)"""
         try:
             if not self._ai_api_key:
                 logger.warning("⚠️ No AI API key available, AI features will be disabled")
                 return
             
-            # Configure Gemini
-            genai.configure(api_key=self._ai_api_key)
-            
-            # Priority 1: User-specified model (highest priority)
-            user_model = os.getenv('GEMINI_MODEL')
-            if user_model:
-                logger.info(f"🎯 Using user-specified model: {user_model}")
-                self._ai_model = genai.GenerativeModel(user_model)
-                self._current_model_name = user_model
-                logger.info(f"🤖 AI service configured with {user_model}")
-                return
-            
-            # Priority 2: Last working model from persistent config
-            last_model = self._load_last_working_model()
-            if last_model:
-                try:
-                    self._ai_model = genai.GenerativeModel(last_model)
-                    self._current_model_name = last_model
-                    logger.info(f"🤖 AI service configured with last working model: {last_model}")
-                    return
-                except Exception as e:
-                    logger.warning(f"⚠️ Last working model '{last_model}' failed: {e}")
-            
-            # Priority 3: Known good default (fallback)
-            try:
-                self._ai_model = genai.GenerativeModel('gemini-flash-latest')
-                self._current_model_name = 'gemini-flash-latest'
-                logger.info("🤖 AI service configured with default: gemini-flash-latest")
-            except Exception as e:
-                logger.warning(f"⚠️ Default model setup failed: {e}")
-                self._ai_model = None
+            if self._ai_provider == 'kimi':
+                self._initialize_kimi()
+            else:
+                self._initialize_gemini()
             
         except Exception as e:
             logger.error(f"❌ Error initializing AI service: {e}")
+            self._ai_model = None
+    
+    def _initialize_gemini(self):
+        """Initialize Google Gemini AI service"""
+        # Configure Gemini
+        genai.configure(api_key=self._ai_api_key)
+        
+        # Priority 1: User-specified model (highest priority)
+        user_model = os.getenv('GEMINI_MODEL')
+        if user_model:
+            logger.info(f"🎯 Using user-specified Gemini model: {user_model}")
+            model = genai.GenerativeModel(user_model)
+            self._ai_model = AIModelWrapper('gemini', model, user_model)
+            self._current_model_name = user_model
+            logger.info(f"🤖 Gemini AI service configured with {user_model}")
+            return
+        
+        # Priority 2: Last working model from persistent config
+        last_model = self._load_last_working_model()
+        if last_model:
+            try:
+                model = genai.GenerativeModel(last_model)
+                self._ai_model = AIModelWrapper('gemini', model, last_model)
+                self._current_model_name = last_model
+                logger.info(f"🤖 Gemini AI service configured with last working model: {last_model}")
+                return
+            except Exception as e:
+                logger.warning(f"⚠️ Last working model '{last_model}' failed: {e}")
+        
+        # Priority 3: Known good default (fallback)
+        try:
+            model = genai.GenerativeModel('gemini-flash-latest')
+            self._ai_model = AIModelWrapper('gemini', model, 'gemini-flash-latest')
+            self._current_model_name = 'gemini-flash-latest'
+            logger.info("🤖 Gemini AI service configured with default: gemini-flash-latest")
+        except Exception as e:
+            logger.warning(f"⚠️ Default model setup failed: {e}")
+            self._ai_model = None
+    
+    def _initialize_kimi(self):
+        """Initialize Kimi K2 AI service (OpenAI-compatible API)"""
+        try:
+            from openai import OpenAI
+            
+            # Kimi uses OpenAI-compatible API
+            base_url = os.getenv('KIMI_BASE_URL', 'https://api.moonshot.cn/v1')
+            model_name = os.getenv('KIMI_MODEL', 'moonshot-v1-8k')
+            
+            client = OpenAI(
+                api_key=self._ai_api_key,
+                base_url=base_url
+            )
+            self._ai_model = AIModelWrapper('kimi', client, model_name)
+            self._current_model_name = model_name
+            logger.info(f"🤖 Kimi AI service configured with {model_name}")
+            
+        except ImportError:
+            logger.error("❌ openai package not installed. Run: pip install openai")
+            self._ai_model = None
+        except Exception as e:
+            logger.error(f"❌ Error initializing Kimi AI: {e}")
             self._ai_model = None
     
     def _discover_and_select_model(self):
@@ -293,7 +364,7 @@ class SharedServices:
             return {
                 'success': False,
                 'error': 'AI service not initialized',
-                'details': 'GEMINI_API_KEY not configured'
+                'details': f'{self._ai_provider.upper()}_API_KEY not configured'
             }
         
         try:
@@ -304,7 +375,8 @@ class SharedServices:
                 'success': True,
                 'message': 'AI connection test successful',
                 'response': response.text.strip(),
-                'model': 'gemini-1.5-flash'
+                'provider': self._ai_provider,
+                'model': self._current_model_name
             }
             
         except Exception as e:

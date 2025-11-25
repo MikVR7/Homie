@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added - 2025-11-25
+
+#### Multi-Provider AI Support
+- Added support for Kimi K2 (Moonshot AI) as alternative to Google Gemini
+- Switch providers via `AI_PROVIDER` environment variable (`gemini` or `kimi`)
+- Unified `AIModelWrapper` provides consistent interface for all providers
+- Easy to add new providers in the future
+- See `💡project-docs/docs/AI_PROVIDER_CONFIGURATION.md` for setup guide
+
 ### Added - 2025-11-24
 
 #### Automatic Destination Memory Integration with AI
