@@ -132,6 +132,7 @@ class AIContextBuilder:
     def format_for_ai_prompt(self, context: Dict[str, Any]) -> str:
         """
         Convert context dict to natural language for AI prompt.
+        Optimized for minimal token usage while maintaining readability.
         
         Args:
             context: Context dictionary from build_context()
@@ -142,116 +143,97 @@ class AIContextBuilder:
         try:
             lines = []
             
-            # Header
-            lines.append("=" * 60)
-            lines.append("KNOWN DESTINATIONS")
-            lines.append("=" * 60)
-            lines.append("")
+            # Header - shortened separator
+            lines.append("--- DESTINATIONS ---")
             
             known_destinations = context.get('known_destinations', [])
             
             if not known_destinations:
-                lines.append("No known destinations yet.")
-                lines.append("")
+                lines.append("None")
             else:
+                # Build drive index map first
+                drive_index_map = {}
+                drive_counter = 1
+                
+                # Collect all unique drives used by destinations
                 for category_info in known_destinations:
-                    category = category_info['category']
-                    paths = category_info['paths']
-                    
-                    # Category header
-                    lines.append(f"Category: {category} ({len(paths)} location{'s' if len(paths) != 1 else ''})")
-                    
-                    # List paths
-                    for path_info in paths:
+                    for path_info in category_info['paths']:
+                        # Find matching drive
+                        for drive in context.get('drives', []):
+                            if path_info['path'].startswith(drive['mount_point']):
+                                if drive['id'] not in drive_index_map:
+                                    drive_index_map[drive['id']] = drive_counter
+                                    drive_counter += 1
+                                break
+                
+                # List all destinations without category grouping
+                for category_info in known_destinations:
+                    for path_info in category_info['paths']:
                         path = path_info['path']
-                        drive_type = path_info['drive_type']
                         usage_count = path_info['usage_count']
-                        available_space = path_info['available_space_gb']
                         is_available = path_info['is_available']
-                        cloud_provider = path_info['cloud_provider']
-                        drive_label = path_info['drive_label']
                         
-                        # Build description
-                        parts = []
+                        # Find drive index for this path
+                        drive_idx = "?"
+                        for drive in context.get('drives', []):
+                            if path.startswith(drive['mount_point']):
+                                drive_idx = drive_index_map.get(drive['id'], "?")
+                                break
                         
-                        # Drive type
-                        if cloud_provider:
-                            parts.append(f"{cloud_provider.title()} Cloud")
-                        elif drive_label:
-                            parts.append(f"{drive_label} ({drive_type.title()})")
-                        else:
-                            parts.append(f"{drive_type.title()} Drive")
-                        
-                        # Available space
-                        if available_space is not None:
-                            parts.append(f"{available_space:.1f} GB free")
-                        
-                        # Usage count
-                        parts.append(f"used {usage_count} time{'s' if usage_count != 1 else ''}")
-                        
-                        # Availability
-                        if not is_available:
-                            parts.append("⚠️ UNAVAILABLE")
-                        
-                        description = ", ".join(parts)
-                        lines.append(f"  - {path}")
-                        lines.append(f"    ({description})")
-                    
-                    lines.append("")
+                        # Compact format: path (drive:id, used:N)
+                        status = " [UNAVAILABLE]" if not is_available else ""
+                        lines.append(f"{path} (drive:{drive_idx}, used:{usage_count}x){status}")
             
-            # Drives section
-            lines.append("=" * 60)
-            lines.append("AVAILABLE DRIVES")
-            lines.append("=" * 60)
-            lines.append("")
+            # Drives section - only include drives referenced by destinations
+            lines.append("\n--- DRIVES ---")
             
+            # Build map of drive_id to destinations that use it
+            drive_usage = {}
+            for category_info in known_destinations:
+                for path_info in category_info['paths']:
+                    # We'll use the index as drive reference
+                    pass
+            
+            # Get unique drives from destinations
             drives = context.get('drives', [])
+            used_drives = []
             
-            if not drives:
-                lines.append("No drives information available.")
-                lines.append("")
+            # Only include drives that are actually used by destinations
+            for category_info in known_destinations:
+                for path_info in category_info['paths']:
+                    # Find matching drive by checking if path starts with mount point
+                    for drive in drives:
+                        if path_info['path'].startswith(drive['mount_point']):
+                            if drive not in used_drives:
+                                used_drives.append(drive)
+                            break
+            
+            if not used_drives:
+                lines.append("None")
             else:
-                for drive in drives:
-                    drive_type = drive['type']
-                    mount_point = drive['mount_point']
+                for idx, drive in enumerate(used_drives, 1):
                     available_space = drive['available_space_gb']
                     volume_label = drive['volume_label']
                     cloud_provider = drive['cloud_provider']
                     
-                    # Drive name
+                    # Compact format: id. Name (space GB)
                     if cloud_provider:
-                        name = f"{cloud_provider.title()} Cloud"
+                        name = cloud_provider.title()
                     elif volume_label:
                         name = volume_label
                     else:
-                        name = f"{drive_type.title()} Drive"
+                        name = drive['type'].title()
                     
-                    # Build line
                     if available_space is not None:
-                        lines.append(f"  - {name}: {mount_point} ({available_space:.1f} GB free)")
+                        lines.append(f"{idx}. {name} ({available_space:.0f}GB)")
                     else:
-                        lines.append(f"  - {name}: {mount_point}")
-                
-                lines.append("")
+                        lines.append(f"{idx}. {name}")
             
-            # Instructions for AI
-            lines.append("=" * 60)
-            lines.append("INSTRUCTIONS FOR FILE ORGANIZATION")
-            lines.append("=" * 60)
-            lines.append("")
-            lines.append("When organizing files, prefer using these known destinations when appropriate.")
-            lines.append("")
-            lines.append("If multiple destinations exist for a category, choose based on:")
-            lines.append("  1. Drive availability (avoid unavailable drives)")
-            lines.append("  2. Available space (ensure sufficient space for files)")
-            lines.append("  3. Usage frequency (prefer frequently used destinations)")
-            lines.append("  4. Drive type:")
-            lines.append("     - Internal drives: Best for frequently accessed files")
-            lines.append("     - Cloud drives: Good for backup and sync across devices")
-            lines.append("     - USB drives: Suitable for portable storage")
-            lines.append("")
-            lines.append("If no suitable known destination exists, suggest creating a new one.")
-            lines.append("")
+            # Instructions - shortened
+            lines.append("\n--- INSTRUCTIONS ---")
+            lines.append("Prefer known destinations when appropriate.")
+            lines.append("Choose based on: availability > space > usage frequency.")
+            lines.append("If no match, suggest new destination.")
             
             return "\n".join(lines)
             

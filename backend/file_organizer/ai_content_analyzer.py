@@ -140,6 +140,77 @@ class AIContentAnalyzer:
             logger.warning(f"Error peeking into archive {archive_path}: {e}")
             return {'error': str(e)}
     
+    def _parse_ai_error(self, error: Exception) -> dict:
+        """
+        Parse AI error and return structured error information.
+        
+        Returns:
+            Dictionary with error_type, message, user_message, code
+        """
+        error_str = str(error).lower()
+        
+        # Authentication errors
+        if '401' in error_str or 'unauthorized' in error_str or 'invalid authentication' in error_str or 'invalid api key' in error_str:
+            return {
+                'error_type': 'authentication_error',
+                'message': str(error),
+                'user_message': 'Invalid API key. Please check your AI provider configuration.',
+                'code': 401
+            }
+        
+        # Insufficient credits / payment required
+        if '402' in error_str or 'insufficient' in error_str or 'quota' in error_str or 'credits' in error_str or 'billing' in error_str:
+            return {
+                'error_type': 'insufficient_credits',
+                'message': str(error),
+                'user_message': 'Insufficient AI credits. Please add funds to your AI provider account.',
+                'code': 402
+            }
+        
+        # Rate limit errors
+        if '429' in error_str or 'rate limit' in error_str or 'too many requests' in error_str:
+            return {
+                'error_type': 'rate_limit',
+                'message': str(error),
+                'user_message': 'Too many requests. Please wait a moment and try again.',
+                'code': 429
+            }
+        
+        # Model not found
+        if '404' in error_str or 'not found' in error_str or 'model' in error_str:
+            return {
+                'error_type': 'model_not_found',
+                'message': str(error),
+                'user_message': 'AI model not found. Please check your model configuration.',
+                'code': 404
+            }
+        
+        # Timeout errors
+        if 'timeout' in error_str or '504' in error_str or '503' in error_str:
+            return {
+                'error_type': 'timeout',
+                'message': str(error),
+                'user_message': 'AI request timed out. Please try again with fewer files.',
+                'code': 504
+            }
+        
+        # Server errors
+        if '500' in error_str or '502' in error_str or 'server error' in error_str:
+            return {
+                'error_type': 'server_error',
+                'message': str(error),
+                'user_message': 'AI service is temporarily unavailable. Please try again later.',
+                'code': 500
+            }
+        
+        # Generic error
+        return {
+            'error_type': 'unknown_error',
+            'message': str(error),
+            'user_message': f'AI request failed: {str(error)[:100]}',
+            'code': 500
+        }
+    
     def _call_ai_with_recovery(self, prompt):
         """
         SINGLE SOURCE OF TRUTH for AI calls with automatic model recovery.
@@ -152,15 +223,30 @@ class AIContentAnalyzer:
             AI response object
             
         Raises:
-            Exception: If AI is unavailable or both attempts fail
+            Exception: If AI is unavailable or both attempts fail (with structured error info)
         """
         if not self.shared_services or not self.shared_services.is_ai_available():
-            raise Exception("AI service not available")
+            error = Exception("AI service not available")
+            error.error_details = {
+                'error_type': 'service_unavailable',
+                'message': 'AI service not initialized',
+                'user_message': 'AI service is not configured. Please check your API key in settings.',
+                'code': 503
+            }
+            raise error
         
         try:
             return self.shared_services.ai_model.generate_content(prompt)
         except Exception as first_error:
-            # If model fails (e.g., deprecated), try discovery and retry once
+            # Parse error details
+            error_details = self._parse_ai_error(first_error)
+            
+            # Don't retry on authentication or credit errors
+            if error_details['error_type'] in ['authentication_error', 'insufficient_credits']:
+                first_error.error_details = error_details
+                raise first_error
+            
+            # Try recovery for other errors
             logger.warning(f"AI model failed, attempting recovery: {str(first_error)[:100]}")
             self.shared_services._model_discovery_attempted = False  # Reset flag to allow retry
             self.shared_services._discover_and_select_model()
@@ -168,10 +254,16 @@ class AIContentAnalyzer:
             # Retry with recovered model
             recovered_model = self.shared_services.ai_model
             if not recovered_model:
+                first_error.error_details = error_details
                 raise first_error
             
             logger.info("🔄 Retrying with recovered model...")
-            return recovered_model.generate_content(prompt)
+            try:
+                return recovered_model.generate_content(prompt)
+            except Exception as second_error:
+                # Attach error details to exception
+                second_error.error_details = self._parse_ai_error(second_error)
+                raise second_error
     
     def analyze_file(self, file_path: str, use_ai: bool = True) -> Dict[str, Any]:
         """
@@ -254,7 +346,284 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
-    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None) -> Dict[str, Any]:
+    def _build_prompt_for_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> str:
+        """
+        Build the AI prompt for batch analysis WITHOUT sending it to AI.
+        Used for token counting before actual analysis.
+        
+        Returns the exact prompt string that would be sent to the AI.
+        """
+        # This is the same logic as analyze_files_batch but only builds the prompt
+        # We'll extract the prompt building logic here
+        
+        # STEP 1: Detect archives
+        archives_info = {}
+        for fp in file_paths:
+            if Path(fp).suffix.lower() in ['.rar', '.zip', '.7z']:
+                archive_content = self._quick_archive_peek(fp)
+                archives_info[fp] = archive_content
+        
+        # STEP 2: Build compact file list
+        root_path = source_path if source_path else None
+        if root_path:
+            root_path = str(Path(root_path).resolve())
+        
+        files_by_folder = {}
+        for fp in file_paths:
+            if root_path:
+                try:
+                    rel_path = Path(fp).relative_to(root_path)
+                    folder = str(rel_path.parent) if str(rel_path.parent) != '.' else '.'
+                    filename = rel_path.name
+                except ValueError:
+                    folder = '.'
+                    filename = fp
+            else:
+                folder = '.'
+                filename = fp
+            
+            if folder not in files_by_folder:
+                files_by_folder[folder] = []
+            
+            file_info = {'file': filename}
+            
+            try:
+                if os.path.exists(fp):
+                    size_bytes = os.path.getsize(fp)
+                    size_mb = round(size_bytes / (1024 * 1024), 1)
+                    file_info['size'] = size_mb
+            except Exception:
+                pass
+            
+            meta = {}
+            if fp in archives_info:
+                meta['archive'] = archives_info[fp]
+            
+            if files_metadata and fp in files_metadata:
+                metadata = files_metadata[fp]
+                if metadata:
+                    if 'size' in metadata:
+                        size_mb = round(metadata['size'] / (1024 * 1024), 1)
+                        file_info['size'] = size_mb
+                    if 'image' in metadata and metadata['image']:
+                        meta['img'] = {k: v for k, v in metadata['image'].items() if v is not None and k != 'format'}
+                    elif 'video' in metadata and metadata['video']:
+                        meta['vid'] = {k: v for k, v in metadata['video'].items() if v is not None and k != 'format'}
+                    elif 'audio' in metadata and metadata['audio']:
+                        meta['aud'] = {k: v for k, v in metadata['audio'].items() if v is not None and k != 'format'}
+                    elif 'document' in metadata and metadata['document']:
+                        meta['doc'] = {k: v for k, v in metadata['document'].items() if v is not None}
+                    elif 'source_code' in metadata and metadata['source_code']:
+                        meta['code'] = {k: v for k, v in metadata['source_code'].items() if v is not None}
+            
+            if meta:
+                file_info['meta'] = meta
+            
+            files_by_folder[folder].append(file_info)
+        
+        # Build indexed lists
+        source_folders = []
+        dest_folders = []
+        file_list_for_ai = []
+        
+        for folder in sorted(files_by_folder.keys()):
+            full_folder = str(Path(root_path) / folder) if root_path and folder != '.' else (root_path if folder == '.' else folder)
+            if full_folder not in source_folders:
+                source_folders.append(full_folder)
+        
+        if ai_context:
+            import re
+            dest_pattern = r'(/[^\s]+)\s+\(drive:'
+            for match in re.finditer(dest_pattern, ai_context):
+                dest_path = match.group(1)
+                if dest_path not in dest_folders:
+                    dest_folders.append(dest_path)
+        
+        for folder in sorted(files_by_folder.keys()):
+            src_folder_idx = source_folders.index(str(Path(root_path) / folder) if root_path and folder != '.' else (root_path if folder == '.' else folder))
+            for file_info in files_by_folder[folder]:
+                file_entry = {
+                    'file': file_info['file'],
+                    'src': src_folder_idx,
+                    'size': file_info.get('size')
+                }
+                if 'meta' in file_info:
+                    file_entry['meta'] = file_info['meta']
+                file_list_for_ai.append(file_entry)
+        
+        # Build context sections (same as analyze_files_batch)
+        context_section = ""
+        if ai_context:
+            context_section = f"""
+{ai_context}
+
+IMPORTANT: You have access to known destinations above!
+- When a file matches a known destination category, return the FULL PATH to that destination
+- Example: If "Images" destination is "/home/user/Pictures", return "/home/user/Pictures" not just "Images"
+- You can also create subfolders within known destinations if needed
+- Choose based on drive availability, space, and usage frequency
+- Only suggest new folders under the destination root if no suitable known destination exists
+"""
+        
+        has_archives = bool(archives_info)
+        archive_handling_rules = ""
+        if has_archives:
+            archive_handling_rules = """
+
+ARCHIVE HANDLING:
+- Only unpack archives if it makes sense (e.g., projects, mixed content that should be organized separately)
+- Keep archives packed if they're complete units (e.g., game installers, software packages, backup archives)
+- If unpacking: detect garbage files (.DS_Store, Thumbs.db, *.tmp, *.cache) → action: "delete"
+- If unpacking: clean filenames with garbage prefixes (LSJF8089_, IMG_20250115_, Copy_of_) → action: "rename"
+- Projects in archives: Keep project files together, extract to single project folder
+
+PROJECT CONTEXT AWARENESS:
+- Check known destinations for project names
+- Match files to projects by name patterns (e.g., "V2K_test_image.jpg" → V2K project)
+- Suggest organizing related files near their projects
+- Example: If "V2K" project exists at /Projects/V2K/, put "V2K_logo.png" in /Projects/V2K/assets/
+- Don't mess up project structure - add to appropriate subfolder (assets/, docs/, etc.)
+
+FILENAME CLEANING:
+- LSJF8089MyDiary.pdf → MyDiary.pdf
+- Copy_of_document.pdf → document.pdf
+- document (1).pdf → document.pdf
+- IMG_20250115_143022.jpg → keep (or use EXIF date if available)
+"""
+        
+        metadata_context = ""
+        has_metadata = any(
+            'meta' in file_info
+            for folder_files in files_by_folder.values()
+            for file_info in folder_files
+        )
+        
+        if has_metadata:
+            metadata_context = """
+METADATA KEYS:
+- img: date_taken, camera_model, location (organize by event/trip)
+- vid: duration, width, height (movies vs clips)
+- aud: artist, album, genre (music organization)
+- doc: title, author, created (invoices by company)
+- archive: files[], type, exe (project detection)
+- code: language (organize by tech stack)
+
+Use metadata when available, prefer over filename guessing.
+"""
+        
+        # Build granularity rules
+        if granularity == 1:
+            granularity_rules = """
+ORGANIZATION LEVEL: BROAD (Level 1)
+- Use ONLY broad categories: "Documents", "Images", "Videos", "Projects", "Software", "Music", "Archives"
+- Group similar files together - don't create specific subfolders
+- Projects go in "Projects" folder (e.g., "Projects/V2K")
+- Keep it simple - user will add detail later if needed
+"""
+        elif granularity == 2:
+            granularity_rules = """
+ORGANIZATION LEVEL: BALANCED (Level 2)
+- Use broad categories with some specificity when clear patterns emerge
+- Examples: "Documents/Finance", "Images/Personal", "Projects/V2K", "Videos/Movies"
+- Only add subfolder if there's a clear grouping (e.g., multiple invoices → Finance)
+- Don't over-categorize - balance between broad and specific
+"""
+        else:
+            granularity_rules = """
+ORGANIZATION LEVEL: DETAILED (Level 3)
+- Create specific subfolders for clear organization
+- Examples: "Documents/Finance/Invoices", "Images/Personal/Family", "Projects/V2K/Assets"
+- Group by type, date, project, or topic as appropriate
+- Maximize organization for easy retrieval
+"""
+        
+        granularity_rules += """
+GENERAL RULES:
+- NO underscores in folder names (use spaces or single words)
+- Projects should always go under "Projects" parent folder
+- Keep folder names clear and intuitive
+"""
+        
+        # Build action type mapping
+        action_types = ["move", "rename", "unpack", "delete"]
+        
+        total_files = sum(len(files) for files in files_by_folder.values())
+        
+        # Build the complete prompt
+        prompt = f"""Analyze {total_files} files and suggest organization.
+
+SOURCE FOLDERS:
+{json.dumps(source_folders, indent=2)}
+
+DESTINATION FOLDERS:
+{json.dumps(dest_folders, indent=2)}
+
+ACTION TYPES:
+{json.dumps(action_types, indent=2)}
+
+{context_section}
+
+{metadata_context}
+
+{granularity_rules}
+
+{archive_handling_rules}
+
+FILES:
+{json.dumps(file_list_for_ai, indent=2)}
+
+Return ONLY valid JSON using indices:
+{{
+  "results": [
+    {{
+      "file": 0,
+      "actions": [
+        {{"type": 0, "dest": 1}}
+      ]
+    }},
+    {{
+      "file": 5,
+      "actions": [
+        {{"type": 1, "new_name": "report.pdf"}},
+        {{"type": 0, "dest": 1, "subfolder": "Documents"}}
+      ]
+    }},
+    {{
+      "file": 8,
+      "actions": [
+        {{"type": 2, "dest": 1, "subfolder": "Projects/MyProject"}},
+        {{"type": 3}}
+      ]
+    }},
+    {{
+      "file": 10,
+      "actions": [
+        {{"type": 3}}
+      ]
+    }}
+  ]
+}}
+
+RESPONSE FORMAT:
+- file: index from FILES list (integer)
+- actions: array of actions to perform IN ORDER
+  - type: index from ACTION TYPES (0=move, 1=rename, 2=unpack, 3=delete)
+  - dest: index from DESTINATION FOLDERS (for move/unpack)
+  - subfolder: optional subfolder path under destination
+  - new_name: new filename (for rename only)
+
+COMMON PATTERNS:
+- Simple move: [{{"type": 0, "dest": 1}}]
+- Rename + move: [{{"type": 1, "new_name": "..."}}, {{"type": 0, "dest": 1}}]
+- Unpack + delete: [{{"type": 2, "dest": 1}}, {{"type": 3}}]
+- Just delete: [{{"type": 3}}]
+
+NO "reason" field - reasons are generated separately on-demand
+"""
+        
+        return prompt
+    
+    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> Dict[str, Any]:
         """
         Analyze multiple files in a single AI call (MUCH faster than individual calls).
         Returns only folder suggestions, no reasons (reasons generated on-demand).
@@ -264,12 +633,15 @@ class AIContentAnalyzer:
             file_paths: List of file paths to analyze
             existing_folders: List of folder names that already exist in destination (for context-aware organization)
             ai_context: Optional context string with known destinations and drives from AIContextBuilder
+            files_metadata: Optional dict mapping file paths to their metadata (size, dates, type-specific info)
+            source_path: Optional source folder path (for relative path optimization)
+            granularity: Organization granularity level (1=broad, 2=balanced, 3=detailed)
             
         Returns:
             {
                 'success': True/False,
                 'results': {
-                    'file_path': {'suggested_folder': 'path', 'content_type': 'type', 'action': 'move/delete/unpack'},
+                    'file_path': {'suggested_folder': 'path', 'action': 'move/delete/unpack'},
                     ...
                 },
                 'error': 'error message if failed'
@@ -289,21 +661,92 @@ class AIContentAnalyzer:
                     archive_content = self._quick_archive_peek(fp)
                     archives_info[fp] = archive_content
             
-            # STEP 2: Build file list for AI with archive context
-            file_list = []
+            # STEP 2: Build compact file list for AI with relative paths grouped by folder
+            
+            # Calculate common root path for optimization
+            root_path = source_path if source_path else None
+            if root_path:
+                root_path = str(Path(root_path).resolve())
+            
+            # Group files by their parent folder
+            files_by_folder = {}
+            
             for fp in file_paths:
-                file_info = {
-                    'path': fp,
-                    'name': Path(fp).name,
-                    'extension': Path(fp).suffix.lower()
-                }
+                # Use relative path if source_path provided
+                if root_path:
+                    try:
+                        rel_path = Path(fp).relative_to(root_path)
+                        folder = str(rel_path.parent) if str(rel_path.parent) != '.' else '.'
+                        filename = rel_path.name
+                    except ValueError:
+                        # File not under root, use full path
+                        folder = '.'
+                        filename = fp
+                else:
+                    folder = '.'
+                    filename = fp
+                
+                if folder not in files_by_folder:
+                    files_by_folder[folder] = []
+                
+                # Compact format: {"file": "name", "size": MB, "meta": {...}}
+                file_info = {'file': filename}
+                
+                # Add file size (always useful for AI decisions)
+                try:
+                    if os.path.exists(fp):
+                        size_bytes = os.path.getsize(fp)
+                        size_mb = round(size_bytes / (1024 * 1024), 1)
+                        file_info['size'] = size_mb  # Size in MB
+                except Exception as e:
+                    logger.debug(f"Could not get size for {fp}: {e}")
+                
+                # Build metadata object only if there's actual metadata
+                meta = {}
                 
                 # Add archive content info if available
                 if fp in archives_info:
-                    file_info['is_archive'] = True
-                    file_info['archive_contents'] = archives_info[fp]
+                    meta['archive'] = archives_info[fp]
                 
-                file_list.append(file_info)
+                # Add metadata if provided by frontend
+                if files_metadata and fp in files_metadata:
+                    metadata = files_metadata[fp]
+                    if metadata:
+                        # Override size if provided by frontend
+                        if 'size' in metadata:
+                            size_mb = round(metadata['size'] / (1024 * 1024), 1)
+                            file_info['size'] = size_mb
+                        # Add type-specific metadata (only non-null values, exclude format)
+                        if 'image' in metadata and metadata['image']:
+                            meta['img'] = {k: v for k, v in metadata['image'].items() if v is not None and k != 'format'}
+                        
+                        elif 'video' in metadata and metadata['video']:
+                            meta['vid'] = {k: v for k, v in metadata['video'].items() if v is not None and k != 'format'}
+                        
+                        elif 'audio' in metadata and metadata['audio']:
+                            meta['aud'] = {k: v for k, v in metadata['audio'].items() if v is not None and k != 'format'}
+                        
+                        elif 'document' in metadata and metadata['document']:
+                            meta['doc'] = {k: v for k, v in metadata['document'].items() if v is not None}
+                        
+                        elif 'archive' in metadata and metadata['archive']:
+                            arch = metadata['archive']
+                            # Override with frontend metadata if available
+                            if 'contents' in arch and arch['contents']:
+                                meta['archive'] = {
+                                    'files': arch['contents'][:5],  # First 5 files
+                                    'type': arch.get('detected_project_type'),
+                                    'exe': arch.get('contains_executables')
+                                }
+                        
+                        elif 'source_code' in metadata and metadata['source_code']:
+                            meta['code'] = {k: v for k, v in metadata['source_code'].items() if v is not None}
+                
+                # Only add meta if it has content
+                if meta:
+                    file_info['meta'] = meta
+                
+                files_by_folder[folder].append(file_info)
             
             # Build context-aware prompt with known destinations and drives
             context_section = ""
@@ -321,116 +764,224 @@ IMPORTANT: You have access to known destinations above!
 - Only suggest new folders under the destination root if no suitable known destination exists
 """
             
-            # Add existing folders context (folders in the destination root)
-            existing_folders_context = ""
-            if existing_folders:
-                existing_folders_context = f"""
-EXISTING FOLDERS in destination root:
-{json.dumps(existing_folders, indent=2)}
-
-IMPORTANT: Reuse these folder names when appropriate! If a file fits into an existing category, use that exact folder name.
-"""
+            # Existing folders context - removed, AI can see destinations already
             
-            # Analyze file diversity to determine appropriate granularity
-            file_extensions = set(f['extension'] for f in file_list)
-            all_same_type = len(file_extensions) == 1
-            
-            granularity_rule = ""
-            if all_same_type and len(file_list) > 3:
-                # All files are same type (e.g., all PDFs) → Allow more specific categories
-                granularity_rule = """
-GRANULARITY RULE: All files are the SAME TYPE, so you can use MORE SPECIFIC categories.
-- For PDFs: Use categories like "Personal", "Health", "Finance", "Work", "Contracts", etc.
-- For images: Use categories like "Vacation", "Family", "Work", "Screenshots", etc.
-- For videos: Use categories like "Movies", "Tutorials", "Personal", etc.
-
-BUT still keep it to ONE level - no nested paths!
-"""
-            else:
-                # Mixed file types → Use broad generic categories
-                granularity_rule = """
-GRANULARITY RULE: Files are MIXED TYPES, so use BROAD, GENERIC categories.
-- Use simple categories: "Documents", "Images", "Photos", "Videos", "Software", "Media", "Music", "Books"
-- NO specific subcategories yet - the user will add those later with "Add Granularity"
-"""
+            # Granularity rule - removed, AI should decide based on context
+            # If files are already in a folder, AI will naturally add another layer
+            # If organizing from scratch, AI will choose appropriate level
             
             # Check if any archives exist
-            has_archives = any(f.get('is_archive') for f in file_list)
+            has_archives = bool(archives_info)
             archive_handling_rules = ""
             
             if has_archives:
                 archive_handling_rules = """
 
-ARCHIVE HANDLING RULES:
-1. **Duplicate Detection**: If an archive filename matches an extracted file (e.g., "movie.rar" + "movie.mkv"):
-   - Set archive action to "delete" (it's redundant)
-   - Only organize the extracted file
-   
-2. **Unknown Archive Content**: If archive name doesn't reveal its content OR you're unsure:
-   - Set action to "unpack" (needs analysis)
-   - Put in a "ToReview" or "Archives" folder temporarily
-   
-3. **Known Archive Content**: If you know what's inside from the filename or content peek:
-   - Set action to "move" and organize by content type
-   - Example: "MovieName.rar" containing "MovieName.mkv" → suggest "delete" for .rar
+ARCHIVE HANDLING:
+- Only unpack archives if it makes sense (e.g., projects, mixed content that should be organized separately)
+- Keep archives packed if they're complete units (e.g., game installers, software packages, backup archives)
+- If unpacking: detect garbage files (.DS_Store, Thumbs.db, *.tmp, *.cache) → action: "delete"
+- If unpacking: clean filenames with garbage prefixes (LSJF8089_, IMG_20250115_, Copy_of_) → action: "rename"
+- Projects in archives: Keep project files together, extract to single project folder
 
-For archives, you MUST include an "action" field: "move", "delete", or "unpack"
+PROJECT CONTEXT AWARENESS:
+- Check known destinations for project names
+- Match files to projects by name patterns (e.g., "V2K_test_image.jpg" → V2K project)
+- Suggest organizing related files near their projects
+- Example: If "V2K" project exists at /Projects/V2K/, put "V2K_logo.png" in /Projects/V2K/assets/
+- Don't mess up project structure - add to appropriate subfolder (assets/, docs/, etc.)
+
+FILENAME CLEANING:
+- LSJF8089MyDiary.pdf → MyDiary.pdf
+- Copy_of_document.pdf → document.pdf
+- document (1).pdf → document.pdf
+- IMG_20250115_143022.jpg → keep (or use EXIF date if available)
 """
             
-            prompt = f"""Analyze these {len(file_list)} files and suggest the best folder structure for each.
+            # Build metadata context section
+            metadata_context = ""
+            has_metadata = any(
+                'meta' in file_info
+                for folder_files in files_by_folder.values()
+                for file_info in folder_files
+            )
+            
+            if has_metadata:
+                metadata_context = """
+METADATA KEYS:
+- img: date_taken, camera_model, location (organize by event/trip)
+- vid: duration, width, height (movies vs clips)
+- aud: artist, album, genre (music organization)
+- doc: title, author, created (invoices by company)
+- archive: files[], type, exe (project detection)
+- code: language (organize by tech stack)
+
+Use metadata when available, prefer over filename guessing.
+"""
+            
+            # Add root path context if using relative paths
+            root_context = ""
+            total_files = sum(len(files) for files in files_by_folder.values())
+            if root_path:
+                root_context = f"""
+SOURCE ROOT: {root_path}
+(Files grouped by subfolder below)
+"""
+            
+            # Build indexed lists for compact response
+            source_folders = []
+            dest_folders = []
+            file_list_for_ai = []
+            
+            # Collect unique source folders
+            for folder in sorted(files_by_folder.keys()):
+                full_folder = str(Path(root_path) / folder) if root_path and folder != '.' else (root_path if folder == '.' else folder)
+                if full_folder not in source_folders:
+                    source_folders.append(full_folder)
+            
+            # Collect destination folders from context
+            if ai_context:
+                # Extract destination paths from context
+                import re
+                dest_pattern = r'(/[^\s]+)\s+\(drive:'
+                for match in re.finditer(dest_pattern, ai_context):
+                    dest_path = match.group(1)
+                    if dest_path not in dest_folders:
+                        dest_folders.append(dest_path)
+            
+            # Build file list with source folder indices
+            for folder in sorted(files_by_folder.keys()):
+                src_folder_idx = source_folders.index(str(Path(root_path) / folder) if root_path and folder != '.' else (root_path if folder == '.' else folder))
+                for file_info in files_by_folder[folder]:
+                    file_entry = {
+                        'file': file_info['file'],
+                        'src': src_folder_idx,
+                        'size': file_info.get('size')
+                    }
+                    if 'meta' in file_info:
+                        file_entry['meta'] = file_info['meta']
+                    file_list_for_ai.append(file_entry)
+            
+            # Build granularity instructions based on level
+            if granularity == 1:
+                granularity_rules = """
+ORGANIZATION LEVEL: BROAD (Level 1)
+- Use ONLY broad categories: "Documents", "Images", "Videos", "Projects", "Software", "Music", "Archives"
+- Group similar files together - don't create specific subfolders
+- Projects go in "Projects" folder (e.g., "Projects/V2K")
+- Keep it simple - user will add detail later if needed
+"""
+            elif granularity == 2:
+                granularity_rules = """
+ORGANIZATION LEVEL: BALANCED (Level 2)
+- Use broad categories with some specificity when clear patterns emerge
+- Examples: "Documents/Finance", "Images/Personal", "Projects/V2K", "Videos/Movies"
+- Only add subfolder if there's a clear grouping (e.g., multiple invoices → Finance)
+- Don't over-categorize - balance between broad and specific
+"""
+            else:  # granularity == 3
+                granularity_rules = """
+ORGANIZATION LEVEL: DETAILED (Level 3)
+- Create specific subfolders for clear organization
+- Examples: "Documents/Finance/Invoices", "Images/Personal/Family", "Projects/V2K/Assets"
+- Group by type, date, project, or topic as appropriate
+- Maximize organization for easy retrieval
+"""
+            
+            granularity_rules += """
+GENERAL RULES:
+- NO underscores in folder names (use spaces or single words)
+- Projects should always go under "Projects" parent folder
+- Keep folder names clear and intuitive
+"""
+            
+            # Build action type mapping
+            action_types = ["move", "rename", "unpack", "delete"]
+            
+            prompt = f"""Analyze {total_files} files and suggest organization.
+
+SOURCE FOLDERS:
+{json.dumps(source_folders, indent=2)}
+
+DESTINATION FOLDERS:
+{json.dumps(dest_folders, indent=2)}
+
+ACTION TYPES:
+{json.dumps(action_types, indent=2)}
 
 {context_section}
 
-{existing_folders_context}
+{metadata_context}
 
-{granularity_rule}
-
-CRITICAL RULES FOR FOLDER NAMES:
-1. NO underscores, NO compound names like "Legal_Documents" or "Personal_Photos"
-2. NO nested paths like "Documents/Contracts" - just ONE level
-3. Keep names simple and clear
-
-✅ GOOD Examples (generic): "Documents", "Images", "Photos", "Videos", "Software", "Media"
-✅ GOOD Examples (specific, when all same type): "Finance", "Health", "Personal", "Vacation", "Movies"
-❌ BAD Examples: "Legal_Documents", "Personal_Photos", "Plans_Drawings", "Videos_Movies"
+{granularity_rules}
 
 {archive_handling_rules}
 
-Files to analyze:
-{json.dumps(file_list, indent=2)}
+FILES:
+{json.dumps(file_list_for_ai, indent=2)}
 
-Return ONLY valid JSON (no markdown) with this structure:
+Return ONLY valid JSON using indices:
 {{
-  "results": {{
-    "full_file_path": {{
-      "suggested_folder": "FolderName or /full/path/to/known/destination",
-      "content_type": "brief_type_description",
-      "action": "move"  // or "delete" or "unpack" (for archives only)
+  "results": [
+    {{
+      "file": 0,
+      "actions": [
+        {{"type": 0, "dest": 1}}
+      ]
     }},
-    ...
-  }}
+    {{
+      "file": 5,
+      "actions": [
+        {{"type": 1, "new_name": "report.pdf"}},
+        {{"type": 0, "dest": 1, "subfolder": "Documents"}}
+      ]
+    }},
+    {{
+      "file": 8,
+      "actions": [
+        {{"type": 2, "dest": 1, "subfolder": "Projects/MyProject"}},
+        {{"type": 3}}
+      ]
+    }},
+    {{
+      "file": 10,
+      "actions": [
+        {{"type": 3}}
+      ]
+    }}
+  ]
 }}
 
-IMPORTANT for suggested_folder:
-- If using a known destination, return the FULL PATH (e.g., "/home/user/Pictures")
-- If creating a new folder, return just the folder name (e.g., "Images")
-- You can append subfolders to known destinations (e.g., "/home/user/Pictures/Vacation")
+RESPONSE FORMAT:
+- file: index from FILES list (integer)
+- actions: array of actions to perform IN ORDER
+  - type: index from ACTION TYPES (0=move, 1=rename, 2=unpack, 3=delete)
+  - dest: index from DESTINATION FOLDERS (for move/unpack)
+  - subfolder: optional subfolder path under destination
+  - new_name: new filename (for rename only)
 
-Remember: If folders exist, REUSE them. If files are mixed, use GENERIC categories. If all same type, use SPECIFIC categories.
-For archives: detect duplicates and suggest deletion OR suggest unpacking if content is unknown."""
+COMMON PATTERNS:
+- Simple move: [{{"type": 0, "dest": 1}}]
+- Rename + move: [{{"type": 1, "new_name": "..."}}, {{"type": 0, "dest": 1}}]
+- Unpack + delete: [{{"type": 2, "dest": 1}}, {{"type": 3}}]
+- Just delete: [{{"type": 3}}]
+
+NO "reason" field - reasons are generated separately on-demand
+"""
 
             # Log to terminal (clean summary)
             CYAN = '\033[96m'
             RESET = '\033[0m'
-            logger.info(f"{CYAN}🤖 Analyzing {len(file_list)} files with AI{RESET}")
+            logger.info(f"{CYAN}🤖 Analyzing {total_files} files with AI{RESET}")
             
             # Log full prompt to AI log file
             ai_logger.info("=" * 80)
             ai_logger.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - AI PROMPT")
             ai_logger.info("=" * 80)
-            ai_logger.info(f"Files: {len(file_list)}")
+            ai_logger.info(f"Files: {total_files}")
+            ai_logger.info(f"Folders: {len(files_by_folder)}")
             ai_logger.info(f"Context: {len(ai_context) if ai_context else 0} chars")
-            ai_logger.info(f"Existing folders: {len(existing_folders) if existing_folders else 0}")
+            ai_logger.info(f"Prompt length: {len(prompt)} chars")
             ai_logger.info("")
             ai_logger.info(prompt)
             ai_logger.info("")
@@ -468,22 +1019,116 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
                 response_text = response_text.strip()
             
             result = json.loads(response_text)
-            results = result.get('results', {})
+            indexed_results = result.get('results', [])
+            
+            # Action type mapping
+            action_types = ["move", "rename", "unpack", "delete"]
+            
+            # Convert indexed format back to full path format
+            results = {}
+            for item in indexed_results:
+                file_idx = item.get('file')
+                actions = item.get('actions', [])
+                
+                if file_idx is None or file_idx >= len(file_list_for_ai):
+                    logger.warning(f"Invalid file index: {file_idx}")
+                    continue
+                
+                if not actions:
+                    logger.warning(f"No actions specified for file index {file_idx}")
+                    continue
+                
+                # Get file info from indexed list
+                file_info = file_list_for_ai[file_idx]
+                filename = file_info['file']
+                source_idx = file_info['src']
+                
+                # Build full source path
+                src_folder = source_folders[source_idx]
+                file_path = str(Path(src_folder) / filename)
+                
+                # Process actions array
+                processed_actions = []
+                suggested_folder = None
+                new_name = None
+                
+                for action in actions:
+                    action_type_idx = action.get('type')
+                    
+                    # Validate action type index
+                    if action_type_idx is None or action_type_idx >= len(action_types):
+                        logger.warning(f"Invalid action type index: {action_type_idx}")
+                        continue
+                    
+                    action_type = action_types[action_type_idx]
+                    
+                    if action_type == 'move':
+                        # Extract destination from move action
+                        dest_idx = action.get('dest')
+                        if dest_idx is not None and dest_idx < len(dest_folders):
+                            suggested_folder = dest_folders[dest_idx]
+                            if 'subfolder' in action:
+                                suggested_folder = str(Path(suggested_folder) / action['subfolder'])
+                        elif 'subfolder' in action:
+                            suggested_folder = action['subfolder']
+                        
+                        processed_actions.append({
+                            'type': 'move',
+                            'destination': suggested_folder
+                        })
+                    
+                    elif action_type == 'rename':
+                        new_name = action.get('new_name')
+                        processed_actions.append({
+                            'type': 'rename',
+                            'new_name': new_name
+                        })
+                    
+                    elif action_type == 'unpack':
+                        # Extract destination from unpack action
+                        dest_idx = action.get('dest')
+                        unpack_dest = None
+                        if dest_idx is not None and dest_idx < len(dest_folders):
+                            unpack_dest = dest_folders[dest_idx]
+                            if 'subfolder' in action:
+                                unpack_dest = str(Path(unpack_dest) / action['subfolder'])
+                        elif 'subfolder' in action:
+                            unpack_dest = action['subfolder']
+                        
+                        processed_actions.append({
+                            'type': 'unpack',
+                            'destination': unpack_dest
+                        })
+                    
+                    elif action_type == 'delete':
+                        processed_actions.append({
+                            'type': 'delete'
+                        })
+                
+                # Build result object with actions array
+                file_result = {
+                    'actions': processed_actions
+                }
+                
+                # For backward compatibility, also set legacy fields
+                # (frontend might still expect these)
+                if suggested_folder:
+                    file_result['suggested_folder'] = suggested_folder
+                if new_name:
+                    file_result['new_name'] = new_name
+                
+                # Set primary action for backward compatibility
+                if processed_actions:
+                    file_result['action'] = processed_actions[0]['type']
+                
+                results[file_path] = file_result
             
             # Log success to terminal
             logger.info(f"{GREEN}✅ AI analysis complete ({len(results)} results){RESET}")
             for file_path, file_result in results.items():
-                if file_result:
-                    suggested_folder = file_result.get('suggested_folder', 'MISSING')
-                    action = file_result.get('action', 'move')
-                    content_type = file_result.get('content_type', 'unknown')
-                    logger.debug(f"  {Path(file_path).name}: folder='{suggested_folder}', action='{action}', type='{content_type}'")
-                    
-                    # Warn about missing or null suggested_folder
-                    if 'suggested_folder' not in file_result:
-                        logger.warning(f"AI result missing 'suggested_folder' for {file_path}: {file_result}")
-                    elif file_result.get('suggested_folder') is None:
-                        logger.warning(f"AI returned None for 'suggested_folder' for {file_path}: {file_result}")
+                suggested_folder = file_result.get('suggested_folder', 'N/A')
+                action = file_result.get('action', 'move')
+                logger.debug(f"  {Path(file_path).name}: folder='{suggested_folder}', action='{action}'")
             
             return {
                 'success': True,
@@ -497,7 +1142,13 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
         except Exception as e:
             error_msg = f"Batch analysis error: {str(e)}"
             logger.error(error_msg)
-            return {'success': False, 'error': error_msg}
+            
+            # Include error details if available
+            error_response = {'success': False, 'error': error_msg}
+            if hasattr(e, 'error_details'):
+                error_response['error_details'] = e.error_details
+            
+            return error_response
     
     def add_granularity(self, folder_path: str, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -523,33 +1174,30 @@ For archives: detect duplicates and suggest deletion OR suggest unpacking if con
         try:
             folder_name = Path(folder_path).name
             
-            prompt = f"""You are organizing the "{folder_name}" folder. Add ONE level of granularity.
-
-CRITICAL RULES:
-1. You can create subfolders, but ONLY ONE LEVEL deep
-2. NOT ALL items need to go into subfolders - only organize items where it makes sense
-3. Items that don't need subcategorization should stay in the current folder (return null for subfolder)
-
-Current folder: {folder_name}
-Items to analyze:
-{json.dumps(items, indent=2)}
-
-Examples of good decisions:
-- If you see 10 contracts and 2 random notes → move contracts to "Contracts/" subfolder, leave notes in "{folder_name}/"
-- If you see 5 photos from 2024 and 3 from 2025 → create "2024/" and "2025/" subfolders
-- If you see 3 random unrelated files → leave them all in "{folder_name}/" (no subfolder needed)
-
-Return ONLY valid JSON (no markdown):
-{{
-  "suggestions": {{
-    "full_item_path": {{
-      "subfolder": "SubfolderName"  // or null if item should stay in current folder
-    }},
-    ...
-  }}
-}}
-
-Be smart and practical. Only create subfolders when there's a clear benefit."""
+            prompt = (
+                f'You are organizing the "{folder_name}" folder. Add ONE level of granularity.\n\n'
+                'CRITICAL RULES:\n'
+                '1. You can create subfolders, but ONLY ONE LEVEL deep\n'
+                '2. NOT ALL items need to go into subfolders - only organize items where it makes sense\n'
+                '3. Items that do not need subcategorization should stay in current folder (return null)\n\n'
+                f'Current folder: {folder_name}\n'
+                'Items to analyze:\n'
+                f'{json.dumps(items, indent=2)}\n\n'
+                'Examples of good decisions:\n'
+                f'- If you see 10 contracts and 2 random notes: move contracts to "Contracts/" subfolder, leave notes in "{folder_name}/"\n'
+                '- If you see 5 photos from 2024 and 3 from 2025: create "2024/" and "2025/" subfolders\n'
+                f'- If you see 3 random unrelated files: leave them all in "{folder_name}/" (no subfolder needed)\n\n'
+                'Return ONLY valid JSON (no markdown):\n'
+                '{\n'
+                '  "suggestions": {\n'
+                '    "full_item_path": {\n'
+                '      "subfolder": "SubfolderName"  // or null if item should stay in current folder\n'
+                '    },\n'
+                '    ...\n'
+                '  }\n'
+                '}\n\n'
+                'Be smart and practical. Only create subfolders when there is a clear benefit.'
+            )
 
             # Call AI with recovery
             try:
@@ -585,11 +1233,11 @@ Be smart and practical. Only create subfolders when there's a clear benefit."""
     
     def _analyze_with_ai(self, file_path: str, file_name: str, file_ext: str, file_exists: bool) -> Dict[str, Any]:
         """
-        Use AI (Gemini) to intelligently categorize and extract metadata from files.
-        Supports dynamic categories like: movies, tv_shows, music, ebooks, tutorials, 
-        projects, assets (3d_models, brushes, plugins), documents, etc.
+        Use AI to intelligently categorize and extract metadata from files.
+        Supports dynamic categories: movies, tv_shows, music, ebooks, tutorials,
+        projects, assets, documents, etc.
         
-        Returns a dict with 'success' field. If success=False, includes 'error' field with details.
+        Returns dict with success field. If success=False, includes error field.
         """
         try:
             if not self.shared_services or not self.shared_services.ai_model:
@@ -1328,7 +1976,7 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
         Detects project types and categorizes files.
         
         Args:
-            archive_path: Path to ZIP/RAR/7z file
+            archive_path: Path to archive file (ZIP, RAR, 7-Zip)
             
         Returns:
             Dictionary with archive analysis
@@ -1386,7 +2034,7 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
             }
     
     def _analyze_7z(self, archive_path: str) -> Dict[str, Any]:
-        """Analyze 7z archive"""
+        """Analyze 7-Zip archive"""
         try:
             import py7zr
             with py7zr.SevenZipFile(archive_path, 'r') as sz_file:
@@ -1465,15 +2113,21 @@ Be creative and intelligent with your folder suggestions. Use the filename and c
         """Categorize a file based on its extension"""
         ext = Path(file_path).suffix.lower()
         
-        if ext in ['.cs', '.py', '.java', '.js', '.ts', '.cpp', '.c', '.dart', '.go', '.rb']:
+        source_exts = ['.cs', '.py', '.java', '.js', '.ts', '.cpp', '.c', '.dart', '.go', '.rb']
+        project_exts = ['.csproj', '.sln', '.json', '.yaml', '.yml', '.xml', '.config']
+        image_exts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        doc_exts = ['.pdf', '.doc', '.docx', '.txt']
+        exe_exts = ['.exe', '.dll', '.so', '.dylib']
+        
+        if ext in source_exts:
             return 'SourceCode'
-        elif ext in ['.csproj', '.sln', '.json', '.yaml', '.yml', '.xml', '.config']:
+        elif ext in project_exts:
             return 'ProjectFile'
-        elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+        elif ext in image_exts:
             return 'Image'
-        elif ext in ['.pdf', '.doc', '.docx', '.txt']:
+        elif ext in doc_exts:
             return 'Document'
-        elif ext in ['.exe', '.dll', '.so', '.dylib']:
+        elif ext in exe_exts:
             return 'Executable'
         else:
             return 'Other'

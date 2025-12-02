@@ -14,8 +14,7 @@
 
 ### Features
 - **[DRIVE_CLIENT_MOUNTS.md](DRIVE_CLIENT_MOUNTS.md)** - Client-specific drive mounting
-- **[BATCH_DRIVE_QUICK_REFERENCE.md](BATCH_DRIVE_QUICK_REFERENCE.md)** - Batch drive registration
-- **[BATCH_DRIVE_REGISTRATION_EXAMPLE.md](BATCH_DRIVE_REGISTRATION_EXAMPLE.md)** - Code examples
+- **[BATCH_DRIVE_QUICK_REFERENCE.md](BATCH_DRIVE_QUICK_REFERENCE.md)** - Batch drive registration with examples
 
 ### Database
 - **[migrations/README.md](../migrations/README.md)** - Database migration system
@@ -28,7 +27,7 @@
 ### For Frontend Developers
 1. Start with [FRONTEND_INTEGRATION_GUIDE.md](FRONTEND_INTEGRATION_GUIDE.md)
 2. Reference [API_ENDPOINTS.md](API_ENDPOINTS.md) for endpoint details
-3. Check [BATCH_DRIVE_REGISTRATION_EXAMPLE.md](BATCH_DRIVE_REGISTRATION_EXAMPLE.md) for code samples
+3. Check [BATCH_DRIVE_QUICK_REFERENCE.md](BATCH_DRIVE_QUICK_REFERENCE.md) for code samples
 
 ### For Backend Developers
 1. Review [DESTINATION_MEMORY_MANAGER.md](DESTINATION_MEMORY_MANAGER.md) for destination logic

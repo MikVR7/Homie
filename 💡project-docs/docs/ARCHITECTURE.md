@@ -1,5 +1,52 @@
 # Homie Architecture
 
+## ViewModels & Data Models
+
+**Backend Models** (`Models/AI/`):
+- `BackendOrganizeResponse`: Root response with success flag, analysis metadata, operations list
+- `AnalysisMetadata`: Analysis ID, file count, timestamps, organization style
+- `FileOperation`: Individual operation with source, destination, reason, type, status
+
+**UI ViewModels** (`ViewModels/`):
+- `FileCardViewModel`: Represents a file in the browser (icon, name, path, background color)
+- `AISuggestionsViewModel`: Container for category cards
+- `CategoryCardViewModel`: Represents a category with icon, name, accent colors, file list
+- `FileViewModel`: Individual file in a category card (name, icon)
+
+**Metadata Models** (`Models/Metadata/`):
+- `FileMetadata`: Base metadata with type-specific fields (size, dates, extension)
+- `ImageMetadata`: EXIF data, dimensions, camera info
+- `ArchiveMetadata`: Contents list, project type, encryption status (`is_encrypted` flag)
+- `DocumentMetadata`: Page count, title, author for PDF/Office docs
+- `SourceCodeMetadata`: Language and project type detection
+
+**Services:**
+- `BackendBridge`: Central manager for all backend services
+- `AIAnalysisService`: Queue-based, event-driven AI operations processor
+- `BackendHealthMonitor`: Monitors backend connection health
+- `ApiService`: Generic HTTP client with logging and health checks
+- `DestinationMemoryService`: Manages known destinations and drive detection
+- `FileTypeColorService`: Maps file extensions to themed color brushes
+- `FileOperationExecutor`: Executes actual file move/copy operations with error handling
+- `FileMetadataService`: Extracts rich metadata from files (images, archives, documents, source code)
+- `ExecutionService`: Legacy service (may be refactored)
+
+## File Organizer: Current State & Roadmap
+
+**Backend Integration:**
+- ✅ Real API communication via `ApiService.GetAnalysisAsync()`
+- ✅ Endpoint: `POST /api/file-organizer/organize`
+- ✅ Request includes: files array (with path and metadata), source_path, destination_path
+- ✅ **File Metadata**: Frontend extracts and sends rich metadata for each file:
+  - File size, dates, extension (always present)
+  - Image metadata: dimensions, EXIF (date taken, camera, location)
+  - Archive metadata: contents list, project type detection, encryption status (`is_encrypted` flag)
+  - Document metadata: page count, title, author (PDF, Office docs)
+  - Source code metadata: language, project type detection
+- ✅ Response: `BackendOrganizeResponse` with analysis metadata and list of file operations
+- ✅ Each operation includes: source, destination, reason, type (move/copy), status
+- ℹ️ **Default destination**: Currently hardcoded to `/home/mikele/Desktop/TestingHomie/Destination` (will be made configurable)
+
 ## Review
 
 Let's review the architecture documentation for any outdated information.
@@ -615,7 +662,9 @@ Each module can be:
 
 
 
-<!-- Last updated: 2025-11-17 07:03 - Reason: Updating the documentation to reflect the 'Orchestrator Window' pattern, which is a more accurate description of the architecture we have implemented. -->
+
+
+<!-- Last updated: 2025-11-26 07:11 - Reason: Added FileMetadataService and metadata models to the architecture documentation -->
 
 ## ### Phase 7: Granular & Alternative Suggestions (Complete)
 

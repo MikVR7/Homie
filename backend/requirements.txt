@@ -12,6 +12,8 @@ gevent-websocket==0.10.1
 
 # AI Integration
 google-generativeai==0.3.2
+openai>=1.50.0  # For Kimi and other OpenAI-compatible APIs
+tiktoken==0.5.2  # For OpenAI-compatible token counting (Kimi, etc.)
 
 # File Operations & Monitoring
 watchdog==3.0.0

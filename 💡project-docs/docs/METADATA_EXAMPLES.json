@@ -1,0 +1,284 @@
+{
+  "example_1_images_with_metadata": {
+    "description": "Organizing photos with EXIF metadata",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/IMG_1234.jpg",
+          "metadata": {
+            "size": 2048000,
+            "last_modified": "2025-01-15T10:30:00Z",
+            "created": "2025-01-12T14:20:00Z",
+            "extension": ".jpg",
+            "image": {
+              "width": 1920,
+              "height": 1080,
+              "format": "JPEG",
+              "date_taken": "2025-01-12T14:20:00Z",
+              "camera_model": "Canon EOS R5",
+              "location": "Vienna, Austria"
+            }
+          }
+        },
+        {
+          "path": "/Users/john/Downloads/IMG_1235.jpg",
+          "metadata": {
+            "size": 1856000,
+            "extension": ".jpg",
+            "image": {
+              "width": 1920,
+              "height": 1080,
+              "date_taken": "2025-01-12T15:45:00Z",
+              "camera_model": "Canon EOS R5",
+              "location": "Vienna, Austria"
+            }
+          }
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Pictures",
+      "organization_style": "by_type",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "Both images organized to Pictures/Vienna2025/ based on location and date"
+  },
+
+  "example_2_project_archive": {
+    "description": "Organizing a project archive with detected project type",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/MyReactApp.zip",
+          "metadata": {
+            "size": 5242880,
+            "extension": ".zip",
+            "archive": {
+              "archive_type": "ZIP",
+              "contents": [
+                "package.json",
+                "src/App.tsx",
+                "src/index.tsx",
+                "public/index.html",
+                "README.md"
+              ],
+              "detected_project_type": "React",
+              "contains_executables": false
+            }
+          }
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Projects",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "Archive extracted to Projects/React/MyReactApp/"
+  },
+
+  "example_3_documents": {
+    "description": "Organizing PDF documents with metadata",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/invoice_acme.pdf",
+          "metadata": {
+            "size": 256000,
+            "extension": ".pdf",
+            "document": {
+              "page_count": 2,
+              "title": "Invoice #12345",
+              "author": "Acme Corp",
+              "created": "2025-01-05T09:00:00Z"
+            }
+          }
+        },
+        {
+          "path": "/Users/john/Downloads/contract.pdf",
+          "metadata": {
+            "size": 512000,
+            "extension": ".pdf",
+            "document": {
+              "page_count": 8,
+              "title": "Service Agreement",
+              "author": "Legal Department",
+              "created": "2025-01-10T14:00:00Z"
+            }
+          }
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Documents",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "Invoice to Documents/Invoices/, Contract to Documents/Contracts/"
+  },
+
+  "example_4_mixed_files": {
+    "description": "Mixed file types with varying metadata availability",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/photo.jpg",
+          "metadata": {
+            "size": 1024000,
+            "image": {
+              "width": 1920,
+              "height": 1080,
+              "date_taken": "2025-01-15T10:00:00Z"
+            }
+          }
+        },
+        {
+          "path": "/Users/john/Downloads/song.mp3",
+          "metadata": {
+            "size": 5120000,
+            "audio": {
+              "duration": 245.3,
+              "artist": "The Beatles",
+              "album": "Abbey Road",
+              "title": "Come Together",
+              "genre": "Rock",
+              "year": 1969
+            }
+          }
+        },
+        {
+          "path": "/Users/john/Downloads/unknown_file.bin",
+          "metadata": null
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Organized",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "Photo to Photos/, Music to Music/TheBeatles/, unknown_file to Uncategorized/"
+  },
+
+  "example_5_legacy_format": {
+    "description": "Legacy format for backward compatibility (no metadata)",
+    "request": {
+      "files": [
+        "/Users/john/Downloads/document.pdf",
+        "/Users/john/Downloads/image.jpg",
+        "/Users/john/Downloads/video.mp4"
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Organized"
+    },
+    "expected_result": "Files organized based on filename patterns only"
+  },
+
+  "example_6_video_files": {
+    "description": "Video files with duration and quality metadata",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/movie.mkv",
+          "metadata": {
+            "size": 4294967296,
+            "extension": ".mkv",
+            "video": {
+              "duration": 7200.5,
+              "width": 3840,
+              "height": 2160,
+              "codec": "H.265",
+              "bitrate": 8000000,
+              "fps": 24.0
+            }
+          }
+        },
+        {
+          "path": "/Users/john/Downloads/clip.mp4",
+          "metadata": {
+            "size": 52428800,
+            "extension": ".mp4",
+            "video": {
+              "duration": 45.2,
+              "width": 1920,
+              "height": 1080,
+              "codec": "H.264",
+              "fps": 30.0
+            }
+          }
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Videos",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "Long movie to Videos/Movies/, short clip to Videos/Clips/"
+  },
+
+  "example_7_dotnet_project": {
+    "description": ".NET project archive with C# files",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/MyDotNetApp.zip",
+          "metadata": {
+            "size": 8388608,
+            "extension": ".zip",
+            "archive": {
+              "archive_type": "ZIP",
+              "contents": [
+                "src/Program.cs",
+                "src/Controllers/HomeController.cs",
+                "MyDotNetApp.csproj",
+                "appsettings.json",
+                "README.md"
+              ],
+              "detected_project_type": "DotNet",
+              "contains_executables": false
+            }
+          }
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Projects",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "Extracted to Projects/DotNet/MyDotNetApp/"
+  },
+
+  "example_8_duplicate_detection": {
+    "description": "Archive and extracted file (duplicate detection)",
+    "request": {
+      "files_with_metadata": [
+        {
+          "path": "/Users/john/Downloads/movie.rar",
+          "metadata": {
+            "size": 4000000000,
+            "extension": ".rar",
+            "archive": {
+              "archive_type": "RAR",
+              "contents": ["movie.mkv"],
+              "detected_project_type": null
+            }
+          }
+        },
+        {
+          "path": "/Users/john/Downloads/movie.mkv",
+          "metadata": {
+            "size": 4294967296,
+            "extension": ".mkv",
+            "video": {
+              "duration": 7200.5,
+              "width": 1920,
+              "height": 1080
+            }
+          }
+        }
+      ],
+      "source_path": "/Users/john/Downloads",
+      "destination_path": "/Users/john/Videos",
+      "user_id": "john_doe",
+      "client_id": "johns_macbook"
+    },
+    "expected_result": "movie.mkv to Videos/Movies/, movie.rar marked for deletion (duplicate)"
+  }
+}

@@ -224,8 +224,8 @@ class SharedServices:
             from openai import OpenAI
             
             # Kimi uses OpenAI-compatible API
-            base_url = os.getenv('KIMI_BASE_URL', 'https://api.moonshot.cn/v1')
-            model_name = os.getenv('KIMI_MODEL', 'moonshot-v1-8k')
+            base_url = os.getenv('KIMI_BASE_URL', 'https://api.moonshot.ai/v1')
+            model_name = os.getenv('KIMI_MODEL', 'kimi-k2-0905-preview')
             
             client = OpenAI(
                 api_key=self._ai_api_key,

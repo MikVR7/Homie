@@ -4,6 +4,8 @@
 
 The backend File Organizer module now automatically supplies destination memory and drive information to the AI model without requiring any parameters from the frontend. This eliminates the need for CLI parameters and `destination_context` payloads.
 
+**Note**: For detailed information about how the context is built and formatted, see [AI_CONTEXT_BUILDER.md](AI_CONTEXT_BUILDER.md).
+
 ## What Changed
 
 ### 1. Automatic AI Context Building
@@ -285,11 +287,9 @@ Using known destination for 'Images': /home/user/Pictures/Sorted
    - Learn preferred destinations from corrections
    - Improve AI suggestions over time
 
-## Related Files
+## Related Documentation
 
-- `backend/file_organizer/ai_context_builder.py` - Builds context for AI
-- `backend/file_organizer/destination_memory_manager.py` - Manages destinations
-- `backend/file_organizer/drive_manager.py` - Manages drives
-- `backend/core/routes/file_organizer_routes.py` - Organize endpoint
-- `backend/file_organizer/ai_content_analyzer.py` - AI integration
-- `backend/core/web_server.py` - Batch analysis method
+- [AI_CONTEXT_BUILDER.md](AI_CONTEXT_BUILDER.md) - Detailed API reference for context building
+- [DESTINATION_MEMORY_MANAGER.md](DESTINATION_MEMORY_MANAGER.md) - Destination management
+- [DRIVE_MANAGER.md](DRIVE_MANAGER.md) - Drive tracking
+- [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) - Verification of automatic context forwarding

@@ -711,16 +711,54 @@ Get available drives/mount points.
 
 Analyze files and suggest organization operations.
 
-**Request Body**:
+**Supports Enhanced Metadata (v2.0)**: This endpoint now accepts rich file metadata for smarter AI suggestions.
+
+**Request Body (New Format with Metadata)**:
 ```json
 {
-  "user_id": "user123",
-  "client_id": "laptop1",
+  "files_with_metadata": [
+    {
+      "path": "/home/user/Downloads/IMG_1234.jpg",
+      "metadata": {
+        "size": 2048000,
+        "extension": ".jpg",
+        "image": {
+          "width": 1920,
+          "height": 1080,
+          "date_taken": "2025-01-12T14:20:00Z",
+          "camera_model": "Canon EOS R5",
+          "location": "Vienna, Austria"
+        }
+      }
+    }
+  ],
   "source_path": "/home/user/Downloads",
   "destination_path": "/home/user/Documents",
-  "organization_style": "by_type"
+  "organization_style": "by_type",
+  "user_id": "user123",
+  "client_id": "laptop1"
 }
 ```
+
+**Request Body (Legacy Format - Still Supported)**:
+```json
+{
+  "file_paths": ["/home/user/Downloads/file1.txt", "/home/user/Downloads/file2.pdf"],
+  "source_path": "/home/user/Downloads",
+  "destination_path": "/home/user/Documents",
+  "organization_style": "by_type",
+  "user_id": "user123",
+  "client_id": "laptop1"
+}
+```
+
+**Supported Metadata Types**:
+- **Image**: width, height, date_taken, camera_model, location
+- **Video**: duration, width, height, codec, bitrate, fps
+- **Audio**: duration, artist, album, title, genre, year
+- **Document**: page_count, title, author, created, modified
+- **Archive**: archive_type, contents, detected_project_type, contains_executables
+- **Source Code**: language, lines_of_code, has_tests
 
 **Response** (200 OK):
 ```json
@@ -731,43 +769,101 @@ Analyze files and suggest organization operations.
     {
       "operation_id": "analysis-uuid-123_op_0",
       "type": "move",
-      "source": "/home/user/Downloads/movie.mp4",
-      "destination": "/home/user/Documents/Movies/movie.mp4",
+      "source": "/home/user/Downloads/IMG_1234.jpg",
+      "destination": "/home/user/Documents/Photos/Vienna2025/IMG_1234.jpg",
+      "reason_hint": "Image taken in Vienna on 2025-01-12 with Canon EOS R5",
       "status": "pending"
     }
-  ]
+  ],
+  "file_plans": [
+    {
+      "source": "/home/user/Downloads/IMG_1234.jpg",
+      "steps": [
+        {
+          "operation_id": "analysis-uuid-123_op_0",
+          "type": "move",
+          "target_path": "/home/user/Documents/Photos/Vienna2025/IMG_1234.jpg",
+          "reason": "Image taken in Vienna on 2025-01-12 with Canon EOS R5",
+          "order": 1,
+          "metadata": {
+            "confidence": "0.95",
+            "suggested_folder": "Photos/Vienna2025",
+            "is_fallback": false
+          }
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "files_received": 1,
+    "operations_generated": 1,
+    "file_plans_generated": 1,
+    "fallback_plans": 0
+  }
 }
 ```
 
 **Features**:
-- Includes AI context with known destinations
-- AI prefers known destinations when appropriate
-- Considers drive availability and space
-- Returns analysis_id for tracking
+- **Enhanced AI with Metadata**: Uses file metadata for 50-70% more specific suggestions
+- **Backward Compatible**: Supports both old and new request formats
+- **AI Context Integration**: Automatically includes known destinations and drives
+- **Project Detection**: Detects project types in archives (DotNet, React, Python, etc.)
+- **Smart Categorization**: Uses EXIF data, document metadata, audio tags, etc.
 
-**AI Context Integration**:
-The endpoint automatically builds context including:
-- Known destinations grouped by category
-- Drive information and available space
-- Usage statistics for each destination
-- Instructions for AI to prefer known destinations
+**Metadata Benefits**:
+- Images organized by date/location instead of generic "Photos"
+- Archives extracted to proper project folders (e.g., "Projects/DotNet/MyApp")
+- Documents organized by author/company (e.g., "Invoices/AcmeCorp")
+- Music organized by artist/album
+- Videos distinguished as movies vs clips based on duration
 
-**Example**:
+**Example (with metadata)**:
 ```javascript
 fetch('/api/file-organizer/organize', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    user_id: 'user123',
-    client_id: 'laptop1',
+    files_with_metadata: [
+      {
+        path: '/home/user/Downloads/IMG_1234.jpg',
+        metadata: {
+          size: 2048000,
+          image: {
+            date_taken: '2025-01-12T14:20:00Z',
+            location: 'Vienna, Austria'
+          }
+        }
+      }
+    ],
     source_path: '/home/user/Downloads',
     destination_path: '/home/user/Documents',
-    organization_style: 'by_type'
+    user_id: 'user123',
+    client_id: 'laptop1'
   })
 })
   .then(res => res.json())
   .then(data => {
     console.log(`Analysis ID: ${data.analysis_id}`);
+    console.log(`${data.operations.length} operations suggested`);
+    // Result: Photos/Vienna2025/ instead of generic Photos/
+  });
+```
+
+**Example (legacy format)**:
+```javascript
+fetch('/api/file-organizer/organize', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    file_paths: ['/home/user/Downloads/file1.txt'],
+    source_path: '/home/user/Downloads',
+    destination_path: '/home/user/Documents',
+    user_id: 'user123',
+    client_id: 'laptop1'
+  })
+})
+  .then(res => res.json())
+  .then(data => {
     console.log(`${data.operations.length} operations suggested`);
   });
 ```

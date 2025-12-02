@@ -445,8 +445,17 @@ Tests cover:
 - ✅ Empty context (new user)
 - ✅ Cloud drive formatting
 
+## Integration with AI System
+
+The AIContextBuilder is automatically used by the File Organizer backend when processing organize requests. The context is built from:
+- **DestinationMemoryManager**: Known destinations with usage statistics
+- **DriveManager**: Available drives with mount points and space information
+
+The formatted context is included in AI prompts to help the AI make intelligent decisions about file organization, preferring known destinations and considering drive availability.
+
 ## See Also
 
 - [DESTINATION_MEMORY_MANAGER.md](DESTINATION_MEMORY_MANAGER.md) - Destination management
 - [DRIVE_MANAGER.md](DRIVE_MANAGER.md) - Drive tracking
 - [MULTI_CLIENT_SUPPORT.md](MULTI_CLIENT_SUPPORT.md) - Multi-client architecture
+- [AI_CONTEXT_INTEGRATION.md](AI_CONTEXT_INTEGRATION.md) - How context is used in organize endpoint

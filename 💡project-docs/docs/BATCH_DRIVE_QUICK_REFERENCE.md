@@ -145,5 +145,5 @@ python backend/file_organizer/test_batch_drive_registration.py
 ## Documentation
 
 - Full API docs: [API_ENDPOINTS.md](API_ENDPOINTS.md)
-- Integration guide: [BATCH_DRIVE_REGISTRATION_EXAMPLE.md](BATCH_DRIVE_REGISTRATION_EXAMPLE.md)
-- Changelog: [BATCH_DRIVE_REGISTRATION_CHANGELOG.md](BATCH_DRIVE_REGISTRATION_CHANGELOG.md)
+- Frontend integration: [FRONTEND_INTEGRATION_GUIDE.md](FRONTEND_INTEGRATION_GUIDE.md)
+- Changelog: [FILE_ORGANIZER_CHANGELOG.md](FILE_ORGANIZER_CHANGELOG.md)

@@ -438,3 +438,7 @@
 - **Caching**: Implement intelligent caching for repeated operations
 - **Async Operations**: Use asynchronous processing for long-running tasks
 <!-- Last updated: 2025-10-13 06:35 - Reason: Marked content analysis implementation as completed with full details -->
+
+## Features
+- [ ] Password-Protected Archive Support: Implement password handling for encrypted archives (RAR, ZIP, 7Z, etc.). Features should include: 1) User prompt to enter password when encrypted archive is detected, 2) Password manager to store and reuse previously entered passwords, 3) UI to select/click saved passwords, 4) Auto-try known passwords option ("Try one of the already known passwords") that attempts all saved passwords before prompting user, 5) Only show password prompt if none of the saved passwords work. This will allow metadata extraction from encrypted archives. (2025-11-26)
+  - Context: Currently encrypted archives are skipped during metadata extraction. Users need ability to provide passwords to extract archive contents for better AI organization suggestions.

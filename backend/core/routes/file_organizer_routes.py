@@ -86,7 +86,8 @@ def register_file_organizer_routes(app, web_server):
             return False, str(e)
     
     def _execute_file_plans(data, analysis_id, file_plans, web_server):
-        """Execute file plans with multi-step atomic operations per file"""
+        """Execute file plans with multi-step atomic operations per file.
+        Supports nested plans for extracted archive contents."""
         from datetime import datetime
         import json
         
@@ -100,11 +101,13 @@ def register_file_organizer_routes(app, web_server):
         for plan in file_plans:
             source = plan['source']
             steps = plan['steps']
+            nested_plans = plan.get('nested_plans', [])
             
             plan_result = {
                 'source': source,
                 'success': True,
-                'steps': []
+                'steps': [],
+                'nested_results': []
             }
             
             # Execute steps sequentially - stop on first failure
@@ -134,6 +137,47 @@ def register_file_organizer_routes(app, web_server):
                 # Update current path for next step (if file was moved/renamed)
                 if step['type'] in ['move', 'rename', 'copy']:
                     current_path = step['target_path']
+            
+            # Execute nested plans (for extracted files) if parent succeeded
+            if plan_result['success'] and nested_plans:
+                logger.info(f"Executing {len(nested_plans)} nested operations for extracted files")
+                
+                for nested_plan in nested_plans:
+                    nested_source = nested_plan['source']
+                    nested_steps = nested_plan['steps']
+                    
+                    nested_result = {
+                        'source': nested_source,
+                        'success': True,
+                        'steps': []
+                    }
+                    
+                    nested_current_path = nested_source
+                    for nested_step in sorted(nested_steps, key=lambda s: s['order']):
+                        nested_step_result = {
+                            'operation_id': nested_step['operation_id'],
+                            'type': nested_step['type'],
+                            'order': nested_step['order'],
+                            'success': False,
+                            'error': None
+                        }
+                        
+                        success, error = _execute_single_step(nested_step, nested_current_path)
+                        nested_step_result['success'] = success
+                        nested_step_result['error'] = error
+                        
+                        nested_result['steps'].append(nested_step_result)
+                        
+                        if not success:
+                            nested_result['success'] = False
+                            nested_result['error'] = f"Nested step {nested_step['order']} failed: {error}"
+                            logger.warning(f"Nested plan failed for {nested_source}: {error}")
+                            break
+                        
+                        if nested_step['type'] in ['move', 'rename', 'copy']:
+                            nested_current_path = nested_step['target_path']
+                    
+                    plan_result['nested_results'].append(nested_result)
             
             plan_results.append(plan_result)
             
@@ -311,20 +355,24 @@ def register_file_organizer_routes(app, web_server):
     def _build_file_plan(file_path, file_result, src_path, dest_root, analysis_id, user_id=None, client_id=None):
         """
         Build a multi-step file plan for a single file.
+        Supports nested operations for archives (extract + organize contents).
         
         Returns a dict with:
         - source: absolute source path
         - steps: ordered list of operations (move, rename, tag, etc.)
+        - nested_plans: optional list of plans for extracted files
         """
         import uuid
         
         f = Path(file_path)
         steps = []
+        nested_plans = []
         
         # Get AI suggested action and folder
         action = file_result.get('action', 'move') if file_result else 'move'
         suggested_folder = file_result.get('suggested_folder') if file_result else None
         confidence = file_result.get('confidence', 0.5) if file_result else 0.0
+        extracted_files = file_result.get('extracted_files', {}) if file_result else {}
         
         # Fallback to Uncategorized if AI didn't return a folder
         if not suggested_folder:
@@ -399,15 +447,84 @@ def register_file_organizer_routes(app, web_server):
                 }
             })
             
-            # TODO: Future steps can be added here
-            # Step 2: Rename (if AI suggests normalization)
-            # Step 3: Tag (if metadata should be added)
-            # Step 4: Index (if file should be indexed for search)
+        # Handle nested operations for extracted files
+        if action == 'unpack' and extracted_files:
+            # AI provided operations for files inside the archive
+            unpack_dest = dest_root / 'ToReview' / f.stem if action == 'unpack' else dest_base
+            
+            for extracted_filename, extracted_op in extracted_files.items():
+                # Build full path for extracted file
+                extracted_path = unpack_dest / extracted_filename
+                
+                # Get operation details
+                extracted_action = extracted_op.get('action', 'move')
+                extracted_folder = extracted_op.get('suggested_folder', 'Uncategorized')
+                new_name = extracted_op.get('new_name')
+                reason = extracted_op.get('reason', '')
+                
+                # Build steps for this extracted file
+                extracted_steps = []
+                step_order = 1
+                current_name = extracted_filename
+                
+                # Step 1: Rename if needed
+                if new_name and new_name != extracted_filename:
+                    rename_path = unpack_dest / new_name
+                    extracted_steps.append({
+                        'operation_id': f"{analysis_id}_nested_{uuid.uuid4().hex[:8]}",
+                        'type': 'rename',
+                        'target_path': str(rename_path),
+                        'reason': reason or f'Clean filename: {extracted_filename} → {new_name}',
+                        'order': step_order,
+                        'metadata': {}
+                    })
+                    step_order += 1
+                    current_name = new_name
+                
+                # Step 2: Move or Delete
+                if extracted_action == 'delete':
+                    extracted_steps.append({
+                        'operation_id': f"{analysis_id}_nested_{uuid.uuid4().hex[:8]}",
+                        'type': 'delete',
+                        'target_path': None,
+                        'reason': reason or 'Garbage file',
+                        'order': step_order,
+                        'metadata': {}
+                    })
+                elif extracted_action == 'move':
+                    # Determine destination
+                    if Path(extracted_folder).is_absolute():
+                        final_dest = Path(extracted_folder) / current_name
+                    else:
+                        final_dest = dest_root / extracted_folder / current_name
+                    
+                    extracted_steps.append({
+                        'operation_id': f"{analysis_id}_nested_{uuid.uuid4().hex[:8]}",
+                        'type': 'move',
+                        'target_path': str(final_dest),
+                        'reason': reason or f'Organize to {extracted_folder}',
+                        'order': step_order,
+                        'metadata': {'suggested_folder': extracted_folder}
+                    })
+                
+                # Add nested plan for this extracted file
+                if extracted_steps:
+                    nested_plans.append({
+                        'source': str(extracted_path),
+                        'steps': extracted_steps,
+                        'parent_archive': file_path
+                    })
         
-        return {
+        plan = {
             'source': file_path,
             'steps': steps
         }
+        
+        # Add nested plans if any
+        if nested_plans:
+            plan['nested_plans'] = nested_plans
+        
+        return plan
     
     def _get_ai_context_builder():
         """Get AIContextBuilder instance"""
@@ -438,14 +555,40 @@ def register_file_organizer_routes(app, web_server):
     def fo_organize():
         try:
             data = request.get_json(force=True, silent=True) or {}
-            source_folder = data.get('source_path')
-            destination_folder = data.get('destination_path')
-            organization_style = data.get('organization_style', 'by_type')
-            user_id = data.get('user_id', 'dev_user')
-            client_id = data.get('client_id', 'default_client')
             
-            # Frontend can optionally provide explicit file list (including nested files)
-            provided_file_paths = data.get('file_paths', [])
+            # Parse and validate request using Pydantic model
+            from file_organizer.request_models import OrganizeRequest
+            try:
+                org_request = OrganizeRequest(**data)
+            except Exception as validation_error:
+                logger.warning(f"Request validation failed: {validation_error}")
+                # Fall back to manual parsing for backward compatibility
+                org_request = None
+            
+            if org_request:
+                source_folder = org_request.source_path
+                destination_folder = org_request.destination_path
+                organization_style = org_request.organization_style
+                user_id = org_request.user_id
+                client_id = org_request.client_id
+                granularity = data.get('granularity', 1)  # Default to broad organization
+                
+                # Get unified file list with metadata
+                files_with_meta = org_request.get_file_list()
+                provided_file_paths = [f['path'] for f in files_with_meta]
+                files_metadata = {f['path']: f['metadata'] for f in files_with_meta if f['metadata']}
+            else:
+                # Legacy parsing
+                source_folder = data.get('source_path')
+                destination_folder = data.get('destination_path')
+                organization_style = data.get('organization_style', 'by_type')
+                user_id = data.get('user_id', 'dev_user')
+                client_id = data.get('client_id', 'default_client')
+                granularity = data.get('granularity', 1)  # Default to broad organization
+                
+                # Frontend can optionally provide explicit file list (including nested files)
+                provided_file_paths = data.get('file_paths', [])
+                files_metadata = {}
 
             if not source_folder:
                 return jsonify({'success': False, 'error': 'source_path required'}), 400
@@ -521,14 +664,23 @@ def register_file_organizer_routes(app, web_server):
                 file_paths, 
                 use_ai=True, 
                 existing_folders=existing_folders,
-                ai_context=ai_context_text
+                ai_context=ai_context_text,
+                files_metadata=files_metadata if org_request else None,
+                source_path=source_folder,
+                granularity=granularity
             )
             
             if not batch_result.get('success'):
-                return jsonify({
+                error_response = {
                     'success': False,
                     'error': f"Batch analysis failed: {batch_result.get('error')}"
-                }), 503
+                }
+                
+                # Add error details if available
+                if 'error_details' in batch_result:
+                    error_response['error_details'] = batch_result['error_details']
+                
+                return jsonify(error_response), 503
             
             # Create analysis ID for this session
             import uuid
@@ -849,6 +1001,138 @@ def register_file_organizer_routes(app, web_server):
             
         except Exception as e:
             logger.error(f"/add-granularity error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/file-organizer/estimate-tokens', methods=['POST'])
+    def fo_estimate_tokens():
+        """
+        Estimate token count for a file organization request.
+        Frontend sends the SAME request body it would send to /organize,
+        and backend simulates the AI call to count exact tokens.
+        
+        Request body: Same as /organize endpoint
+        {
+            "source_path": "/path/to/source",
+            "destination_path": "/path/to/dest",
+            "files_with_metadata": [...],
+            "granularity": 1,
+            "user_id": "user123",
+            "client_id": "client123"
+        }
+        
+        Response:
+        {
+            "success": true,
+            "input_tokens": 5234,
+            "estimated_output_tokens": 1500,
+            "total_tokens": 6734,
+            "estimated_cost_usd": 0.000842,
+            "method": "exact",
+            "breakdown": {
+                "input_method": "exact",
+                "output_method": "estimated"
+            }
+        }
+        """
+        try:
+            from file_organizer.token_counter import TokenCounter
+            from file_organizer.ai_content_analyzer import AIContentAnalyzer
+            from file_organizer.request_models import OrganizeRequest
+            
+            data = request.get_json()
+            
+            # Parse request (same as /organize)
+            try:
+                org_request = OrganizeRequest(**data)
+            except Exception:
+                org_request = None
+            
+            if org_request:
+                source_folder = org_request.source_path
+                destination_folder = org_request.destination_path
+                user_id = org_request.user_id
+                client_id = org_request.client_id
+                granularity = data.get('granularity', 1)
+                
+                files_with_meta = org_request.get_file_list()
+                provided_file_paths = [f['path'] for f in files_with_meta]
+                files_metadata = {f['path']: f['metadata'] for f in files_with_meta if f['metadata']}
+            else:
+                # Legacy parsing
+                source_folder = data.get('source_path')
+                destination_folder = data.get('destination_path')
+                user_id = data.get('user_id', 'dev_user')
+                client_id = data.get('client_id', 'default_client')
+                granularity = data.get('granularity', 1)
+                provided_file_paths = data.get('file_paths', [])
+                files_metadata = {}
+            
+            if not source_folder or not destination_folder:
+                return jsonify({'success': False, 'error': 'source_path and destination_path required'}), 400
+            
+            # Get file paths
+            src_path = Path(source_folder).expanduser()
+            if provided_file_paths:
+                file_paths = provided_file_paths
+            else:
+                files = [p for p in src_path.iterdir() if p.is_file()]
+                file_paths = [str(f) for f in files]
+            
+            # Build AI context (same as /organize)
+            ai_context_text = None
+            context_builder = _get_ai_context_builder()
+            if context_builder:
+                try:
+                    context = context_builder.build_context(user_id, client_id)
+                    ai_context_text = context_builder.format_for_ai_prompt(context)
+                except Exception as e:
+                    logger.warning(f"Could not build AI context: {e}")
+            
+            # Build the ACTUAL prompt that would be sent to AI
+            shared_services = web_server.components.get('shared_services')
+            analyzer = AIContentAnalyzer(shared_services=shared_services)
+            
+            # Call internal method to build prompt (without sending to AI)
+            prompt = analyzer._build_prompt_for_batch(
+                file_paths,
+                existing_folders=[],
+                ai_context=ai_context_text,
+                files_metadata=files_metadata,
+                source_path=source_folder,
+                granularity=granularity
+            )
+            
+            # Count input tokens using actual prompt
+            counter = TokenCounter(shared_services)
+            input_count = counter.count_tokens(prompt)
+            
+            # Estimate output tokens (indexed format: ~10 tokens per file)
+            estimated_output = len(file_paths) * 10
+            
+            total_tokens = input_count['tokens'] + estimated_output
+            
+            # Calculate cost (provider auto-detected from shared services)
+            cost_info = counter.estimate_cost(
+                input_count['tokens'],
+                estimated_output
+            )
+            
+            return jsonify({
+                'success': True,
+                'input_tokens': input_count['tokens'],
+                'estimated_output_tokens': estimated_output,
+                'total_tokens': total_tokens,
+                'estimated_cost_usd': cost_info['total_cost_usd'],
+                'method': input_count['method'],
+                'breakdown': {
+                    'input_method': input_count['method'],
+                    'output_method': 'estimated',
+                    'file_count': len(file_paths)
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"/estimate-tokens error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
 # REMOVE OLD DUPLICATE CODE BELOW THIS LINE - IT SHOULD NOT EXIST

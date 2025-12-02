@@ -99,14 +99,10 @@ curl -X POST http://localhost:8000/api/file-organizer/suggest-destination \
 
 ## 🔧 **API Endpoints**
 
-### **USB Drive Management**
-- `GET /api/file-organizer/usb-drives` - Get all registered USB drives
-- `POST /api/file-organizer/register-usb-drive` - Register a new USB drive
-- `POST /api/file-organizer/suggest-destination` - Get destination suggestions
-
-### **File Access Analytics**
-- `GET /api/file-organizer/access-analytics` - Get file access statistics
-- `POST /api/file-organizer/log-access` - Log file access events
+For detailed API documentation, see:
+- [API_ENDPOINTS.md](API_ENDPOINTS.md) - Complete API reference
+- [DRIVE_MANAGER.md](DRIVE_MANAGER.md) - Drive management APIs
+- [DESTINATION_MEMORY_MANAGER.md](DESTINATION_MEMORY_MANAGER.md) - Destination management APIs
 
 ## 📊 **Benefits**
 

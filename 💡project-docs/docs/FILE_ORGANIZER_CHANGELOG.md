@@ -4,6 +4,18 @@
 
 ### Added - 2025-11-25
 
+#### Enhanced File Metadata Support (v2.0)
+- `/api/file-organizer/organize` now accepts rich file metadata alongside file paths
+- Supports 6 metadata types: Image, Video, Audio, Document, Archive, Source Code
+- AI uses metadata for 50-70% more specific folder suggestions
+- Image metadata: date_taken, camera_model, location → organize by trip/event
+- Archive metadata: contents, detected_project_type → extract to proper project folders
+- Document metadata: author, title → organize by company/category
+- 100% backward compatible with existing clients
+- New Pydantic models for type-safe request validation
+- See `💡project-docs/docs/ENHANCED_METADATA_SUPPORT.md` for details
+- See `💡project-docs/docs/METADATA_EXAMPLES.json` for example requests
+
 #### Multi-Provider AI Support
 - Added support for Kimi K2 (Moonshot AI) as alternative to Google Gemini
 - Switch providers via `AI_PROVIDER` environment variable (`gemini` or `kimi`)
@@ -51,7 +63,7 @@
 - New `/api/file-organizer/drives/batch` endpoint for registering multiple drives in one request
 - ~80% performance improvement over sequential registration (5 drives: 250ms → 50ms)
 - Atomic transactions ensure all-or-nothing behavior
-- See `BATCH_DRIVE_REGISTRATION_EXAMPLE.md` for integration examples
+- See `BATCH_DRIVE_QUICK_REFERENCE.md` for integration examples
 
 ### Fixed - 2025-11-19
 

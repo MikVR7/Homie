@@ -131,7 +131,7 @@ class WebServer:
                     'error': f'AI call failed after recovery: {str(retry_error)}'
                 }
     
-    def _batch_analyze_files(self, file_paths, use_ai=True, existing_folders=None, ai_context=None):
+    def _batch_analyze_files(self, file_paths, use_ai=True, existing_folders=None, ai_context=None, files_metadata=None, source_path=None, granularity=1):
         """
         SINGLE SOURCE OF TRUTH for batch file analysis.
         Both /organize and /analyze-content-batch call this method.
@@ -141,6 +141,9 @@ class WebServer:
             use_ai: Whether to use AI for analysis
             existing_folders: List of folder names that already exist in destination (for context-aware organization)
             ai_context: Optional AI context string with known destinations and drives
+            files_metadata: Optional dict mapping file paths to their metadata
+            source_path: Optional source folder path (for relative path optimization)
+            granularity: Organization granularity level (1=broad, 2=balanced, 3=detailed)
         
         Returns: dict with 'success', 'results', 'ai_enabled', 'error' (if failed)
         """
@@ -154,16 +157,25 @@ class WebServer:
             batch_result = analyzer.analyze_files_batch(
                 file_paths, 
                 existing_folders=existing_folders,
-                ai_context=ai_context
+                ai_context=ai_context,
+                files_metadata=files_metadata,
+                source_path=source_path,
+                granularity=granularity
             )
             
             if not batch_result.get('success'):
                 logger.warning(f"Batch AI analysis failed: {batch_result.get('error')}")
-                return {
+                error_response = {
                     'success': False,
                     'error': batch_result.get('error'),
                     'ai_enabled': False
                 }
+                
+                # Pass through error details if available
+                if 'error_details' in batch_result:
+                    error_response['error_details'] = batch_result['error_details']
+                
+                return error_response
             
             results = batch_result.get('results', {})
             # Ensure all results have success flag

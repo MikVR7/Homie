@@ -1,35 +1,26 @@
 # File Organizer Module
 
-AI-powered file organization system with destination memory learning.
-
-## Quick Links
-
-- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
-- **[Destination Memory System](docs/README_DESTINATION_MEMORY.md)** - Overview and main documentation
-- **[API Documentation](docs/DESTINATION_MEMORY_MANAGER.md)** - Complete API reference
+AI-powered file organization system with destination memory learning and enhanced metadata support.
 
 ## Documentation
 
-All documentation is in the [`docs/`](docs/) directory:
+All documentation is in `💡project-docs/docs/`:
 
-### Getting Started
-- [Quick Start](docs/QUICK_START.md)
-- [Destination Memory System](docs/README_DESTINATION_MEMORY.md)
+### API & Integration
+- [API Endpoints](../../💡project-docs/docs/API_ENDPOINTS.md) - Complete API reference
+- [Enhanced Metadata Support](../../💡project-docs/docs/ENHANCED_METADATA_SUPPORT.md) - v2.0 metadata features
+- [Frontend Integration Guide](../../💡project-docs/docs/FRONTEND_INTEGRATION_GUIDE.md) - Integration examples
+- [Metadata Examples](../../💡project-docs/docs/METADATA_EXAMPLES.json) - Example requests
 
-### API Documentation
-- [Destination Memory Manager](docs/DESTINATION_MEMORY_MANAGER.md)
-- [Drive Manager](docs/DRIVE_MANAGER.md)
-- [AI Context Builder](docs/AI_CONTEXT_BUILDER.md)
+### Architecture & Features
+- [AI Context Integration](../../💡project-docs/docs/AI_CONTEXT_INTEGRATION.md) - How AI uses context
+- [AI Context Builder](../../💡project-docs/docs/AI_CONTEXT_BUILDER.md) - Context preparation
+- [Destination Memory Manager](../../💡project-docs/docs/DESTINATION_MEMORY_MANAGER.md) - Learning system
+- [Drive Manager](../../💡project-docs/docs/DRIVE_MANAGER.md) - Multi-client drive tracking
+- [Multi-Client Support](../../💡project-docs/docs/MULTI_CLIENT_SUPPORT.md) - Multi-device architecture
 
-### Architecture
-- [Multi-Client Support](docs/MULTI_CLIENT_SUPPORT.md)
-- [Drive Client Mounts](docs/DRIVE_CLIENT_MOUNTS.md)
-- [Database Schema](docs/DESTINATION_MEMORY.md)
-
-### Development
-- [Migrations Guide](docs/MIGRATIONS.md)
-- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)
-- [Verification Checklist](docs/VERIFICATION_CHECKLIST.md)
+### Changelog
+- [File Organizer Changelog](../../💡project-docs/docs/FILE_ORGANIZER_CHANGELOG.md) - Version history
 
 ## Key Components
 
