@@ -327,11 +327,23 @@ Supports:
 
 ### Existing Destinations
 
-- Existing destinations have `color = NULL`
-- Colors are auto-assigned when:
-  - Frontend requests destinations (can assign on first load)
-  - Destination is updated via PUT request
-  - New files are organized to that destination
+**One-Time Migration:**
+Run the migration script to assign colors to all existing destinations:
+
+```bash
+python3 backend/file_organizer/assign_colors_to_existing_destinations.py
+```
+
+This script:
+- Finds all active destinations without colors
+- Assigns colors sequentially from the palette per user
+- Preserves existing colors (doesn't overwrite)
+- Verifies all destinations have colors after completion
+
+**Result:**
+- All existing destinations get unique colors
+- Colors are assigned in creation order (oldest first)
+- Each user's destinations get independent color assignments
 
 ### New Destinations
 
