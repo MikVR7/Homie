@@ -28,6 +28,7 @@
 - **[CENTRALIZED_MEMORY.md](CENTRALIZED_MEMORY.md)** - Destination and drive memory system
 - **[DESTINATION_MEMORY_MANAGER.md](DESTINATION_MEMORY_MANAGER.md)** - Remember user's organization patterns
 - **[DESTINATION_COLORS.md](DESTINATION_COLORS.md)** - Visual identification with colors
+- **[DESTINATION_COLORS_PHILOSOPHY.md](DESTINATION_COLORS_PHILOSOPHY.md)** - Backend as source of truth
 - **[DRIVE_MANAGER.md](DRIVE_MANAGER.md)** - Multi-drive support and monitoring
 - **[AI_CONTEXT_BUILDER.md](AI_CONTEXT_BUILDER.md)** - Build context for AI from memory
 - **[AI_CONTEXT_INTEGRATION.md](AI_CONTEXT_INTEGRATION.md)** - Integration guide
@@ -87,10 +88,12 @@
 
 ---
 
-**Total Documents**: 39 organized by category
+**Total Documents**: 40 organized by category
 
 **Last Updated**: December 2, 2025
 
 **Recent Updates**:
 - Added DESTINATION_COLORS.md - Visual identification feature
+- Added DESTINATION_COLORS_PHILOSOPHY.md - Backend as source of truth
+- Updated frontend prompt to reflect backend color assignment
 - Removed 3 redundant/outdated files (BATCH_DRIVE_REGISTRATION_EXAMPLE, TERMINAL_COMMAND_ARCHITECTURE, FIX_DESTINATION_PERSISTENCE)

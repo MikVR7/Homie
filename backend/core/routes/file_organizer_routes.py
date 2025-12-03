@@ -838,11 +838,59 @@ def register_file_organizer_routes(app, web_server):
                 
                 conn.commit()
                 
+                # Extract unique destination folders and suggest colors
+                suggested_destinations = {}
+                dest_manager = _get_destination_manager()
+                
+                if dest_manager:
+                    # Get existing colors to avoid duplicates
+                    existing_destinations = dest_manager.get_destinations(user_id)
+                    existing_colors = [d.color for d in existing_destinations if d.color]
+                    
+                    # Extract unique destination folders from operations
+                    unique_dest_folders = set()
+                    for op in operations:
+                        if op.get('destination'):
+                            dest_path = Path(op['destination'])
+                            # Get the immediate subfolder under dest_root
+                            try:
+                                rel_path = dest_path.relative_to(dest_root)
+                                if rel_path.parts:
+                                    folder_name = rel_path.parts[0]
+                                    unique_dest_folders.add(folder_name)
+                            except ValueError:
+                                pass
+                    
+                    # Suggest colors for new destinations
+                    from file_organizer.color_palette import assign_color_from_palette
+                    for folder_name in unique_dest_folders:
+                        # Check if this destination already exists
+                        existing_dest = next((d for d in existing_destinations if folder_name.lower() in d.category.lower()), None)
+                        if existing_dest and existing_dest.color:
+                            # Use existing color
+                            suggested_destinations[folder_name] = {
+                                'path': str(dest_root / folder_name),
+                                'category': folder_name,
+                                'color': existing_dest.color,
+                                'is_existing': True
+                            }
+                        else:
+                            # Suggest new color
+                            suggested_color = assign_color_from_palette(existing_colors)
+                            existing_colors.append(suggested_color)  # Track for next iteration
+                            suggested_destinations[folder_name] = {
+                                'path': str(dest_root / folder_name),
+                                'category': folder_name,
+                                'color': suggested_color,
+                                'is_existing': False
+                            }
+                
                 response = {
                     'success': True,
                     'analysis_id': analysis_id,
                     'operations': operations,  # Legacy format (backward compatibility)
                     'file_plans': file_plans,  # New multi-step format
+                    'suggested_destinations': suggested_destinations,  # NEW: Suggested colors for destinations
                     'counts': {
                         'files_received': len(files),
                         'operations_generated': len(operations),
