@@ -84,6 +84,7 @@ def register_destination_routes(app, web_server):
                     'id': dest.id,
                     'path': dest.path,
                     'category': dest.category,
+                    'color': dest.color,  # Include color
                     'drive_id': dest.drive_id,
                     'usage_count': dest.usage_count,
                     'last_used_at': dest.last_used_at.isoformat() if dest.last_used_at else None,
@@ -120,6 +121,7 @@ def register_destination_routes(app, web_server):
             client_id = data.get('client_id', 'default_client')
             path = data.get('path')
             category = data.get('category')
+            color = data.get('color')  # Optional color from frontend
             
             # Validate required fields
             if not path:
@@ -147,8 +149,8 @@ def register_destination_routes(app, web_server):
                 except Exception as e:
                     logger.warning(f"Could not determine drive_id: {e}")
             
-            # Add destination
-            destination = dest_manager.add_destination(user_id, path, category, client_id, drive_id)
+            # Add destination (with optional color)
+            destination = dest_manager.add_destination(user_id, path, category, client_id, drive_id, color)
             
             if not destination:
                 return jsonify({'success': False, 'error': 'Failed to add destination'}), 500
@@ -158,6 +160,7 @@ def register_destination_routes(app, web_server):
                 'id': destination.id,
                 'path': destination.path,
                 'category': destination.category,
+                'color': destination.color,  # Include color in response
                 'drive_id': destination.drive_id,
                 'usage_count': destination.usage_count,
                 'created_at': destination.created_at.isoformat() if destination.created_at else None,
@@ -205,8 +208,15 @@ def register_destination_routes(app, web_server):
             logger.error(f"/get-drives error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/api/file-organizer/destinations/<destination_id>', methods=['DELETE'])
-    def fo_delete_destination(destination_id):
+    @app.route('/api/file-organizer/destinations/<destination_id>', methods=['DELETE', 'PUT'])
+    def fo_manage_destination(destination_id):
+        """Update or remove a destination"""
+        if request.method == 'DELETE':
+            return _delete_destination(destination_id)
+        else:
+            return _update_destination(destination_id)
+    
+    def _delete_destination(destination_id):
         """Remove a destination (soft delete)"""
         try:
             user_id = request.args.get('user_id', 'dev_user')
@@ -237,6 +247,54 @@ def register_destination_routes(app, web_server):
                 
         except Exception as e:
             logger.error(f"DELETE /destinations/{destination_id} error: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    def _update_destination(destination_id):
+        """Update a destination's properties"""
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            user_id = data.get('user_id', 'dev_user')
+            path = data.get('path')
+            category = data.get('category')
+            color = data.get('color')
+            
+            if not destination_id:
+                return jsonify({'success': False, 'error': 'destination_id required'}), 400
+            
+            dest_manager = _get_destination_manager()
+            
+            if not dest_manager:
+                return jsonify({'success': False, 'error': 'DestinationMemoryManager not available'}), 500
+            
+            # Update destination
+            destination = dest_manager.update_destination(
+                user_id=user_id,
+                destination_id=destination_id,
+                path=path,
+                category=category,
+                color=color
+            )
+            
+            if not destination:
+                return jsonify({'success': False, 'error': 'Failed to update destination or destination not found'}), 404
+            
+            # Format response
+            result = {
+                'id': destination.id,
+                'path': destination.path,
+                'category': destination.category,
+                'color': destination.color,
+                'drive_id': destination.drive_id,
+                'usage_count': destination.usage_count,
+                'last_used_at': destination.last_used_at.isoformat() if destination.last_used_at else None,
+                'created_at': destination.created_at.isoformat() if destination.created_at else None,
+                'is_active': destination.is_active
+            }
+            
+            return jsonify({'success': True, 'destination': result})
+            
+        except Exception as e:
+            logger.error(f"PUT /destinations/{destination_id} error: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/file-organizer/destinations/capture', methods=['POST'])
@@ -287,6 +345,7 @@ def register_destination_routes(app, web_server):
                     'id': dest.id,
                     'path': dest.path,
                     'category': dest.category,
+                    'color': dest.color,  # Include color
                     'drive_id': dest.drive_id,
                     'usage_count': dest.usage_count,
                     'last_used_at': dest.last_used_at.isoformat() if dest.last_used_at else None,

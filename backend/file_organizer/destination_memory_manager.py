@@ -61,7 +61,7 @@ class DestinationMemoryManager:
             with self._get_db_connection() as conn:
                 cursor = conn.execute("""
                     SELECT 
-                        d.id, d.user_id, d.path, d.category, d.drive_id,
+                        d.id, d.user_id, d.path, d.category, d.color, d.drive_id,
                         d.created_at, d.last_used_at, d.usage_count, d.is_active
                     FROM destinations d
                     WHERE d.user_id = ? AND d.is_active = 1
@@ -78,6 +78,29 @@ class DestinationMemoryManager:
         except Exception as e:
             logger.error(f"Error retrieving destinations for user {user_id}: {e}")
             return []
+    
+    def _get_existing_colors(self, user_id: str, conn: sqlite3.Connection) -> List[str]:
+        """
+        Get all colors currently assigned to active destinations for a user.
+        
+        Args:
+            user_id: User identifier
+            conn: Database connection
+            
+        Returns:
+            List of hex color codes
+        """
+        try:
+            cursor = conn.execute("""
+                SELECT color FROM destinations
+                WHERE user_id = ? AND is_active = 1 AND color IS NOT NULL
+            """, (user_id,))
+            
+            colors = [row['color'] for row in cursor.fetchall()]
+            return colors
+        except Exception as e:
+            logger.error(f"Error retrieving existing colors: {e}")
+            return []
 
     def add_destination(
         self, 
@@ -85,7 +108,8 @@ class DestinationMemoryManager:
         path: str, 
         category: str, 
         client_id: str,
-        drive_id: Optional[str] = None
+        drive_id: Optional[str] = None,
+        color: Optional[str] = None
     ) -> Optional[Destination]:
         """
         Manually add a new destination.
@@ -96,6 +120,7 @@ class DestinationMemoryManager:
             category: File category for this destination
             client_id: Client/laptop identifier reporting this destination
             drive_id: Optional drive identifier (auto-detected if None)
+            color: Optional hex color code (auto-assigned if None)
             
         Returns:
             Created or existing Destination object, None on error
@@ -109,10 +134,17 @@ class DestinationMemoryManager:
             # Normalize path
             normalized_path = str(Path(path).resolve())
             
+            # Validate and normalize color if provided
+            if color:
+                from .color_palette import normalize_hex_color
+                color = normalize_hex_color(color)
+                if not color:
+                    logger.warning(f"Invalid color format provided, will auto-assign")
+            
             with self._get_db_connection() as conn:
                 # Check for existing destination
                 cursor = conn.execute("""
-                    SELECT id, user_id, path, category, drive_id,
+                    SELECT id, user_id, path, category, color, drive_id,
                            created_at, last_used_at, usage_count, is_active
                     FROM destinations
                     WHERE user_id = ? AND path = ?
@@ -123,16 +155,26 @@ class DestinationMemoryManager:
                     # If destination exists but is inactive, reactivate it
                     if not existing['is_active']:
                         logger.info(f"Reactivating inactive destination: {normalized_path}")
-                        conn.execute("""
-                            UPDATE destinations
-                            SET is_active = 1, last_used_at = ?
-                            WHERE id = ?
-                        """, (datetime.now().isoformat(), existing['id']))
+                        
+                        # If color is provided, update it; otherwise keep existing
+                        if color:
+                            conn.execute("""
+                                UPDATE destinations
+                                SET is_active = 1, last_used_at = ?, color = ?
+                                WHERE id = ?
+                            """, (datetime.now().isoformat(), color, existing['id']))
+                        else:
+                            conn.execute("""
+                                UPDATE destinations
+                                SET is_active = 1, last_used_at = ?
+                                WHERE id = ?
+                            """, (datetime.now().isoformat(), existing['id']))
+                        
                         conn.commit()
                         
                         # Fetch the updated destination
                         cursor = conn.execute("""
-                            SELECT id, user_id, path, category, drive_id,
+                            SELECT id, user_id, path, category, color, drive_id,
                                    created_at, last_used_at, usage_count, is_active
                             FROM destinations
                             WHERE id = ?
@@ -147,21 +189,28 @@ class DestinationMemoryManager:
                 if drive_id is None:
                     drive_id = self.get_drive_for_path(user_id, client_id, normalized_path)
                 
+                # Auto-assign color if not provided
+                if not color:
+                    existing_colors = self._get_existing_colors(user_id, conn)
+                    from .color_palette import assign_color_from_palette
+                    color = assign_color_from_palette(existing_colors)
+                    logger.debug(f"Auto-assigned color {color} to destination")
+                
                 # Create new destination
                 destination_id = str(uuid.uuid4())
                 now = datetime.now().isoformat()
                 
                 conn.execute("""
                     INSERT INTO destinations 
-                    (id, user_id, path, category, drive_id, created_at, last_used_at, usage_count, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)
-                """, (destination_id, user_id, normalized_path, category, drive_id, now, None))
+                    (id, user_id, path, category, color, drive_id, created_at, last_used_at, usage_count, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+                """, (destination_id, user_id, normalized_path, category, color, drive_id, now, None))
                 
                 conn.commit()
                 
                 # Retrieve and return the created destination
                 cursor = conn.execute("""
-                    SELECT id, user_id, path, category, drive_id,
+                    SELECT id, user_id, path, category, color, drive_id,
                            created_at, last_used_at, usage_count, is_active
                     FROM destinations
                     WHERE id = ?
@@ -170,7 +219,7 @@ class DestinationMemoryManager:
                 row = cursor.fetchone()
                 destination = Destination.from_db_row(row)
                 
-                logger.info(f"Added destination: {normalized_path} (category: {category})")
+                logger.info(f"Added destination: {normalized_path} (category: {category}, color: {color})")
                 return destination
                 
         except Exception as e:
@@ -239,6 +288,101 @@ class DestinationMemoryManager:
             logger.error(f"Error removing destination {destination_id}: {e}")
             return False
 
+    def update_destination(
+        self,
+        user_id: str,
+        destination_id: str,
+        path: Optional[str] = None,
+        category: Optional[str] = None,
+        color: Optional[str] = None
+    ) -> Optional[Destination]:
+        """
+        Update an existing destination's properties.
+        
+        Args:
+            user_id: User identifier
+            destination_id: Destination UUID
+            path: New path (optional)
+            category: New category (optional)
+            color: New color (optional)
+            
+        Returns:
+            Updated Destination object, None on error
+        """
+        try:
+            # Validate color if provided
+            if color:
+                from .color_palette import normalize_hex_color
+                color = normalize_hex_color(color)
+                if not color:
+                    logger.warning(f"Invalid color format provided for update")
+                    return None
+            
+            with self._get_db_connection() as conn:
+                # Check if destination exists
+                cursor = conn.execute("""
+                    SELECT id FROM destinations
+                    WHERE id = ? AND user_id = ?
+                """, (destination_id, user_id))
+                
+                if not cursor.fetchone():
+                    logger.warning(f"Destination not found: {destination_id}")
+                    return None
+                
+                # Build update query dynamically based on provided fields
+                update_fields = []
+                update_values = []
+                
+                if path is not None:
+                    normalized_path = str(Path(path).resolve())
+                    update_fields.append("path = ?")
+                    update_values.append(normalized_path)
+                
+                if category is not None:
+                    update_fields.append("category = ?")
+                    update_values.append(category)
+                
+                if color is not None:
+                    update_fields.append("color = ?")
+                    update_values.append(color)
+                
+                if not update_fields:
+                    logger.warning("No fields to update")
+                    return None
+                
+                # Add destination_id to values for WHERE clause
+                update_values.extend([user_id, destination_id])
+                
+                # Execute update
+                update_query = f"""
+                    UPDATE destinations
+                    SET {', '.join(update_fields)}
+                    WHERE user_id = ? AND id = ?
+                """
+                
+                conn.execute(update_query, update_values)
+                conn.commit()
+                
+                # Retrieve and return updated destination
+                cursor = conn.execute("""
+                    SELECT id, user_id, path, category, color, drive_id,
+                           created_at, last_used_at, usage_count, is_active
+                    FROM destinations
+                    WHERE id = ?
+                """, (destination_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    destination = Destination.from_db_row(row)
+                    logger.info(f"Updated destination {destination_id}")
+                    return destination
+                
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error updating destination {destination_id}: {e}")
+            return None
+
     def get_destinations_for_client(self, user_id: str, client_id: str) -> List[Destination]:
         """
         Get destinations that are accessible from a specific client.
@@ -257,7 +401,7 @@ class DestinationMemoryManager:
             with self._get_db_connection() as conn:
                 cursor = conn.execute("""
                     SELECT DISTINCT
-                        d.id, d.user_id, d.path, d.category, d.drive_id,
+                        d.id, d.user_id, d.path, d.category, d.color, d.drive_id,
                         d.created_at, d.last_used_at, d.usage_count, d.is_active
                     FROM destinations d
                     LEFT JOIN drives dr ON d.drive_id = dr.id
@@ -298,7 +442,7 @@ class DestinationMemoryManager:
             with self._get_db_connection() as conn:
                 cursor = conn.execute("""
                     SELECT 
-                        id, user_id, path, category, drive_id,
+                        id, user_id, path, category, color, drive_id,
                         created_at, last_used_at, usage_count, is_active
                     FROM destinations
                     WHERE user_id = ? AND LOWER(category) = LOWER(?) AND is_active = 1

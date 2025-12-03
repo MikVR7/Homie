@@ -101,6 +101,7 @@ class Destination:
         user_id: User who uses this destination
         path: Full path to the destination folder
         category: File category this destination is used for (e.g., 'invoices', 'receipts')
+        color: Hex color code for visual identification (e.g., '#667eea')
         drive_id: Reference to the drive this path is on (for portability)
         created_at: When this destination was first learned
         last_used_at: Last time files were organized to this destination
@@ -111,6 +112,7 @@ class Destination:
     user_id: str
     path: str
     category: str
+    color: Optional[str]
     drive_id: Optional[str]
     created_at: datetime
     last_used_at: Optional[datetime]
@@ -125,6 +127,7 @@ class Destination:
             user_id=row['user_id'],
             path=row['path'],
             category=row['category'],
+            color=row['color'] if 'color' in row.keys() else None,  # May be None for existing destinations
             drive_id=row['drive_id'],
             created_at=datetime.fromisoformat(row['created_at']),
             last_used_at=datetime.fromisoformat(row['last_used_at']) if row['last_used_at'] else None,
