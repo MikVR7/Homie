@@ -134,22 +134,42 @@ class TokenCounter:
         if provider is None:
             provider = 'gemini'
         
-        # Pricing per 1M tokens (as of 2024)
+        # Pricing per 1M tokens (as of 2025-12-09)
         pricing = {
             'gemini': {
-                'input': 0.075,   # $0.075 per 1M input tokens
-                'output': 0.30,   # $0.30 per 1M output tokens
-                'name': 'Google Gemini'
+                'input': 0.30,    # Gemini 2.5 Flash (balanced tier)
+                'output': 2.50,
+                'name': 'Google Gemini 2.5 Flash'
+            },
+            'gemini-lite': {
+                'input': 0.10,    # Gemini 2.5 Flash Lite (high-volume)
+                'output': 0.40,
+                'name': 'Google Gemini 2.5 Flash Lite'
+            },
+            'gemini-pro': {
+                'input': 1.25,    # Gemini 2.5 Pro (reasoning tier)
+                'output': 10.00,
+                'name': 'Google Gemini 2.5 Pro'
             },
             'kimi': {
-                'input': 0.10,    # Kimi pricing (adjust if you know exact pricing)
-                'output': 0.40,   # Kimi pricing (adjust if you know exact pricing)
+                'input': 0.10,    # Kimi pricing (similar to Gemini Lite)
+                'output': 0.40,
                 'name': 'Kimi AI'
             },
             'mistral': {
-                'input': 2.00,    # Mistral open-mixtral-8x22b pricing
-                'output': 6.00,   # Mistral open-mixtral-8x22b pricing
-                'name': 'Mistral AI'
+                'input': 2.00,    # Mistral Large / open-mixtral-8x22b
+                'output': 6.00,
+                'name': 'Mistral AI Large'
+            },
+            'claude-opus': {
+                'input': 15.00,   # Claude 4 Opus (premium tier)
+                'output': 75.00,
+                'name': 'Anthropic Claude 4 Opus'
+            },
+            'claude-haiku': {
+                'input': 0.80,    # Claude 3.5 Haiku (cheaper variant)
+                'output': 4.00,
+                'name': 'Anthropic Claude 3.5 Haiku'
             },
             'openai': {
                 'input': 0.50,    # GPT-4 pricing

@@ -3,31 +3,58 @@
 ## Overview
 The token counter automatically detects which AI provider you're using and applies the correct pricing for cost estimation.
 
-## Supported Providers
+## Supported Providers (Updated 2025-12-09)
 
-### 1. Google Gemini (Default)
+### 1. Google Gemini 2.5 Flash (Default - Balanced)
 **Token Counting**: Exact (uses Gemini's native `count_tokens()`)
 **Pricing** (per 1M tokens):
-- Input: $0.075
-- Output: $0.30
+- Input: $0.30
+- Output: $2.50
+**Use Case**: Balanced performance and cost for general use
 
-### 2. Kimi AI
+### 2. Google Gemini 2.5 Flash Lite (High-Volume)
+**Token Counting**: Exact (uses Gemini's native `count_tokens()`)
+**Pricing** (per 1M tokens):
+- Input: $0.10
+- Output: $0.40
+**Use Case**: High-volume, cost-sensitive applications
+
+### 3. Google Gemini 2.5 Pro (Premium Reasoning)
+**Token Counting**: Exact (uses Gemini's native `count_tokens()`)
+**Pricing** (per 1M tokens):
+- Input: $1.25
+- Output: $10.00
+**Use Case**: Complex reasoning, multimodal tasks
+
+### 4. Kimi AI
 **Token Counting**: Exact (uses tiktoken with cl100k_base encoding)
 **Pricing** (per 1M tokens):
-- Input: $0.10 (adjust if you know exact pricing)
-- Output: $0.40 (adjust if you know exact pricing)
+- Input: $0.10
+- Output: $0.40
+**Use Case**: Cost-effective alternative, similar to Gemini Lite
 
-**Note**: Kimi pricing is estimated. Update in `backend/file_organizer/token_counter.py` if you have exact pricing.
-
-### 3. Mistral AI (open-mixtral-8x22b)
+### 5. Mistral AI Large (open-mixtral-8x22b)
 **Token Counting**: Exact (uses tiktoken with cl100k_base encoding)
 **Pricing** (per 1M tokens):
 - Input: $2.00
 - Output: $6.00
+**Use Case**: Large model with strong performance, mid-high tier pricing
 
-**Note**: Mistral pricing based on official pricing page. open-mixtral-8x22b is their large model.
+### 6. Anthropic Claude 4 Opus (Premium)
+**Token Counting**: Exact (uses tiktoken)
+**Pricing** (per 1M tokens):
+- Input: $15.00
+- Output: $75.00
+**Use Case**: Enterprise-grade, top performance (most expensive)
 
-### 4. OpenAI GPT-4
+### 7. Anthropic Claude 3.5 Haiku (Budget)
+**Token Counting**: Exact (uses tiktoken)
+**Pricing** (per 1M tokens):
+- Input: $0.80
+- Output: $4.00
+**Use Case**: Lower-cost Claude variant
+
+### 8. OpenAI GPT-4
 **Token Counting**: Exact (uses tiktoken)
 **Pricing** (per 1M tokens):
 - Input: $0.50
@@ -97,12 +124,29 @@ pricing = {
 }
 ```
 
+## Cost Comparison (Typical File Organization Request)
+
+For organizing 100 files with ~10K input tokens and ~2K output tokens:
+
+| Provider | Input Cost | Output Cost | Total Cost | Relative Cost |
+|----------|-----------|-------------|------------|---------------|
+| **Gemini Lite** | $0.001 | $0.0008 | **$0.0018** | 1x (cheapest) |
+| **Kimi AI** | $0.001 | $0.0008 | **$0.0018** | 1x |
+| **Gemini Flash** | $0.003 | $0.005 | **$0.008** | 4.4x |
+| **Claude Haiku** | $0.008 | $0.008 | **$0.016** | 8.9x |
+| **Mistral Large** | $0.020 | $0.012 | **$0.032** | 17.8x |
+| **OpenAI GPT-4** | $0.005 | $0.003 | **$0.008** | 4.4x |
+| **Gemini Pro** | $0.0125 | $0.020 | **$0.0325** | 18.1x |
+| **Claude Opus** | $0.150 | $0.150 | **$0.300** | 166.7x (most expensive) |
+
+**Recommendation**: For file organization, **Gemini Lite** or **Kimi** offer the best value. Gemini Flash is a good balance if you need better quality.
+
 ## Token Counting Methods
 
 ### Exact Counting
 - **Gemini**: Uses `model.count_tokens()` - 100% accurate
-- **Kimi**: Uses tiktoken - 100% accurate for OpenAI-compatible models
-- **OpenAI**: Uses tiktoken - 100% accurate
+- **Kimi/Mistral**: Uses tiktoken - 100% accurate for OpenAI-compatible models
+- **Claude/OpenAI**: Uses tiktoken - 100% accurate
 
 ### Estimated Counting
 If exact counting fails or provider is unknown:
