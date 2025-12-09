@@ -65,8 +65,8 @@ class TokenCounter:
                         except Exception as e:
                             logger.debug(f"Gemini token counting failed: {e}")
             
-            elif provider == 'kimi':
-                # Kimi uses OpenAI-compatible API
+            elif provider in ['kimi', 'mistral']:
+                # Kimi and Mistral use OpenAI-compatible API
                 # Try to use tiktoken for OpenAI-compatible models
                 try:
                     import tiktoken
@@ -145,6 +145,11 @@ class TokenCounter:
                 'input': 0.10,    # Kimi pricing (adjust if you know exact pricing)
                 'output': 0.40,   # Kimi pricing (adjust if you know exact pricing)
                 'name': 'Kimi AI'
+            },
+            'mistral': {
+                'input': 2.00,    # Mistral open-mixtral-8x22b pricing
+                'output': 6.00,   # Mistral open-mixtral-8x22b pricing
+                'name': 'Mistral AI'
             },
             'openai': {
                 'input': 0.50,    # GPT-4 pricing

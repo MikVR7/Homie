@@ -30,8 +30,8 @@ class AIModelWrapper:
     
     def generate_content(self, prompt: str) -> AIResponse:
         """Generate content using the configured AI provider"""
-        if self.provider == 'kimi':
-            # Kimi uses OpenAI-compatible API
+        if self.provider in ['kimi', 'mistral']:
+            # Kimi and Mistral use OpenAI-compatible API
             response = self.model.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
@@ -97,7 +97,7 @@ class SharedServices:
             }
             
             # Get AI provider and API key
-            self._ai_provider = os.getenv('AI_PROVIDER', 'gemini').lower()  # 'gemini' or 'kimi'
+            self._ai_provider = os.getenv('AI_PROVIDER', 'gemini').lower()  # 'gemini', 'kimi', or 'mistral'
             
             if self._ai_provider == 'kimi':
                 self._ai_api_key = os.getenv('KIMI_API_KEY')
@@ -106,6 +106,13 @@ class SharedServices:
                 else:
                     masked_key = f"{self._ai_api_key[:8]}...{self._ai_api_key[-4:]}"
                     logger.info(f"🔑 Kimi AI API key loaded: {masked_key}")
+            elif self._ai_provider == 'mistral':
+                self._ai_api_key = os.getenv('MISTRAL_API_KEY')
+                if not self._ai_api_key:
+                    logger.warning("⚠️ MISTRAL_API_KEY not found in environment")
+                else:
+                    masked_key = f"{self._ai_api_key[:8]}...{self._ai_api_key[-4:]}"
+                    logger.info(f"🔑 Mistral AI API key loaded: {masked_key}")
             else:  # default to gemini
                 self._ai_api_key = os.getenv('GEMINI_API_KEY')
                 if not self._ai_api_key:
@@ -174,6 +181,8 @@ class SharedServices:
             
             if self._ai_provider == 'kimi':
                 self._initialize_kimi()
+            elif self._ai_provider == 'mistral':
+                self._initialize_mistral()
             else:
                 self._initialize_gemini()
             
@@ -240,6 +249,30 @@ class SharedServices:
             self._ai_model = None
         except Exception as e:
             logger.error(f"❌ Error initializing Kimi AI: {e}")
+            self._ai_model = None
+    
+    def _initialize_mistral(self):
+        """Initialize Mistral AI service (OpenAI-compatible API)"""
+        try:
+            from openai import OpenAI
+            
+            # Mistral uses OpenAI-compatible API
+            base_url = os.getenv('MISTRAL_BASE_URL', 'https://api.mistral.ai/v1')
+            model_name = os.getenv('MISTRAL_MODEL', 'open-mixtral-8x22b')
+            
+            client = OpenAI(
+                api_key=self._ai_api_key,
+                base_url=base_url
+            )
+            self._ai_model = AIModelWrapper('mistral', client, model_name)
+            self._current_model_name = model_name
+            logger.info(f"🤖 Mistral AI service configured with {model_name}")
+            
+        except ImportError:
+            logger.error("❌ openai package not installed. Run: pip install openai")
+            self._ai_model = None
+        except Exception as e:
+            logger.error(f"❌ Error initializing Mistral AI: {e}")
             self._ai_model = None
     
     def _discover_and_select_model(self):

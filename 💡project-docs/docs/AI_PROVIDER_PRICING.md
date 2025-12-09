@@ -19,7 +19,15 @@ The token counter automatically detects which AI provider you're using and appli
 
 **Note**: Kimi pricing is estimated. Update in `backend/file_organizer/token_counter.py` if you have exact pricing.
 
-### 3. OpenAI GPT-4
+### 3. Mistral AI (open-mixtral-8x22b)
+**Token Counting**: Exact (uses tiktoken with cl100k_base encoding)
+**Pricing** (per 1M tokens):
+- Input: $2.00
+- Output: $6.00
+
+**Note**: Mistral pricing based on official pricing page. open-mixtral-8x22b is their large model.
+
+### 4. OpenAI GPT-4
 **Token Counting**: Exact (uses tiktoken)
 **Pricing** (per 1M tokens):
 - Input: $0.50
