@@ -442,3 +442,59 @@
 ## Features
 - [ ] Password-Protected Archive Support: Implement password handling for encrypted archives (RAR, ZIP, 7Z, etc.). Features should include: 1) User prompt to enter password when encrypted archive is detected, 2) Password manager to store and reuse previously entered passwords, 3) UI to select/click saved passwords, 4) Auto-try known passwords option ("Try one of the already known passwords") that attempts all saved passwords before prompting user, 5) Only show password prompt if none of the saved passwords work. This will allow metadata extraction from encrypted archives. (2025-11-26)
   - Context: Currently encrypted archives are skipped during metadata extraction. Users need ability to provide passwords to extract archive contents for better AI organization suggestions.
+
+## Edge Case Testing (2025-12-02)
+
+### High Priority Edge Cases
+- [ ] **Nested Archives**: Test archive.zip → backup.rar → source.7z → code.tar.gz → files (recursive unpacking, infinite loop prevention)
+- [ ] **Duplicate Content in Archives**: Movie.mkv (5GB) + Movie.rar (5GB, same content) - should detect and delete redundant archive
+- [ ] **Special Characters in Filenames**: Test @#$%^&*()[]{}|<>'"\ characters, ensure no path construction failures
+- [ ] **Project Recognition**: V2K_logo.png should go to existing Projects/V2K/ folder (case-insensitive matching)
+- [ ] **TV Series Naming Variations**: S01E01, 1x01, 01x01, [GROUP] Show - 01 formats - all should be recognized as same series
+- [ ] **Very Long Filenames**: 300+ character filenames, test truncation and filesystem limits
+- [ ] **Unicode/Emoji Filenames**: 文档.pdf, документ.docx, 📄Important🔥.pdf - ensure no corruption
+- [ ] **Exact Duplicates**: Same file with different names (hash-based detection), keep best name
+- [ ] **Large Files**: 50GB+ videos, ensure no memory issues or timeouts
+- [ ] **Interrupted Operations**: Kill process mid-organization, verify no data loss or corruption
+
+### Medium Priority Edge Cases
+- [ ] **Corrupted Archives**: Test corrupted.zip + valid_backup.7z - should use valid backup
+- [ ] **Mixed Content Archives**: random_stuff.zip with photos, docs, videos, music - extract and organize by type
+- [ ] **Ambiguous Filenames**: IMG_1234.jpg, Document.pdf, Untitled.txt - use content analysis, not just filename
+- [ ] **Similar but Different Files**: photo.jpg, photo_edited.jpg, photo_resized.jpg - keep all, don't mark as duplicates
+- [ ] **Same Content Different Formats**: document.pdf, document.docx, document.txt - keep all formats
+- [ ] **Project Archive**: MyProject.zip with package.json, src/, node_modules/ - extract to Projects/MyProject/ keeping structure
+- [ ] **Movie with Extras**: Movie.mkv + Movie.srt + Movie.nfo + Behind_The_Scenes.mkv - keep all together
+- [ ] **Music Album**: 01-Song.mp3, 02-Song.mp3, cover.jpg - keep together, extract ID3 tags
+- [ ] **Invoice Detection**: Analyze PDF content to detect invoices/contracts/receipts, organize by type
+- [ ] **Scanned Documents**: scan001.jpg (invoice) vs scan004.jpg (photo) - differentiate using OCR
+- [ ] **Nested Source Files**: Downloads/subfolder1/subfolder2/file.pdf - scan recursively
+- [ ] **Symlinks**: real_file.pdf + link_to_file.pdf (symlink) - don't duplicate
+- [ ] **Cross-Drive Moves**: USB → Internal drive, use copy+delete if move fails
+- [ ] **Read-Only Files**: Test locked/read-only files, request permissions or skip gracefully
+- [ ] **Hidden Files**: .hidden_file, .DS_Store, Thumbs.db - skip system files, handle user hidden files
+- [ ] **10,000+ Files**: Test large batches, ensure no timeout, provide progress, allow cancellation
+
+### Advanced Edge Cases
+- [ ] **Ambiguous Project Match**: Project_file.txt when Projects/Project/, Projects/ProjectX/, Projects/MyProject/ exist
+- [ ] **Multi-Language Content**: document_en.pdf, document_de.pdf - detect language, organize appropriately
+- [ ] **Temporal Organization**: Q1_Report_2024.pdf, January_2024_Invoice.pdf - extract dates, organize by time
+- [ ] **Disk Full During Operation**: Detect space before starting, stop gracefully if disk fills
+- [ ] **Network Drive Disconnection**: Detect disconnection, don't lose files, retry or fail gracefully
+- [ ] **Conflicting Signals**: Work_Personal_Photo_Document.pdf - prioritize most specific category
+- [ ] **Very Large File Count**: 50,000+ files, test memory usage and performance
+- [ ] **Archive with Additional Files**: Movie.rar contains movie + subtitles + NFO - extract all, keep together
+- [ ] **Password-Protected Nested Archive**: Outer archive OK, inner archive password-protected
+
+### Test Verification Checklist
+For each test case verify:
+- [ ] No data loss
+- [ ] No file corruption  
+- [ ] Appropriate error messages
+- [ ] Clear logging
+- [ ] Acceptable performance
+- [ ] Reasonable memory usage
+- [ ] Can be cancelled safely
+- [ ] Colors assigned correctly
+- [ ] Existing destinations reused
+- [ ] AI suggestions make sense

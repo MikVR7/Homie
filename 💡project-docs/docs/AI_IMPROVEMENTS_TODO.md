@@ -191,6 +191,7 @@ Not huge, but every bit helps!
 3. **Max_tokens limit** - Set to 500 to prevent runaway costs
 4. **Finish_reason logging** - Tracks response completion status
 5. **Error type detection** - Parses specific error codes from AI providers
+6. **Ebook detection** - AI now recognizes PDFs with title/author/page_count as ebooks and suggests proper naming
 
 ### 🔄 In Progress
 6. **Prompt optimization** - Ongoing refinement of prompt structure

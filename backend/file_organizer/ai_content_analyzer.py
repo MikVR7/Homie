@@ -346,12 +346,17 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
-    def _build_prompt_for_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> str:
+    def _build_prompt_for_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> Dict[str, Any]:
         """
         Build the AI prompt for batch analysis WITHOUT sending it to AI.
-        Used for token counting before actual analysis.
+        Used for token counting and by analyze_files_batch.
         
-        Returns the exact prompt string that would be sent to the AI.
+        Returns dict with:
+            - prompt: The complete prompt string
+            - source_folders: List of source folder paths (for response parsing)
+            - dest_folders: List of destination folder paths (for response parsing)
+            - file_list_for_ai: List of file entries sent to AI (for response parsing)
+            - files_by_folder: Dict of files grouped by folder (for logging)
         """
         # This is the same logic as analyze_files_batch but only builds the prompt
         # We'll extract the prompt building logic here
@@ -504,11 +509,17 @@ METADATA KEYS:
 - img: date_taken, camera_model, location (organize by event/trip)
 - vid: duration, width, height (movies vs clips)
 - aud: artist, album, genre (music organization)
-- doc: title, author, created (invoices by company)
+- doc: title, author, created, page_count (ebooks vs documents)
 - archive: files[], type, exe (project detection)
 - code: language (organize by tech stack)
 
 Use metadata when available, prefer over filename guessing.
+
+EBOOK DETECTION:
+- PDFs with title + author + page_count (>50 pages) → likely ebook
+- Suggest destination: "eBooks" or "Books" (not generic "Documents")
+- Rename to: "[Title] - [Author].pdf" (clean, readable format)
+- Example: "46i6iryjdhfsgsd_sanet.st.pdf" with title="Open Circuits", author="Eric Schlaepfer & Windell H. Oskay" → rename to "Open Circuits - Eric Schlaepfer & Windell H. Oskay.pdf"
 """
         
         # Build granularity rules
@@ -621,7 +632,13 @@ COMMON PATTERNS:
 NO "reason" field - reasons are generated separately on-demand
 """
         
-        return prompt
+        return {
+            'prompt': prompt,
+            'source_folders': source_folders,
+            'dest_folders': dest_folders,
+            'file_list_for_ai': file_list_for_ai,
+            'files_by_folder': files_by_folder
+        }
     
     def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> Dict[str, Any]:
         """
@@ -654,321 +671,25 @@ NO "reason" field - reasons are generated separately on-demand
             return {'success': True, 'results': {}}
         
         try:
-            # STEP 1: Detect archives and analyze their contents
-            archives_info = {}
-            for fp in file_paths:
-                if Path(fp).suffix.lower() in ['.rar', '.zip', '.7z']:
-                    archive_content = self._quick_archive_peek(fp)
-                    archives_info[fp] = archive_content
-            
-            # STEP 2: Build compact file list for AI with relative paths grouped by folder
-            
-            # Calculate common root path for optimization
-            root_path = source_path if source_path else None
-            if root_path:
-                root_path = str(Path(root_path).resolve())
-            
-            # Group files by their parent folder
-            files_by_folder = {}
-            
-            for fp in file_paths:
-                # Use relative path if source_path provided
-                if root_path:
-                    try:
-                        rel_path = Path(fp).relative_to(root_path)
-                        folder = str(rel_path.parent) if str(rel_path.parent) != '.' else '.'
-                        filename = rel_path.name
-                    except ValueError:
-                        # File not under root, use full path
-                        folder = '.'
-                        filename = fp
-                else:
-                    folder = '.'
-                    filename = fp
-                
-                if folder not in files_by_folder:
-                    files_by_folder[folder] = []
-                
-                # Compact format: {"file": "name", "size": MB, "meta": {...}}
-                file_info = {'file': filename}
-                
-                # Add file size (always useful for AI decisions)
-                try:
-                    if os.path.exists(fp):
-                        size_bytes = os.path.getsize(fp)
-                        size_mb = round(size_bytes / (1024 * 1024), 1)
-                        file_info['size'] = size_mb  # Size in MB
-                except Exception as e:
-                    logger.debug(f"Could not get size for {fp}: {e}")
-                
-                # Build metadata object only if there's actual metadata
-                meta = {}
-                
-                # Add archive content info if available
-                if fp in archives_info:
-                    meta['archive'] = archives_info[fp]
-                
-                # Add metadata if provided by frontend
-                if files_metadata and fp in files_metadata:
-                    metadata = files_metadata[fp]
-                    if metadata:
-                        # Override size if provided by frontend
-                        if 'size' in metadata:
-                            size_mb = round(metadata['size'] / (1024 * 1024), 1)
-                            file_info['size'] = size_mb
-                        # Add type-specific metadata (only non-null values, exclude format)
-                        if 'image' in metadata and metadata['image']:
-                            meta['img'] = {k: v for k, v in metadata['image'].items() if v is not None and k != 'format'}
-                        
-                        elif 'video' in metadata and metadata['video']:
-                            meta['vid'] = {k: v for k, v in metadata['video'].items() if v is not None and k != 'format'}
-                        
-                        elif 'audio' in metadata and metadata['audio']:
-                            meta['aud'] = {k: v for k, v in metadata['audio'].items() if v is not None and k != 'format'}
-                        
-                        elif 'document' in metadata and metadata['document']:
-                            meta['doc'] = {k: v for k, v in metadata['document'].items() if v is not None}
-                        
-                        elif 'archive' in metadata and metadata['archive']:
-                            arch = metadata['archive']
-                            # Override with frontend metadata if available
-                            if 'contents' in arch and arch['contents']:
-                                meta['archive'] = {
-                                    'files': arch['contents'][:5],  # First 5 files
-                                    'type': arch.get('detected_project_type'),
-                                    'exe': arch.get('contains_executables')
-                                }
-                        
-                        elif 'source_code' in metadata and metadata['source_code']:
-                            meta['code'] = {k: v for k, v in metadata['source_code'].items() if v is not None}
-                
-                # Only add meta if it has content
-                if meta:
-                    file_info['meta'] = meta
-                
-                files_by_folder[folder].append(file_info)
-            
-            # Build context-aware prompt with known destinations and drives
-            context_section = ""
-            
-            # Add AI context (known destinations and drives) if provided
-            if ai_context:
-                context_section = f"""
-{ai_context}
-
-IMPORTANT: You have access to known destinations above!
-- When a file matches a known destination category, return the FULL PATH to that destination
-- Example: If "Images" destination is "/home/user/Pictures", return "/home/user/Pictures" not just "Images"
-- You can also create subfolders within known destinations if needed
-- Choose based on drive availability, space, and usage frequency
-- Only suggest new folders under the destination root if no suitable known destination exists
-"""
-            
-            # Existing folders context - removed, AI can see destinations already
-            
-            # Granularity rule - removed, AI should decide based on context
-            # If files are already in a folder, AI will naturally add another layer
-            # If organizing from scratch, AI will choose appropriate level
-            
-            # Check if any archives exist
-            has_archives = bool(archives_info)
-            archive_handling_rules = ""
-            
-            if has_archives:
-                archive_handling_rules = """
-
-ARCHIVE HANDLING:
-- Only unpack archives if it makes sense (e.g., projects, mixed content that should be organized separately)
-- Keep archives packed if they're complete units (e.g., game installers, software packages, backup archives)
-- If unpacking: detect garbage files (.DS_Store, Thumbs.db, *.tmp, *.cache) → action: "delete"
-- If unpacking: clean filenames with garbage prefixes (LSJF8089_, IMG_20250115_, Copy_of_) → action: "rename"
-- Projects in archives: Keep project files together, extract to single project folder
-
-PROJECT CONTEXT AWARENESS:
-- Check known destinations for project names
-- Match files to projects by name patterns (e.g., "V2K_test_image.jpg" → V2K project)
-- Suggest organizing related files near their projects
-- Example: If "V2K" project exists at /Projects/V2K/, put "V2K_logo.png" in /Projects/V2K/assets/
-- Don't mess up project structure - add to appropriate subfolder (assets/, docs/, etc.)
-
-FILENAME CLEANING:
-- LSJF8089MyDiary.pdf → MyDiary.pdf
-- Copy_of_document.pdf → document.pdf
-- document (1).pdf → document.pdf
-- IMG_20250115_143022.jpg → keep (or use EXIF date if available)
-"""
-            
-            # Build metadata context section
-            metadata_context = ""
-            has_metadata = any(
-                'meta' in file_info
-                for folder_files in files_by_folder.values()
-                for file_info in folder_files
+            # Build prompt using shared method (DRY principle)
+            prompt_data = self._build_prompt_for_batch(
+                file_paths=file_paths,
+                existing_folders=existing_folders,
+                ai_context=ai_context,
+                files_metadata=files_metadata,
+                source_path=source_path,
+                granularity=granularity
             )
             
-            if has_metadata:
-                metadata_context = """
-METADATA KEYS:
-- img: date_taken, camera_model, location (organize by event/trip)
-- vid: duration, width, height (movies vs clips)
-- aud: artist, album, genre (music organization)
-- doc: title, author, created (invoices by company)
-- archive: files[], type, exe (project detection)
-- code: language (organize by tech stack)
-
-Use metadata when available, prefer over filename guessing.
-"""
+            # Extract data from prompt builder
+            prompt = prompt_data['prompt']
+            source_folders = prompt_data['source_folders']
+            dest_folders = prompt_data['dest_folders']
+            file_list_for_ai = prompt_data['file_list_for_ai']
+            files_by_folder = prompt_data['files_by_folder']
             
-            # Add root path context if using relative paths
-            root_context = ""
-            total_files = sum(len(files) for files in files_by_folder.values())
-            if root_path:
-                root_context = f"""
-SOURCE ROOT: {root_path}
-(Files grouped by subfolder below)
-"""
+            total_files = len(file_paths)
             
-            # Build indexed lists for compact response
-            source_folders = []
-            dest_folders = []
-            file_list_for_ai = []
-            
-            # Collect unique source folders
-            for folder in sorted(files_by_folder.keys()):
-                full_folder = str(Path(root_path) / folder) if root_path and folder != '.' else (root_path if folder == '.' else folder)
-                if full_folder not in source_folders:
-                    source_folders.append(full_folder)
-            
-            # Collect destination folders from context
-            if ai_context:
-                # Extract destination paths from context
-                import re
-                dest_pattern = r'(/[^\s]+)\s+\(drive:'
-                for match in re.finditer(dest_pattern, ai_context):
-                    dest_path = match.group(1)
-                    if dest_path not in dest_folders:
-                        dest_folders.append(dest_path)
-            
-            # Build file list with source folder indices
-            for folder in sorted(files_by_folder.keys()):
-                src_folder_idx = source_folders.index(str(Path(root_path) / folder) if root_path and folder != '.' else (root_path if folder == '.' else folder))
-                for file_info in files_by_folder[folder]:
-                    file_entry = {
-                        'file': file_info['file'],
-                        'src': src_folder_idx,
-                        'size': file_info.get('size')
-                    }
-                    if 'meta' in file_info:
-                        file_entry['meta'] = file_info['meta']
-                    file_list_for_ai.append(file_entry)
-            
-            # Build granularity instructions based on level
-            if granularity == 1:
-                granularity_rules = """
-ORGANIZATION LEVEL: BROAD (Level 1)
-- Use ONLY broad categories: "Documents", "Images", "Videos", "Projects", "Software", "Music", "Archives"
-- Group similar files together - don't create specific subfolders
-- Projects go in "Projects" folder (e.g., "Projects/V2K")
-- Keep it simple - user will add detail later if needed
-"""
-            elif granularity == 2:
-                granularity_rules = """
-ORGANIZATION LEVEL: BALANCED (Level 2)
-- Use broad categories with some specificity when clear patterns emerge
-- Examples: "Documents/Finance", "Images/Personal", "Projects/V2K", "Videos/Movies"
-- Only add subfolder if there's a clear grouping (e.g., multiple invoices → Finance)
-- Don't over-categorize - balance between broad and specific
-"""
-            else:  # granularity == 3
-                granularity_rules = """
-ORGANIZATION LEVEL: DETAILED (Level 3)
-- Create specific subfolders for clear organization
-- Examples: "Documents/Finance/Invoices", "Images/Personal/Family", "Projects/V2K/Assets"
-- Group by type, date, project, or topic as appropriate
-- Maximize organization for easy retrieval
-"""
-            
-            granularity_rules += """
-GENERAL RULES:
-- NO underscores in folder names (use spaces or single words)
-- Projects should always go under "Projects" parent folder
-- Keep folder names clear and intuitive
-"""
-            
-            # Build action type mapping
-            action_types = ["move", "rename", "unpack", "delete"]
-            
-            prompt = f"""Analyze {total_files} files and suggest organization.
-
-SOURCE FOLDERS:
-{json.dumps(source_folders, indent=2)}
-
-DESTINATION FOLDERS:
-{json.dumps(dest_folders, indent=2)}
-
-ACTION TYPES:
-{json.dumps(action_types, indent=2)}
-
-{context_section}
-
-{metadata_context}
-
-{granularity_rules}
-
-{archive_handling_rules}
-
-FILES:
-{json.dumps(file_list_for_ai, indent=2)}
-
-Return ONLY valid JSON using indices:
-{{
-  "results": [
-    {{
-      "file": 0,
-      "actions": [
-        {{"type": 0, "dest": 1}}
-      ]
-    }},
-    {{
-      "file": 5,
-      "actions": [
-        {{"type": 1, "new_name": "report.pdf"}},
-        {{"type": 0, "dest": 1, "subfolder": "Documents"}}
-      ]
-    }},
-    {{
-      "file": 8,
-      "actions": [
-        {{"type": 2, "dest": 1, "subfolder": "Projects/MyProject"}},
-        {{"type": 3}}
-      ]
-    }},
-    {{
-      "file": 10,
-      "actions": [
-        {{"type": 3}}
-      ]
-    }}
-  ]
-}}
-
-RESPONSE FORMAT:
-- file: index from FILES list (integer)
-- actions: array of actions to perform IN ORDER
-  - type: index from ACTION TYPES (0=move, 1=rename, 2=unpack, 3=delete)
-  - dest: index from DESTINATION FOLDERS (for move/unpack)
-  - subfolder: optional subfolder path under destination
-  - new_name: new filename (for rename only)
-
-COMMON PATTERNS:
-- Simple move: [{{"type": 0, "dest": 1}}]
-- Rename + move: [{{"type": 1, "new_name": "..."}}, {{"type": 0, "dest": 1}}]
-- Unpack + delete: [{{"type": 2, "dest": 1}}, {{"type": 3}}]
-- Just delete: [{{"type": 3}}]
-
-NO "reason" field - reasons are generated separately on-demand
-"""
-
             # Log to terminal (clean summary)
             CYAN = '\033[96m'
             RESET = '\033[0m'

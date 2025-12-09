@@ -1141,7 +1141,7 @@ def register_file_organizer_routes(app, web_server):
             analyzer = AIContentAnalyzer(shared_services=shared_services)
             
             # Call internal method to build prompt (without sending to AI)
-            prompt = analyzer._build_prompt_for_batch(
+            prompt_data = analyzer._build_prompt_for_batch(
                 file_paths,
                 existing_folders=[],
                 ai_context=ai_context_text,
@@ -1152,7 +1152,7 @@ def register_file_organizer_routes(app, web_server):
             
             # Count input tokens using actual prompt
             counter = TokenCounter(shared_services)
-            input_count = counter.count_tokens(prompt)
+            input_count = counter.count_tokens(prompt_data['prompt'])
             
             # Estimate output tokens (indexed format: ~10 tokens per file)
             estimated_output = len(file_paths) * 10
