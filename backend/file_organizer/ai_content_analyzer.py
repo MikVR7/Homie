@@ -462,12 +462,19 @@ class AIContentAnalyzer:
             context_section = f"""
 {ai_context}
 
-IMPORTANT: You have access to known destinations above!
-- When a file matches a known destination category, return the FULL PATH to that destination
-- Example: If "Images" destination is "/home/user/Pictures", return "/home/user/Pictures" not just "Images"
-- You can also create subfolders within known destinations if needed
-- Choose based on drive availability, space, and usage frequency
-- Only suggest new folders under the destination root if no suitable known destination exists
+CRITICAL: USE EXISTING DESTINATIONS FIRST!
+- ALWAYS check if a file type matches an existing destination
+- For images: Use ImagesSorted destination (dest index from DESTINATION FOLDERS list)
+- For documents: Use main Destination folder (dest index from DESTINATION FOLDERS list)
+- DO NOT create "Documents" subfolder if main destination exists
+- DO NOT create "Images" subfolder if ImagesSorted destination exists
+- Only create subfolders for specific organization (like "Projects/V2K")
+
+CONCRETE EXAMPLES with current destinations:
+- Image file → {{"type": 0, "dest": 1}} (use ImagesSorted directly)
+- Document file → {{"type": 0, "dest": 0}} (use Destination directly, NO "Documents" subfolder)
+- Project file → {{"type": 0, "dest": 0, "subfolder": "Projects/V2K"}} (subfolder OK for projects)
+- Software file → {{"type": 0, "dest": 0, "subfolder": "Software"}} (subfolder OK for software)
 """
         
         has_archives = bool(archives_info)
