@@ -94,15 +94,10 @@ class FileWithMetadata(BaseModel):
 class OrganizeRequest(BaseModel):
     """
     Request model for /api/file-organizer/organize endpoint.
-    
-    Supports both legacy format (files as string array) and new format (files with metadata).
     """
-    # Legacy format support
-    files: Optional[List[str]] = Field(None, description="Legacy: Array of file paths as strings")
-    
-    # New format with metadata
+    # File formats
     file_paths: Optional[List[str]] = Field(None, description="Array of file paths (without metadata)")
-    files_with_metadata: Optional[List[FileWithMetadata]] = Field(None, description="New: Array of files with metadata")
+    files_with_metadata: Optional[List[FileWithMetadata]] = Field(None, description="Array of files with metadata")
     
     # Common fields
     source_path: str = Field(..., description="Source folder path")
@@ -116,7 +111,7 @@ class OrganizeRequest(BaseModel):
         Extract file list in a unified format.
         Returns list of dicts with 'path' and optional 'metadata' keys.
         """
-        # Priority 1: New format with metadata
+        # Priority 1: Files with metadata
         if self.files_with_metadata:
             return [
                 {
@@ -129,9 +124,5 @@ class OrganizeRequest(BaseModel):
         # Priority 2: file_paths array (no metadata)
         if self.file_paths:
             return [{'path': fp, 'metadata': None} for fp in self.file_paths]
-        
-        # Priority 3: Legacy format (files as strings)
-        if self.files:
-            return [{'path': fp, 'metadata': None} for fp in self.files]
         
         return []

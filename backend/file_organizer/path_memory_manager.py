@@ -71,7 +71,7 @@ class PathMemoryManager:
         self._drive_manager = DriveManager(self._db_path)
         logger.info("✅ DestinationMemoryManager and DriveManager initialized")
 
-        # Legacy DrivesManager (for backward compatibility)
+        # DrivesManager
         from .drives_manager import DrivesManager
 
         self._drives_manager = DrivesManager(event_bus=self.event_bus)

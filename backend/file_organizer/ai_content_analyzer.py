@@ -290,7 +290,7 @@ class AIContentAnalyzer:
                 # _analyze_with_ai now always returns a dict with 'success' field
                 return ai_result
             
-            # Non-AI path remains for legacy or specific calls that disable AI.
+            # Non-AI path for specific calls that disable AI.
             if file_ext in ['.mkv', '.mp4', '.avi', '.mov', '.wmv']:
                 return self._analyze_video(file_name, file_path)
             elif file_ext in ['.pdf']:
@@ -826,40 +826,19 @@ NO "reason" field - reasons are generated separately on-demand
                             'type': 'delete'
                         })
                 
-                # Build result object with actions array
+                # Build result object with actions array only
                 file_result = {
                     'actions': processed_actions
                 }
-                
-                # For backward compatibility, also set legacy fields
-                # (frontend might still expect these)
-                if suggested_folder:
-                    file_result['suggested_folder'] = suggested_folder
-                if new_name:
-                    file_result['new_name'] = new_name
-                
-                # Set primary action for backward compatibility
-                # If there's a move action, prioritize that for legacy compatibility
-                primary_action = 'move'  # Default to move
-                if processed_actions:
-                    # Look for move action first (most important for frontend)
-                    move_action = next((a for a in processed_actions if a['type'] == 'move'), None)
-                    if move_action:
-                        primary_action = 'move'
-                    else:
-                        # No move action, use the first action
-                        primary_action = processed_actions[0]['type']
-                    
-                    file_result['action'] = primary_action
                 
                 results[file_path] = file_result
             
             # Log success to terminal
             logger.info(f"{GREEN}✅ AI analysis complete ({len(results)} results){RESET}")
             for file_path, file_result in results.items():
-                suggested_folder = file_result.get('suggested_folder', 'N/A')
-                action = file_result.get('action', 'move')
-                logger.debug(f"  {Path(file_path).name}: folder='{suggested_folder}', action='{action}'")
+                actions = file_result.get('actions', [])
+                action_summary = ', '.join([f"{a['type']}" for a in actions])
+                logger.debug(f"  {Path(file_path).name}: actions=[{action_summary}]")
             
             return {
                 'success': True,

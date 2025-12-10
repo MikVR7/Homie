@@ -57,8 +57,8 @@ def register_destination_routes(app, web_server):
             drive_manager = _get_drive_manager()
             
             if not dest_manager:
-                # Fallback to legacy method
-                logger.warning("Using legacy destination retrieval")
+                # Fallback method
+                logger.warning("Using fallback destination retrieval")
                 conn = web_server._get_file_organizer_db_connection()
                 try:
                     cursor = conn.execute("""
@@ -227,8 +227,8 @@ def register_destination_routes(app, web_server):
             dest_manager = _get_destination_manager()
             
             if not dest_manager:
-                # Fallback to legacy method
-                logger.warning("Using legacy destination deletion")
+                # Fallback method
+                logger.warning("Using fallback destination deletion")
                 conn = web_server._get_file_organizer_db_connection()
                 try:
                     conn.execute("DELETE FROM destination_mappings WHERE id = ?", (destination_id,))
@@ -375,37 +375,5 @@ def register_destination_routes(app, web_server):
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
-    # Legacy endpoint for backward compatibility
-    @app.route('/api/file-organizer/delete-destination', methods=['POST'])
-    def fo_delete_destination_legacy():
-        """Delete a saved destination (legacy endpoint)"""
-        try:
-            data = request.get_json(force=True, silent=True) or {}
-            destination_id = data.get('destination_id')
-            user_id = data.get('user_id', 'dev_user')
-            
-            if not destination_id:
-                return jsonify({'success': False, 'error': 'destination_id required'}), 400
-            
-            dest_manager = _get_destination_manager()
-            
-            if not dest_manager:
-                conn = web_server._get_file_organizer_db_connection()
-                try:
-                    conn.execute("DELETE FROM destination_mappings WHERE id = ?", (destination_id,))
-                    conn.commit()
-                    return jsonify({'success': True})
-                finally:
-                    conn.close()
-            
-            success = dest_manager.remove_destination(user_id, destination_id)
-            
-            if success:
-                return jsonify({'success': True})
-            else:
-                return jsonify({'success': False, 'error': 'Destination not found'}), 404
-                
-        except Exception as e:
-            logger.error(f"/delete-destination error: {e}", exc_info=True)
-            return jsonify({'success': False, 'error': str(e)}), 500
+
 
