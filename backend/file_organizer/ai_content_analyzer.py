@@ -839,8 +839,18 @@ NO "reason" field - reasons are generated separately on-demand
                     file_result['new_name'] = new_name
                 
                 # Set primary action for backward compatibility
+                # If there's a move action, prioritize that for legacy compatibility
+                primary_action = 'move'  # Default to move
                 if processed_actions:
-                    file_result['action'] = processed_actions[0]['type']
+                    # Look for move action first (most important for frontend)
+                    move_action = next((a for a in processed_actions if a['type'] == 'move'), None)
+                    if move_action:
+                        primary_action = 'move'
+                    else:
+                        # No move action, use the first action
+                        primary_action = processed_actions[0]['type']
+                    
+                    file_result['action'] = primary_action
                 
                 results[file_path] = file_result
             
