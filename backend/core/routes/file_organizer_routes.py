@@ -368,11 +368,30 @@ def register_file_organizer_routes(app, web_server):
         steps = []
         nested_plans = []
         
-        # Get AI suggested action and folder
-        action = file_result.get('action', 'move') if file_result else 'move'
-        suggested_folder = file_result.get('suggested_folder') if file_result else None
-        confidence = file_result.get('confidence', 0.5) if file_result else 0.0
-        extracted_files = file_result.get('extracted_files', {}) if file_result else {}
+        # Process actions array (new format)
+        action = 'move'  # Default
+        suggested_folder = None
+        confidence = 0.5
+        extracted_files = {}
+        
+        if file_result:
+            actions = file_result.get('actions', [])
+            confidence = file_result.get('confidence', 0.5)
+            extracted_files = file_result.get('extracted_files', {})
+            
+            # Find the primary action and destination
+            for act in actions:
+                if act.get('type') == 'move':
+                    action = 'move'
+                    suggested_folder = act.get('destination')
+                    break
+                elif act.get('type') == 'delete':
+                    action = 'delete'
+                    break
+                elif act.get('type') == 'unpack':
+                    action = 'unpack'
+                    suggested_folder = act.get('destination')
+                    break
         
         # Fallback to Uncategorized if AI didn't return a folder
         if not suggested_folder:
@@ -723,9 +742,37 @@ def register_file_organizer_routes(app, web_server):
                     })
                     continue
                 
-                # Get AI suggested action (move/delete/unpack)
-                action = file_result.get('action', 'move')
-                suggested_folder = file_result.get('suggested_folder', 'Other')
+                # Process actions array (new format)
+                actions = file_result.get('actions', [])
+                if not actions:
+                    # No actions - fallback to move to Uncategorized
+                    action = 'move'
+                    suggested_folder = 'Uncategorized'
+                else:
+                    # Find the primary action (move, delete, unpack)
+                    primary_action = None
+                    suggested_folder = None
+                    
+                    for act in actions:
+                        if act.get('type') == 'move':
+                            primary_action = act
+                            action = 'move'
+                            suggested_folder = act.get('destination', 'Uncategorized')
+                            break
+                        elif act.get('type') == 'delete':
+                            primary_action = act
+                            action = 'delete'
+                            break
+                        elif act.get('type') == 'unpack':
+                            primary_action = act
+                            action = 'unpack'
+                            suggested_folder = act.get('destination', 'Uncategorized')
+                            break
+                    
+                    # If no move/delete/unpack found, default to move
+                    if not primary_action:
+                        action = 'move'
+                        suggested_folder = 'Uncategorized'
                 
                 # Extract first step from plan for legacy format
                 first_step = file_plan['steps'][0]
