@@ -131,7 +131,7 @@ class WebServer:
                     'error': f'AI call failed after recovery: {str(retry_error)}'
                 }
     
-    def _batch_analyze_files(self, file_paths, use_ai=True, existing_folders=None, ai_context=None, files_metadata=None, source_path=None, granularity=1):
+    def _batch_analyze_files(self, file_paths, use_ai=True, existing_folders=None, ai_context=None, files_metadata=None, source_path=None, granularity=1, user_id="dev_user"):
         """
         SINGLE SOURCE OF TRUTH for batch file analysis.
         Both /organize and /analyze-content-batch call this method.
@@ -144,6 +144,7 @@ class WebServer:
             files_metadata: Optional dict mapping file paths to their metadata
             source_path: Optional source folder path (for relative path optimization)
             granularity: Organization granularity level (1=broad, 2=balanced, 3=detailed)
+            user_id: User ID for loading user-specific settings
         
         Returns: dict with 'success', 'results', 'ai_enabled', 'error' (if failed)
         """
@@ -160,7 +161,8 @@ class WebServer:
                 ai_context=ai_context,
                 files_metadata=files_metadata,
                 source_path=source_path,
-                granularity=granularity
+                granularity=granularity,
+                user_id=user_id  # Pass user_id for settings integration
             )
             
             if not batch_result.get('success'):
@@ -327,6 +329,7 @@ class WebServer:
         from core.routes.analysis_routes import register_analysis_routes
         from core.routes.operation_routes import register_operation_routes
         from core.routes.ai_routes import register_ai_routes
+        from core.routes.settings_routes import register_settings_routes
         
         # Register all route modules
         register_destination_routes(self.app, self)
@@ -335,6 +338,7 @@ class WebServer:
         register_analysis_routes(self.app, self)
         register_operation_routes(self.app, self)
         register_ai_routes(self.app, self)
+        register_settings_routes(self.app, self)
     
     def _setup_websocket_handlers(self):
         """Setup WebSocket event handlers"""

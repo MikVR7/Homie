@@ -371,6 +371,7 @@ def register_file_organizer_routes(app, web_server):
         # Process actions array (new format)
         action = 'move'  # Default
         suggested_folder = None
+        new_filename = None
         confidence = 0.5
         extracted_files = {}
         
@@ -379,19 +380,18 @@ def register_file_organizer_routes(app, web_server):
             confidence = file_result.get('confidence', 0.5)
             extracted_files = file_result.get('extracted_files', {})
             
-            # Find the primary action and destination
+            # Process ALL actions to find rename and primary action
             for act in actions:
-                if act.get('type') == 'move':
+                if act.get('type') == 'rename':
+                    new_filename = act.get('new_name')
+                elif act.get('type') == 'move':
                     action = 'move'
                     suggested_folder = act.get('destination')
-                    break
                 elif act.get('type') == 'delete':
                     action = 'delete'
-                    break
                 elif act.get('type') == 'unpack':
                     action = 'unpack'
                     suggested_folder = act.get('destination')
-                    break
         
         # Fallback to Uncategorized if AI didn't return a folder
         if not suggested_folder:
@@ -408,18 +408,21 @@ def register_file_organizer_routes(app, web_server):
         else:
             dest_base = dest_root / suggested_folder
         
+        # Determine final filename (use renamed filename if provided)
+        final_filename = new_filename if new_filename else f.name
+        
         # Preserve relative subfolder structure for nested files
         try:
             relative_path = f.relative_to(src_path)
             if len(relative_path.parts) > 1:
-                # File is in a subfolder - preserve the structure
-                dest_path = dest_base / relative_path
+                # File is in a subfolder - preserve the structure but use new filename
+                dest_path = dest_base / relative_path.parent / final_filename
             else:
                 # File is at root level
-                dest_path = dest_base / f.name
+                dest_path = dest_base / final_filename
         except ValueError:
             # File is not relative to source path
-            dest_path = dest_base / f.name
+            dest_path = dest_base / final_filename
         
         # Step 1: Primary action (move/delete/unpack)
         if action == 'delete':
@@ -448,17 +451,36 @@ def register_file_organizer_routes(app, web_server):
                 }
             })
         else:
-            # Regular move operation
+            # Regular move operation (possibly with rename)
             reason = file_result.get('reason', f'Matches {suggested_folder} category') if file_result else 'No AI analysis - defaulting to Uncategorized'
             if is_fallback:
                 reason = f'Low confidence categorization - {reason}'
             
+            step_order = 1
+            
+            # Step 1: Rename (if needed)
+            if new_filename and new_filename != f.name:
+                steps.append({
+                    'operation_id': f"{analysis_id}_op_{uuid.uuid4().hex[:8]}",
+                    'type': 'rename',
+                    'target_path': str(f.parent / new_filename),  # Rename in place first
+                    'reason': f'Clean filename: {f.name} → {new_filename}',
+                    'order': step_order,
+                    'metadata': {
+                        'old_name': f.name,
+                        'new_name': new_filename,
+                        'confidence': str(confidence)
+                    }
+                })
+                step_order += 1
+            
+            # Step 2: Move (always needed)
             steps.append({
                 'operation_id': f"{analysis_id}_op_{uuid.uuid4().hex[:8]}",
                 'type': 'move',
                 'target_path': str(dest_path),
                 'reason': reason,
-                'order': 1,
+                'order': step_order,
                 'metadata': {
                     'confidence': str(confidence),
                     'suggested_folder': suggested_folder,
@@ -686,7 +708,8 @@ def register_file_organizer_routes(app, web_server):
                 ai_context=ai_context_text,
                 files_metadata=files_metadata if org_request else None,
                 source_path=source_folder,
-                granularity=granularity
+                granularity=granularity,
+                user_id=user_id  # Pass user_id for settings integration
             )
             
             if not batch_result.get('success'):

@@ -23,6 +23,7 @@
 - **[TOKEN_ESTIMATION_SUMMARY.md](TOKEN_ESTIMATION_SUMMARY.md)** - Pre-request cost estimation
 - **[ACTION_ARRAYS_IMPLEMENTATION.md](ACTION_ARRAYS_IMPLEMENTATION.md)** - Multi-step file actions
 - **[ENHANCED_METADATA_SUPPORT.md](ENHANCED_METADATA_SUPPORT.md)** - Rich file metadata for AI
+- **[USER_SETTINGS_SYSTEM.md](USER_SETTINGS_SYSTEM.md)** - ✨ User preferences and custom templates
 
 ### Memory & Context
 - **[CENTRALIZED_MEMORY.md](CENTRALIZED_MEMORY.md)** - Destination and drive memory system

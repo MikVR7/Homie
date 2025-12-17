@@ -346,7 +346,7 @@ class AIContentAnalyzer:
                 'error': str(e)
             }
     
-    def _build_prompt_for_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> Dict[str, Any]:
+    def _build_prompt_for_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1, user_id: str = "dev_user") -> Dict[str, Any]:
         """
         Build the AI prompt for batch analysis WITHOUT sending it to AI.
         Used for token counting and by analyze_files_batch.
@@ -485,6 +485,8 @@ CONCRETE EXAMPLES with current destinations:
 ARCHIVE HANDLING:
 - Only unpack archives if it makes sense (e.g., projects, mixed content that should be organized separately)
 - Keep archives packed if they're complete units (e.g., game installers, software packages, backup archives)
+- DUPLICATE CONTENT: If you see both an archive AND its extracted content (same base name), prefer the extracted content and DELETE the archive
+- Example: "Movie.rar" + "Movie.mkv" → move Movie.mkv to Videos, delete Movie.rar
 - If unpacking: detect garbage files (.DS_Store, Thumbs.db, *.tmp, *.cache) → action: "delete"
 - If unpacking: clean filenames with garbage prefixes (LSJF8089_, IMG_20250115_, Copy_of_) → action: "rename"
 - Projects in archives: Keep project files together, extract to single project folder
@@ -503,6 +505,26 @@ FILENAME CLEANING:
 - IMG_20250115_143022.jpg → keep (or use EXIF date if available)
 """
         
+        # Load user file naming preferences
+        user_naming_prompt = ""
+        try:
+            from pathlib import Path
+            import sys
+            sys.path.append(str(Path(__file__).parent.parent))
+            from file_organizer.user_settings_manager import UserSettingsManager
+            
+            # Get database path - use default if shared services not available
+            if hasattr(self.shared_services, '_get_file_organizer_db_path'):
+                db_path = self.shared_services._get_file_organizer_db_path()
+            else:
+                db_path = 'backend/data/modules/homie_file_organizer.db'
+            
+            settings_manager = UserSettingsManager(db_path)
+            user_naming_prompt = settings_manager.generate_file_naming_prompt(user_id)
+        except Exception as e:
+            logger.warning(f"Could not load user settings: {e}")
+            user_naming_prompt = "Keep original file names unchanged."
+        
         metadata_context = ""
         has_metadata = any(
             'meta' in file_info
@@ -511,7 +533,7 @@ FILENAME CLEANING:
         )
         
         if has_metadata:
-            metadata_context = """
+            metadata_context = f"""
 METADATA KEYS:
 - img: date_taken, camera_model, location (organize by event/trip)
 - vid: duration, width, height (movies vs clips)
@@ -527,6 +549,9 @@ EBOOK DETECTION:
 - Suggest destination: "eBooks" or "Books" (not generic "Documents")
 - Rename to: "[Title] - [Author].pdf" (clean, readable format)
 - Example: "46i6iryjdhfsgsd_sanet.st.pdf" with title="Open Circuits", author="Eric Schlaepfer & Windell H. Oskay" → rename to "Open Circuits - Eric Schlaepfer & Windell H. Oskay.pdf"
+
+USER FILE NAMING PREFERENCES:
+{user_naming_prompt}
 """
         
         # Build granularity rules
@@ -647,7 +672,7 @@ NO "reason" field - reasons are generated separately on-demand
             'files_by_folder': files_by_folder
         }
     
-    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1) -> Dict[str, Any]:
+    def analyze_files_batch(self, file_paths: List[str], existing_folders: List[str] = None, ai_context: str = None, files_metadata: Dict[str, Dict] = None, source_path: str = None, granularity: int = 1, user_id: str = "dev_user") -> Dict[str, Any]:
         """
         Analyze multiple files in a single AI call (MUCH faster than individual calls).
         Returns only folder suggestions, no reasons (reasons generated on-demand).
@@ -685,7 +710,8 @@ NO "reason" field - reasons are generated separately on-demand
                 ai_context=ai_context,
                 files_metadata=files_metadata,
                 source_path=source_path,
-                granularity=granularity
+                granularity=granularity,
+                user_id=user_id
             )
             
             # Extract data from prompt builder
@@ -845,6 +871,11 @@ NO "reason" field - reasons are generated separately on-demand
             for file_path, file_result in results.items():
                 actions = file_result.get('actions', [])
                 action_summary = ', '.join([f"{a['type']}" for a in actions])
+                # Debug: Log actual destinations
+                for action in actions:
+                    if action.get('type') == 'move':
+                        dest = action.get('destination', 'NO_DEST')
+                        logger.info(f"🔍 {Path(file_path).name} → {dest}")
                 logger.debug(f"  {Path(file_path).name}: actions=[{action_summary}]")
             
             return {

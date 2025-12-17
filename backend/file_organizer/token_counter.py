@@ -157,9 +157,9 @@ class TokenCounter:
                 'name': 'Kimi AI'
             },
             'mistral': {
-                'input': 2.00,    # Mistral Large / open-mixtral-8x22b
-                'output': 6.00,
-                'name': 'Mistral AI Large'
+                'input': 0.10,    # Mistral open-mixtral-8x22b (same as Kimi)
+                'output': 0.40,
+                'name': 'Mistral AI (Mixtral 8x22B)'
             },
             'claude-opus': {
                 'input': 15.00,   # Claude 4 Opus (premium tier)
